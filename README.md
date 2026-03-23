@@ -17,6 +17,8 @@ npm run dev
 Puis ouvre `http://localhost:3000`.
 
 > 📋 Pour une mise en production étape par étape, utilise la checklist dédiée: **`PRODUCTION_CHECKLIST.md`**
+>
+> 🛟 Pour une migration sans perte (local -> infra publique), consulte: **`MIGRATION_GUIDE.md`**
 
 ### Parcours de test rapide
 1. Crée un compte client
