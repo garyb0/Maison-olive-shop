@@ -19,6 +19,8 @@ Puis ouvre `http://localhost:3000`.
 > 📋 Pour une mise en production étape par étape, utilise la checklist dédiée: **`PRODUCTION_CHECKLIST.md`**
 >
 > 🛟 Pour une migration sans perte (local -> infra publique), consulte: **`MIGRATION_GUIDE.md`**
+>
+> 🖥️ Pour héberger sur ton PC (Windows) de façon stable: **`LOCAL_HOSTING_RUNBOOK.md`**
 
 ### Parcours de test rapide
 1. Crée un compte client
