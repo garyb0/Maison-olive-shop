@@ -1,0 +1,172 @@
+// CRITICAL DATA SAFETY NOTE (FR/EN)
+// FR: Ne jamais supprimer ou altérer de façon destructive les données commandes/inventaire/utilisateurs.
+// EN: Never destructively delete or alter orders/inventory/user data.
+// Use soft workflows, audit logs, and transactions for critical mutations.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum UserRole {
+  CUSTOMER
+  ADMIN
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  MANUAL
+  STRIPE
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  firstName    String
+  lastName     String
+  role         UserRole  @default(CUSTOMER)
+  language     String    @default("fr")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  sessions Session[]
+  orders   Order[]
+  logs     AuditLog[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Product {
+  id            String   @id @default(cuid())
+  slug          String   @unique
+  nameFr        String
+  nameEn        String
+  descriptionFr String
+  descriptionEn String
+  imageUrl      String?
+  priceCents    Int
+  currency      String   @default("CAD")
+  stock         Int      @default(0)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  orderItems          OrderItem[]
+  inventoryMovements  InventoryMovement[]
+
+  @@index([isActive])
+  @@index([slug])
+}
+
+model Order {
+  id              String        @id @default(cuid())
+  orderNumber     String        @unique
+  userId          String
+  customerEmail   String
+  customerName    String
+  status          OrderStatus   @default(PENDING)
+  paymentStatus   PaymentStatus @default(PENDING)
+  paymentMethod   PaymentMethod @default(MANUAL)
+  paymentProvider String?
+  stripeSessionId String?       @unique
+  subtotalCents   Int
+  discountCents   Int           @default(0)
+  taxCents        Int
+  shippingCents   Int
+  refundedCents   Int           @default(0)
+  totalCents      Int
+  currency        String        @default("CAD")
+  shippingLine1   String?
+  shippingCity    String?
+  shippingRegion  String?
+  shippingPostal  String?
+  shippingCountry String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  user               User                @relation(fields: [userId], references: [id], onDelete: Restrict)
+  items              OrderItem[]
+  inventoryMovements InventoryMovement[]
+
+  @@index([userId, createdAt])
+  @@index([status])
+  @@index([paymentStatus])
+}
+
+model OrderItem {
+  id                    String   @id @default(cuid())
+  orderId               String
+  productId             String
+  quantity              Int
+  unitPriceCents        Int
+  lineTotalCents        Int
+  productNameSnapshotFr String
+  productNameSnapshotEn String
+  createdAt             DateTime @default(now())
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model InventoryMovement {
+  id             String   @id @default(cuid())
+  productId      String
+  orderId        String?
+  quantityChange Int
+  reason         String
+  createdAt      DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  order   Order?  @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@index([productId, createdAt])
+  @@index([orderId])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorUserId String?
+  action      String
+  entity      String
+  entityId    String
+  metadata    String?
+  createdAt   DateTime @default(now())
+
+  actor User? @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([entity, createdAt])
+  @@index([actorUserId, createdAt])
+}
