@@ -92,10 +92,26 @@ npm run dev          # Démarrage en mode développement
 npm run build        # Build de production
 npm run start        # Démarrage du serveur de production
 npm run lint         # Vérification du code
+npm run validate:env:dev   # Validation env en mode développement
+npm run validate:env:prod  # Validation env en mode production
+npm run validate      # validate:env:dev + lint + build
+npm run smoke         # Smoke checks API (health + protections admin)
 npm run prisma:generate  # Génération du client Prisma
 npm run prisma:migrate   # Exécution des migrations
 npm run prisma:studio    # Interface visuelle pour la DB
 ```
+
+## 🧪 Smoke checks rapides
+
+Avec l'app démarrée (`npm run dev` ou `npm run start`), exécute:
+
+```bash
+npm run smoke
+```
+
+Le script vérifie:
+- `/api/health` répond OK
+- `/api/admin/orders`, `/api/admin/customers`, `/api/admin/taxes` refusent sans session admin (401/403)
 
 ## 🔐 Variables d'Environnement
 

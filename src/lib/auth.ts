@@ -1,11 +1,11 @@
 import { cookies } from "next/headers";
 import { randomBytes } from "crypto";
 import bcrypt from "bcryptjs";
-import { env } from "@/lib/env";
+import { DEV_SESSION_SECRET, env } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 
 const ensureSessionSecret = () => {
-  if (process.env.NODE_ENV === "production" && env.sessionSecret === "dev-insecure-change-me") {
+  if (process.env.NODE_ENV === "production" && env.sessionSecret === DEV_SESSION_SECRET) {
     throw new Error("SESSION_SECRET_NOT_CONFIGURED");
   }
 };
