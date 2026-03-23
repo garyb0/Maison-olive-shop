@@ -1,5 +1,6 @@
 import { getTaxReport, taxReportToCsv } from "@/lib/admin";
 import { jsonError, jsonOk } from "@/lib/http";
+import { logApiEvent } from "@/lib/observability";
 import { requireAdmin } from "@/lib/permissions";
 
 const parseDate = (value: string | null) => {
@@ -20,6 +21,15 @@ export async function GET(request: Request) {
 
     if (format === "csv") {
       const csv = taxReportToCsv(report.orders);
+
+      logApiEvent({
+        level: "INFO",
+        route: "/api/admin/taxes",
+        event: "ADMIN_TAXES_EXPORT_CSV",
+        status: 200,
+        details: { orders: report.orders.length },
+      });
+
       return new Response(csv, {
         status: 200,
         headers: {
@@ -29,11 +39,36 @@ export async function GET(request: Request) {
       });
     }
 
+    logApiEvent({
+      level: "INFO",
+      route: "/api/admin/taxes",
+      event: "ADMIN_TAXES_FETCH_SUCCESS",
+      status: 200,
+      details: { orders: report.orders.length },
+    });
+
     return jsonOk(report);
   } catch (error) {
     if (error instanceof Error && error.message === "UNAUTHORIZED") {
+      logApiEvent({
+        level: "WARN",
+        route: "/api/admin/taxes",
+        event: "ADMIN_TAXES_UNAUTHORIZED",
+        status: 401,
+        details: { error },
+      });
+
       return jsonError("Unauthorized", 401);
     }
+
+    logApiEvent({
+      level: "WARN",
+      route: "/api/admin/taxes",
+      event: "ADMIN_TAXES_FORBIDDEN",
+      status: 403,
+      details: { error },
+    });
+
     return jsonError("Forbidden", 403);
   }
 }

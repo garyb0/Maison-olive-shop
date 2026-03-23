@@ -78,6 +78,19 @@ export function AdminClient({ language, t, orders, customers, taxSummary }: Prop
   const safeCustomerPage = Math.min(customerPage, customerTotalPages);
   const pagedCustomers = filteredCustomers.slice((safeCustomerPage - 1) * customerPageSize, safeCustomerPage * customerPageSize);
 
+  const clearOrderFilters = () => {
+    setStatusFilter("");
+    setPaymentFilter("");
+    setCustomerFilter("");
+    setOrderPage(1);
+  };
+
+  const clearCustomerFilters = () => {
+    setCustomerSearch("");
+    setRoleFilter("");
+    setCustomerPage(1);
+  };
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -192,6 +205,10 @@ export function AdminClient({ language, t, orders, customers, taxSummary }: Prop
             <option value="20">20</option>
             <option value="50">50</option>
           </select>
+
+          <button className="btn" onClick={clearOrderFilters}>
+            {language === "fr" ? "Réinitialiser filtres" : "Reset filters"}
+          </button>
         </div>
 
         <div className="row" style={{ marginBottom: 10, gap: 8 }}>
@@ -286,6 +303,10 @@ export function AdminClient({ language, t, orders, customers, taxSummary }: Prop
             <option value="20">20</option>
             <option value="50">50</option>
           </select>
+
+          <button className="btn" onClick={clearCustomerFilters}>
+            {language === "fr" ? "Réinitialiser filtres" : "Reset filters"}
+          </button>
         </div>
 
         <div className="row" style={{ marginBottom: 10, gap: 8 }}>

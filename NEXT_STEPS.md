@@ -82,6 +82,20 @@ Attendu:
 - `/api/admin/customers` => 401/403 sans session
 - `/api/admin/taxes` => 401/403 sans session
 
+## 3.1) Observabilité minimale (maintenant en place)
+
+- Les routes API clés loggent des événements JSON (`INFO/WARN/ERROR`) pour faciliter le debug.
+- Le health endpoint retourne maintenant:
+  - `ok`
+  - `service`
+  - `version`
+  - `timestamp`
+
+En cas d’incident, commence par:
+1. vérifier `/api/health`,
+2. relancer `npm run smoke`,
+3. inspecter les logs JSON des routes API concernées.
+
 ## 4) Validation business finale
 
 - Créer compte client

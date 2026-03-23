@@ -6,13 +6,31 @@ import { stripe, stripeEnabled } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
 import { sendOrderConfirmationEmail } from "@/lib/business";
 import { env } from "@/lib/env";
+import { logApiEvent } from "@/lib/observability";
 
 export async function GET() {
   try {
     const user = await requireUser();
     const orders = await getOrdersForUser(user.id);
+
+    logApiEvent({
+      level: "INFO",
+      route: "/api/orders",
+      event: "ORDERS_FETCH_SUCCESS",
+      status: 200,
+      details: { userId: user.id, count: orders.length },
+    });
+
     return jsonOk({ orders });
-  } catch {
+  } catch (error) {
+    logApiEvent({
+      level: "WARN",
+      route: "/api/orders",
+      event: "ORDERS_FETCH_UNAUTHORIZED",
+      status: 401,
+      details: { error },
+    });
+
     return jsonError("Unauthorized", 401);
   }
 }
@@ -83,6 +101,14 @@ export async function POST(request: Request) {
         data: { stripeSessionId: session.id },
       });
 
+      logApiEvent({
+        level: "INFO",
+        route: "/api/orders",
+        event: "ORDER_CREATED_STRIPE",
+        status: 200,
+        details: { userId: user.id, orderId: order.id, orderNumber: order.orderNumber },
+      });
+
       return jsonOk({ order, stripeCheckoutUrl: session.url });
     }
 
@@ -95,20 +121,58 @@ export async function POST(request: Request) {
       language: user.language,
     });
 
+    logApiEvent({
+      level: "INFO",
+      route: "/api/orders",
+      event: "ORDER_CREATED_MANUAL",
+      status: 200,
+      details: { userId: user.id, orderId: order.id, orderNumber: order.orderNumber },
+    });
+
     return jsonOk({ order, stripeCheckoutUrl: null });
   } catch (error) {
     if (error instanceof Error && error.message === "UNAUTHORIZED") {
+      logApiEvent({
+        level: "WARN",
+        route: "/api/orders",
+        event: "ORDER_CREATE_UNAUTHORIZED",
+        status: 401,
+        details: { error },
+      });
       return jsonError("Unauthorized", 401);
     }
     if (error instanceof Error && error.message === "INSUFFICIENT_STOCK") {
+      logApiEvent({
+        level: "WARN",
+        route: "/api/orders",
+        event: "ORDER_CREATE_INSUFFICIENT_STOCK",
+        status: 409,
+        details: { error },
+      });
       return jsonError("Insufficient stock", 409);
     }
     if (
       error instanceof Error &&
       ["EMPTY_CART", "PRODUCT_NOT_FOUND", "INVALID_QUANTITY"].includes(error.message)
     ) {
+      logApiEvent({
+        level: "WARN",
+        route: "/api/orders",
+        event: "ORDER_CREATE_INVALID_REQUEST",
+        status: 400,
+        details: { error },
+      });
       return jsonError("Invalid checkout request", 400);
     }
+
+    logApiEvent({
+      level: "ERROR",
+      route: "/api/orders",
+      event: "ORDER_CREATE_UNHANDLED_ERROR",
+      status: 400,
+      details: { error },
+    });
+
     return jsonError("Invalid checkout request", 400);
   }
 }

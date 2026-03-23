@@ -1,5 +1,6 @@
 import { getAdminCustomers } from "@/lib/admin";
 import { jsonError, jsonOk } from "@/lib/http";
+import { logApiEvent } from "@/lib/observability";
 import { requireAdmin } from "@/lib/permissions";
 import { adminCustomersQuerySchema } from "@/lib/validators";
 
@@ -17,7 +18,16 @@ export async function GET(request: Request) {
       pageSize: searchParams.get("pageSize") ?? undefined,
     });
 
-    if (!parsed.success) return jsonError("Invalid query", 400);
+    if (!parsed.success) {
+      logApiEvent({
+        level: "WARN",
+        route: "/api/admin/customers",
+        event: "ADMIN_CUSTOMERS_INVALID_QUERY",
+        status: 400,
+      });
+
+      return jsonError("Invalid query", 400);
+    }
 
     const q = parsed.data;
     let customers = await getAdminCustomers(q.search);
@@ -41,14 +51,39 @@ export async function GET(request: Request) {
     const start = (page - 1) * pageSize;
     const rows = customers.slice(start, start + pageSize);
 
+    logApiEvent({
+      level: "INFO",
+      route: "/api/admin/customers",
+      event: "ADMIN_CUSTOMERS_FETCH_SUCCESS",
+      status: 200,
+      details: { total, page, pageSize, rows: rows.length },
+    });
+
     return jsonOk({
       customers: rows,
       pagination: { total, page, pageSize, totalPages },
     });
   } catch (error) {
     if (error instanceof Error && error.message === "UNAUTHORIZED") {
+      logApiEvent({
+        level: "WARN",
+        route: "/api/admin/customers",
+        event: "ADMIN_CUSTOMERS_UNAUTHORIZED",
+        status: 401,
+        details: { error },
+      });
+
       return jsonError("Unauthorized", 401);
     }
+
+    logApiEvent({
+      level: "WARN",
+      route: "/api/admin/customers",
+      event: "ADMIN_CUSTOMERS_FORBIDDEN",
+      status: 403,
+      details: { error },
+    });
+
     return jsonError("Forbidden", 403);
   }
 }
