@@ -96,10 +96,33 @@ npm run validate:env:dev   # Validation env en mode développement
 npm run validate:env:prod  # Validation env en mode production
 npm run validate      # validate:env:dev + lint + build
 npm run smoke         # Smoke checks API (health + protections admin)
+npm run db:backup -- <label>      # Backup SQLite local dans /backups
+npm run db:restore -- [file.db]   # Restore SQLite (backup sécurité auto avant restore)
+npm run prisma:migrate:safe -- <name> # Backup auto + migration Prisma
 npm run prisma:generate  # Génération du client Prisma
 npm run prisma:migrate   # Exécution des migrations
 npm run prisma:studio    # Interface visuelle pour la DB
 ```
+
+## 🛟 Local-first sans perte de données (important)
+
+Pour minimiser le risque de perte pendant les évolutions locales:
+
+```bash
+# 1) Backup manuel
+npm run db:backup -- before-change
+
+# 2) Migration sûre (backup auto + migration)
+npm run prisma:migrate:safe -- add-new-field
+
+# 3) Si besoin, restauration (backup sécurité auto avant restore)
+npm run db:restore -- backups/ton-backup.db
+```
+
+Notes:
+- Les backups SQLite sont stockés dans `backups/`.
+- Les fichiers `backups/*.db` et `backups/*.db.json` sont ignorés par Git.
+- Pour une DB managée (non `file:`), utiliser aussi les snapshots/backup provider.
 
 ## 🧪 Smoke checks rapides
 

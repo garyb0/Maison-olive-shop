@@ -38,6 +38,36 @@ Si c'est le premier déploiement DB:
 npm run prisma:migrate -- --name prod-init
 ```
 
+## 2.1) Local-first sans perte (recommandé)
+
+Avant toute migration locale, utilise la commande safe:
+
+```bash
+npm run prisma:migrate:safe -- local-change-name
+```
+
+Cette commande:
+- crée un backup SQLite dans `backups/` (avec manifest JSON),
+- puis lance la migration Prisma.
+
+Backup manuel:
+
+```bash
+npm run db:backup -- manual
+```
+
+Restore du dernier backup:
+
+```bash
+npm run db:restore
+```
+
+Restore d’un backup précis:
+
+```bash
+npm run db:restore -- backups/mon-backup.db
+```
+
 ## 3) Smoke tests post-déploiement
 
 App en ligne, exécuter:
