@@ -16,6 +16,8 @@ npm run dev
 
 Puis ouvre `http://localhost:3000`.
 
+> 📋 Pour une mise en production étape par étape, utilise la checklist dédiée: **`PRODUCTION_CHECKLIST.md`**
+
 ### Parcours de test rapide
 1. Crée un compte client
 2. Passe une commande
