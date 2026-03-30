@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { sendOrderConfirmationEmail } from "@/lib/business";
 import { env } from "@/lib/env";
 import { logApiEvent } from "@/lib/observability";
+import { applyRateLimit } from "@/lib/rate-limit";
 
 export async function GET() {
   try {
@@ -36,6 +37,11 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const rate = applyRateLimit(request, { namespace: "orders:create", windowMs: 60_000, max: 12 });
+  if (!rate.ok) {
+    return jsonError("Too many requests", 429);
+  }
+
   try {
     const user = await requireUser();
     const body = await request.json();
@@ -54,6 +60,7 @@ export async function POST(request: Request) {
       customerEmail: user.email,
       customerName: `${user.firstName} ${user.lastName}`,
       paymentMethod: input.paymentMethod,
+      promoCode: input.promoCode,
       items: input.items,
       shippingLine1: input.shippingLine1,
       shippingCity: input.shippingCity,
@@ -153,7 +160,7 @@ export async function POST(request: Request) {
     }
     if (
       error instanceof Error &&
-      ["EMPTY_CART", "PRODUCT_NOT_FOUND", "INVALID_QUANTITY"].includes(error.message)
+      ["EMPTY_CART", "PRODUCT_NOT_FOUND", "INVALID_QUANTITY", "OUTSIDE_DELIVERY_ZONE"].includes(error.message)
     ) {
       logApiEvent({
         level: "WARN",

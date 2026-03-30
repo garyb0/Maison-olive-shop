@@ -37,7 +37,7 @@ async function checkUnauthorized(baseUrl: string, path: string): Promise<CheckRe
 }
 
 async function main() {
-  const baseUrl = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/+$/, "");
+  const baseUrl = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3101").replace(/\/+$/, "");
 
   const checks: CheckResult[] = [];
   checks.push(await checkHealth(baseUrl));

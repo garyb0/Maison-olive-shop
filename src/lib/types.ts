@@ -9,6 +9,9 @@ export type OrderStatus =
   | "DELIVERED"
   | "CANCELLED";
 
+export type SupportConversationStatus = "WAITING" | "OPEN" | "ASSIGNED" | "CLOSED";
+export type SupportSenderType = "CUSTOMER" | "ADMIN" | "SYSTEM";
+
 export type CurrentUser = {
   id: string;
   email: string;
@@ -26,6 +29,7 @@ export type CartItemInput = {
 export type CheckoutPayload = {
   items: CartItemInput[];
   paymentMethod: PaymentMethod;
+  promoCode?: string;
   shippingLine1?: string;
   shippingCity?: string;
   shippingRegion?: string;

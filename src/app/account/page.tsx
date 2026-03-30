@@ -6,6 +6,8 @@ import { getDictionary } from "@/lib/i18n";
 import { getOrdersForUser, syncOrderPaymentFromStripeSessionForUser } from "@/lib/orders";
 import { AccountClient } from "@/app/account/account-client";
 import type { OrderStatus, PaymentStatus } from "@/lib/types";
+import { Navigation } from "@/components/Navigation";
+import { PromoBanner } from "@/components/PromoBanner";
 
 type PresentationOrder = {
   id: string;
@@ -53,6 +55,11 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
   if (!user) {
     return (
       <div className="app-shell">
+      <header className="topbar">
+          <div className="brand">{t.brandName}</div>
+          <Navigation language={language} t={t} user={null} />
+        </header>
+        <PromoBanner />
         <section className="section">
           <h1>{t.accountTitle}</h1>
           <p className="small">{language === "fr" ? "Connecte-toi pour accéder à ton compte." : "Please login to access your account."}</p>
@@ -95,7 +102,7 @@ export default async function AccountPage({ searchParams }: AccountPageProps) {
     <AccountClient
       language={language}
       t={t}
-      user={{ firstName: user.firstName, email: user.email }}
+      user={{ firstName: user.firstName, email: user.email, role: user.role }}
       orders={presentationOrders}
     />
   );

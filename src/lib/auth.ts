@@ -1,8 +1,9 @@
 import { cookies } from "next/headers";
-import { randomBytes } from "crypto";
+import { randomBytes, createHash } from "crypto";
 import bcrypt from "bcryptjs";
 import { DEV_SESSION_SECRET, env } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
+import { logApiEvent } from "@/lib/observability"; // eslint-disable-line @typescript-eslint/no-unused-vars
 
 const ensureSessionSecret = () => {
   if (process.env.NODE_ENV === "production" && env.sessionSecret === DEV_SESSION_SECRET) {
@@ -92,6 +93,57 @@ export async function logoutUser() {
   }
 
   cookieStore.delete(env.sessionCookieName);
+}
+
+// ─── Password Reset ─────────────────────────────────────────────────────────
+
+const PASSWORD_RESET_EXPIRY_MS = 60 * 60 * 1000; // 1 hour
+
+/**
+ * Creates a password-reset token for the given email.
+ * Returns the plain token (to be sent by email) or null if the email
+ * is not registered (we don't reveal whether the address exists).
+ */
+export async function requestPasswordReset(email: string): Promise<string | null> {
+  const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
+  if (!user) return null;
+
+  const token = randomBytes(32).toString("hex");
+  const tokenHash = createHash("sha256").update(token).digest("hex");
+  const expiresAt = new Date(Date.now() + PASSWORD_RESET_EXPIRY_MS);
+
+  // Purge any previous tokens for this user
+  await prisma.passwordReset.deleteMany({ where: { userId: user.id } });
+
+  await prisma.passwordReset.create({
+    data: { tokenHash, userId: user.id, expiresAt },
+  });
+
+  return token;
+}
+
+/**
+ * Validates a reset token and updates the user's password.
+ * Invalidates all active sessions for that user.
+ */
+export async function resetPassword(token: string, newPassword: string): Promise<void> {
+  const tokenHash = createHash("sha256").update(token).digest("hex");
+
+  const reset = await prisma.passwordReset.findUnique({
+    where: { tokenHash },
+  });
+
+  if (!reset) throw new Error("INVALID_RESET_TOKEN");
+  if (reset.usedAt) throw new Error("RESET_TOKEN_ALREADY_USED");
+  if (reset.expiresAt < new Date()) throw new Error("RESET_TOKEN_EXPIRED");
+
+  const passwordHash = await hashPassword(newPassword);
+
+  await prisma.$transaction([
+    prisma.user.update({ where: { id: reset.userId }, data: { passwordHash } }),
+    prisma.passwordReset.update({ where: { id: reset.id }, data: { usedAt: new Date() } }),
+    prisma.session.deleteMany({ where: { userId: reset.userId } }),
+  ]);
 }
 
 export async function getCurrentUser() {

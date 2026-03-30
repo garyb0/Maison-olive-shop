@@ -18,11 +18,17 @@ export default async function HomePage() {
 
   const productCards = products.map((p: CatalogProduct) => ({
     id: p.id,
+    slug: p.slug,
+    category: p.category?.name ?? "Uncategorized",
     name: language === "fr" ? p.nameFr : p.nameEn,
     description: language === "fr" ? p.descriptionFr : p.descriptionEn,
+    priceCents: p.priceCents,
     priceLabel: formatCurrency(p.priceCents, p.currency, language === "fr" ? "fr-CA" : "en-CA"),
     stock: p.stock,
+    imageUrl: p.imageUrl ?? null,
   }));
 
-  return <StorefrontClient language={language} t={t} user={user} products={productCards} />;
+  const oliveMode = (process.env.OLIVE_MODE as "princess" | "gremlin") || "princess";
+
+  return <StorefrontClient language={language} t={t} user={user} products={productCards} oliveMode={oliveMode} />;
 }

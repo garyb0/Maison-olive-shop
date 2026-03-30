@@ -33,9 +33,17 @@ export const env = {
   stripeSecretKey: process.env.STRIPE_SECRET_KEY ?? "",
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
   siteUrl: normalizeSiteUrl(process.env.NEXT_PUBLIC_SITE_URL),
-  businessSupportEmail: process.env.BUSINESS_SUPPORT_EMAIL ?? "support@maisonolive.local",
+  businessSupportEmail: process.env.BUSINESS_SUPPORT_EMAIL ?? "gary_b0@hotmail.fr",
   resendApiKey: process.env.RESEND_API_KEY ?? "",
   resendFromEmail: process.env.RESEND_FROM_EMAIL ?? "Maison Olive <onboarding@resend.dev>",
+  adminSmsEmail: process.env.ADMIN_SMS_EMAIL ?? "",
+  // SMTP configuration for sending emails
+  smtpHost: process.env.SMTP_HOST ?? "",
+  smtpPort: parseInt(process.env.SMTP_PORT ?? "587"),
+  smtpSecure: process.env.SMTP_SECURE === "true",
+  smtpUser: process.env.SMTP_USER ?? "",
+  smtpPass: process.env.SMTP_PASS ?? "",
+  smtpFromEmail: process.env.SMTP_FROM_EMAIL ?? "",
 } as const;
 
 export type EnvValidationReport = {

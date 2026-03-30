@@ -1,9 +1,11 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { getPromoDiscountCents } from "@/lib/promo";
 import { computeOrderAmounts } from "@/lib/taxes";
 import { sendOrderConfirmationEmail } from "@/lib/business";
 import { stripe, stripeEnabled } from "@/lib/stripe";
 import type { PaymentMethod } from "@/lib/types";
+import { isRimouskiDeliveryAddress } from "@/lib/delivery-zone";
 
 type CheckoutItem = {
   productId: string;
@@ -15,6 +17,7 @@ type CreateOrderInput = {
   customerEmail: string;
   customerName: string;
   paymentMethod: PaymentMethod;
+  promoCode?: string;
   items: CheckoutItem[];
   shippingLine1?: string;
   shippingCity?: string;
@@ -38,6 +41,15 @@ const nextOrderNumber = () => {
 export async function createOrderSafely(input: CreateOrderInput) {
   if (!input.items.length) {
     throw new Error("EMPTY_CART");
+  }
+
+  if (
+    !isRimouskiDeliveryAddress({
+      postalCode: input.shippingPostal,
+      country: input.shippingCountry,
+    })
+  ) {
+    throw new Error("OUTSIDE_DELIVERY_ZONE");
   }
 
   return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
@@ -69,7 +81,8 @@ export async function createOrderSafely(input: CreateOrderInput) {
       return sum + product.priceCents * item.quantity;
     }, 0);
 
-    const amounts = computeOrderAmounts(subtotalCents, 0);
+    const discountCents = getPromoDiscountCents(subtotalCents, input.promoCode);
+    const amounts = computeOrderAmounts(subtotalCents, discountCents);
 
     const order = await tx.order.create({
       data: {

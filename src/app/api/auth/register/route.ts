@@ -1,8 +1,14 @@
 import { registerUser } from "@/lib/auth";
 import { jsonError, jsonOk } from "@/lib/http";
+import { applyRateLimit } from "@/lib/rate-limit";
 import { registerSchema } from "@/lib/validators";
 
 export async function POST(request: Request) {
+  const rate = applyRateLimit(request, { namespace: "auth:register", windowMs: 10 * 60_000, max: 10 });
+  if (!rate.ok) {
+    return jsonError("Too many requests", 429);
+  }
+
   try {
     const body = await request.json();
     const input = registerSchema.parse(body);

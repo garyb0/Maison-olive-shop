@@ -37,6 +37,19 @@ enum PaymentMethod {
   STRIPE
 }
 
+enum SupportConversationStatus {
+  WAITING
+  OPEN
+  ASSIGNED
+  CLOSED
+}
+
+enum SupportSenderType {
+  CUSTOMER
+  ADMIN
+  SYSTEM
+}
+
 model User {
   id           String    @id @default(cuid())
   email        String    @unique
@@ -48,9 +61,13 @@ model User {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  sessions Session[]
-  orders   Order[]
-  logs     AuditLog[]
+  sessions                     Session[]
+  orders                       Order[]
+  logs                         AuditLog[]
+  customerSupportConversations SupportConversation[] @relation("CustomerSupportConversations")
+  assignedSupportConversations SupportConversation[] @relation("AssignedSupportConversations")
+  supportMessages              SupportMessage[]      @relation("SupportMessages")
+  passwordResets               PasswordReset[]
 }
 
 model Session {
@@ -83,9 +100,12 @@ model Product {
 
   orderItems          OrderItem[]
   inventoryMovements  InventoryMovement[]
+  categoryId          String?
+  category            Category? @relation(fields: [categoryId], references: [id])
 
   @@index([isActive])
   @@index([slug])
+  @@index([categoryId])
 }
 
 model Order {
@@ -169,4 +189,63 @@ model AuditLog {
 
   @@index([entity, createdAt])
   @@index([actorUserId, createdAt])
+}
+
+model SupportConversation {
+  id              String                    @id @default(cuid())
+  customerUserId  String?
+  customerEmail   String
+  customerName    String
+  assignedAdminId String?
+  status          SupportConversationStatus @default(WAITING)
+  lastMessageAt   DateTime                  @default(now())
+  closedAt        DateTime?
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
+
+  customerUser  User?            @relation("CustomerSupportConversations", fields: [customerUserId], references: [id], onDelete: SetNull)
+  assignedAdmin User?            @relation("AssignedSupportConversations", fields: [assignedAdminId], references: [id], onDelete: SetNull)
+  messages      SupportMessage[]
+
+  @@index([customerUserId, createdAt])
+  @@index([assignedAdminId, status])
+  @@index([status, lastMessageAt])
+}
+
+model SupportMessage {
+  id             String            @id @default(cuid())
+  conversationId String
+  senderUserId   String?
+  senderType     SupportSenderType
+  content        String
+  readAt         DateTime?
+  createdAt      DateTime          @default(now())
+
+  conversation SupportConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderUser   User?               @relation("SupportMessages", fields: [senderUserId], references: [id], onDelete: SetNull)
+
+  @@index([conversationId, createdAt])
+  @@index([senderUserId, createdAt])
+}
+
+model Category {
+  id        String    @id @default(uuid())
+  name      String    @unique
+  products  Product[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model PasswordReset {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  userId    String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }

@@ -7,9 +7,18 @@ const adapter = new PrismaLibSql({
 
 const prisma = new PrismaClient({ adapter });
 
+const categories = [
+  { name: "Food" },
+  { name: "Accessories" },
+  { name: "Toys" },
+  { name: "Hygiene" },
+  { name: "Beds" },
+];
+
 const products = [
   {
     slug: "croquettes-premium-bulldog",
+    categoryName: "Food",
     nameFr: "Croquettes Premium Bulldog",
     nameEn: "Premium Bulldog Kibble",
     descriptionFr: "Croquettes premium pour bulldog français, digestion sensible.",
@@ -22,6 +31,7 @@ const products = [
   },
   {
     slug: "harnais-confort-olive",
+    categoryName: "Accessories",
     nameFr: "Harnais Confort Olive",
     nameEn: "Olive Comfort Harness",
     descriptionFr: "Harnais respirant et réglable pour promenades quotidiennes.",
@@ -34,6 +44,7 @@ const products = [
   },
   {
     slug: "jouet-corde-resistante",
+    categoryName: "Toys",
     nameFr: "Jouet Corde Résistante",
     nameEn: "Durable Rope Toy",
     descriptionFr: "Jouet corde robuste pour mastication et jeux de traction.",
@@ -46,6 +57,7 @@ const products = [
   },
   {
     slug: "shampoing-peau-sensible",
+    categoryName: "Hygiene",
     nameFr: "Shampoing Peau Sensible",
     nameEn: "Sensitive Skin Shampoo",
     descriptionFr: "Shampoing doux sans parfum pour peau sensible.",
@@ -58,6 +70,7 @@ const products = [
   },
   {
     slug: "lit-douillet-anti-stress",
+    categoryName: "Beds",
     nameFr: "Lit Douillet Anti-Stress",
     nameEn: "Calming Cozy Bed",
     descriptionFr: "Lit moelleux anti-stress pour un sommeil profond.",
@@ -71,21 +84,43 @@ const products = [
 ];
 
 async function main() {
+  for (const category of categories) {
+    await prisma.category.upsert({
+      where: { name: category.name },
+      update: {},
+      create: category,
+    });
+  }
+
   for (const product of products) {
+    const category = await prisma.category.findUnique({
+      where: { name: product.categoryName },
+    });
+
+    if (!category) {
+      throw new Error(`Category ${product.categoryName} not found`);
+    }
+
+    const { categoryName, ...productData } = product;
+
     await prisma.product.upsert({
       where: { slug: product.slug },
       update: {
-        nameFr: product.nameFr,
-        nameEn: product.nameEn,
-        descriptionFr: product.descriptionFr,
-        descriptionEn: product.descriptionEn,
-        imageUrl: product.imageUrl,
-        priceCents: product.priceCents,
-        currency: product.currency,
-        stock: product.stock,
-        isActive: product.isActive,
+        nameFr: productData.nameFr,
+        nameEn: productData.nameEn,
+        descriptionFr: productData.descriptionFr,
+        descriptionEn: productData.descriptionEn,
+        imageUrl: productData.imageUrl,
+        priceCents: productData.priceCents,
+        currency: productData.currency,
+        stock: productData.stock,
+        isActive: productData.isActive,
+        category: { connect: { id: category.id } },
       },
-      create: product,
+      create: {
+        ...productData,
+        category: { connect: { id: category.id } },
+      },
     });
   }
 

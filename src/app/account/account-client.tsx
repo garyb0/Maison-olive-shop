@@ -1,13 +1,15 @@
 "use client";
 
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import type { Dictionary, Language } from "@/lib/i18n";
+import type { CurrentUser } from "@/lib/types";
+import { Navigation } from "@/components/Navigation";
+import { PromoBanner } from "@/components/PromoBanner";
 
 type Props = {
   language: Language;
   t: Dictionary;
-  user: { firstName: string; email: string };
+  user: { firstName: string; email: string; role: "CUSTOMER" | "ADMIN" };
   orders: Array<{
     id: string;
     orderNumber: string;
@@ -47,36 +49,17 @@ export function AccountClient({ language, t, user, orders }: Props) {
   return (
     <div className="app-shell">
       <header className="topbar">
-        <div>
-          <div className="brand">{t.brandName}</div>
-          <div className="small">{user.email}</div>
-        </div>
-        <nav className="nav-links">
-          <Link className="pill-link" href="/">
-            {t.navHome}
-          </Link>
-          <Link className="pill-link" href="/checkout">
-            {t.navCheckout}
-          </Link>
-          <Link className="pill-link" href="/admin">
-            {t.navAdmin}
-          </Link>
-          <Link className="pill-link" href="/faq">
-            {t.navFaq}
-          </Link>
-          <Link className="pill-link" href="/terms">
-            {t.navTerms}
-          </Link>
-          <Link className="pill-link" href="/returns">
-            {t.navReturns}
-          </Link>
-        </nav>
+        <div className="brand">{t.brandName}</div>
+        <Navigation language={language} t={t} user={{ role: user.role }} />
       </header>
+
+      <PromoBanner />
 
       <section className="section">
         <h1>
           {t.accountTitle} — {user.firstName}
         </h1>
+        <p className="small">{user.email}</p>
         <p className="small">{t.orderHistory}</p>
         {paid ? (
           <p className="ok small" style={{ marginTop: 8 }}>
@@ -139,6 +122,7 @@ export function AccountClient({ language, t, user, orders }: Props) {
           </div>
         )}
       </section>
+
     </div>
   );
 }

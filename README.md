@@ -14,7 +14,7 @@ npm run seed
 npm run dev
 ```
 
-Puis ouvre `http://localhost:3000`.
+Puis ouvre `http://localhost:3101`.
 
 > 📋 Pour une mise en production étape par étape, utilise la checklist dédiée: **`PRODUCTION_CHECKLIST.md`**
 >
@@ -87,7 +87,7 @@ npm run seed
 npm run dev
 ```
 
-Le site sera accessible sur `http://localhost:3000`
+Le site sera accessible sur `http://localhost:3101`
 
 ## 📦 Scripts Disponibles
 
@@ -160,7 +160,7 @@ STRIPE_WEBHOOK_SECRET=
 NODE_ENV=development
 
 # Business / support
-BUSINESS_SUPPORT_EMAIL="support@maisonolive.local"
+BUSINESS_SUPPORT_EMAIL="gary_b0@hotmail.fr"
 
 # Email transactionnel (Resend)
 # Laisse vide pour fallback console log en local
@@ -221,7 +221,7 @@ Le projet est prêt pour un flux Stripe test complet (checkout + webhook + mise 
 Renseigne au minimum:
 
 ```env
-NEXT_PUBLIC_SITE_URL="http://localhost:3000"
+NEXT_PUBLIC_SITE_URL="http://localhost:3101"
 STRIPE_SECRET_KEY="sk_test_..."
 STRIPE_WEBHOOK_SECRET="whsec_..."
 ```
@@ -251,7 +251,7 @@ stripe login
 #### 4) Forward webhook Stripe vers l’app locale
 
 ```bash
-stripe listen --forward-to http://localhost:3000/api/stripe/webhook
+stripe listen --forward-to http://localhost:3101/api/stripe/webhook
 ```
 
 Copie le secret `whsec_...` affiché et mets-le dans `STRIPE_WEBHOOK_SECRET`.

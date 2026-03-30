@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Node maintenance scripts (outside Next/TS app scope):
+    "keep-alive.js",
+    "keep-alive-enhanced.js",
+    "scripts/*.js",
   ]),
 ]);
 

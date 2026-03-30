@@ -1,0 +1,1138 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guide de Lancement - Maison Olive Shop</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      line-height: 1.6;
+      color: #2C1E0F;
+      background: #FAF8F4;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    /* Header */
+    .header {
+      background: linear-gradient(135deg, #5C6B40 0%, #3D4A2A 100%);
+      color: white;
+      padding: 3rem 2rem;
+      border-radius: 1.5rem;
+      text-align: center;
+      margin-bottom: 2rem;
+      box-shadow: 0 8px 30px rgba(92, 107, 64, 0.3);
+    }
+
+    .header h1 {
+      font-size: 2.5rem;
+      margin-bottom: 0.5rem;
+      font-weight: 700;
+    }
+
+    .header .subtitle {
+      font-size: 1.2rem;
+      opacity: 0.95;
+      margin-bottom: 1rem;
+    }
+
+    .header .emoji {
+      font-size: 4rem;
+      margin-bottom: 1rem;
+    }
+
+    /* Sections */
+    .section {
+      background: white;
+      border: 1px solid #E8DDD0;
+      border-radius: 1.2rem;
+      padding: 2rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 2px 12px rgba(92, 107, 64, 0.1);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .section:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(92, 107, 64, 0.15);
+    }
+
+    .section h2 {
+      color: #3D4A2A;
+      font-size: 1.8rem;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      border-bottom: 2px solid #C4955A;
+      padding-bottom: 0.5rem;
+    }
+
+    .section h3 {
+      color: #5C6B40;
+      font-size: 1.3rem;
+      margin: 1.5rem 0 1rem;
+    }
+
+    .section p {
+      margin-bottom: 1rem;
+      color: #8C7B65;
+    }
+
+    /* Lists */
+    ul, ol {
+      margin-left: 2rem;
+      margin-bottom: 1rem;
+    }
+
+    li {
+      margin-bottom: 0.5rem;
+    }
+
+    /* Code blocks */
+    pre {
+      background: #2C1E0F;
+      color: #FAF8F4;
+      padding: 1.5rem;
+      border-radius: 0.8rem;
+      overflow-x: auto;
+      margin: 1rem 0;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+
+    code {
+      background: #F5F0E8;
+      color: #3D4A2A;
+      padding: 0.2rem 0.5rem;
+      border-radius: 0.3rem;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9rem;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+    }
+
+    th, td {
+      padding: 0.8rem;
+      text-align: left;
+      border-bottom: 1px solid #E8DDD0;
+    }
+
+    th {
+      background: #5C6B40;
+      color: white;
+      font-weight: 600;
+    }
+
+    tr:hover {
+      background: #FAF8F4;
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-block;
+      padding: 0.3rem 0.8rem;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin: 0.2rem;
+    }
+
+    .badge-success {
+      background: #f0faf3;
+      color: #4A7C59;
+      border: 1px solid #b7e4c7;
+    }
+
+    .badge-warning {
+      background: #fff9ec;
+      color: #92600a;
+      border: 1px solid #f5e0a0;
+    }
+
+    .badge-danger {
+      background: #fff5f5;
+      color: #b42318;
+      border: 1px solid #fed7d7;
+    }
+
+    .badge-info {
+      background: #e8f0dc;
+      color: #3D4A2A;
+      border: 1px solid #d6e6b0;
+    }
+
+    /* Alerts */
+    .alert {
+      padding: 1rem 1.5rem;
+      border-radius: 0.8rem;
+      margin: 1rem 0;
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+    }
+
+    .alert-success {
+      background: #f0faf3;
+      color: #4A7C59;
+      border: 1px solid #b7e4c7;
+    }
+
+    .alert-warning {
+      background: #fff9ec;
+      color: #92600a;
+      border: 1px solid #f5e0a0;
+    }
+
+    .alert-danger {
+      background: #fff5f5;
+      color: #b42318;
+      border: 1px solid #fed7d7;
+    }
+
+    .alert-info {
+      background: #e8f0dc;
+      color: #3D4A2A;
+      border: 1px solid #d6e6b0;
+    }
+
+    /* Progress steps */
+    .steps {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      margin: 1.5rem 0;
+    }
+
+    .step {
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+      padding: 1rem;
+      border: 1px solid #E8DDD0;
+      border-radius: 0.8rem;
+      background: #FAF8F4;
+    }
+
+    .step-number {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: #C4955A;
+      line-height: 1;
+      flex-shrink: 0;
+      min-width: 2.5rem;
+    }
+
+    .step-content h4 {
+      color: #3D4A2A;
+      margin-bottom: 0.3rem;
+    }
+
+    .step-content p {
+      margin: 0;
+      font-size: 0.95rem;
+    }
+
+    /* Checklist */
+    .checklist {
+      list-style: none;
+      margin-left: 0;
+    }
+
+    .checklist li {
+      padding: 0.8rem;
+      border: 1px solid #E8DDD0;
+      border-radius: 0.6rem;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      background: white;
+      transition: background 0.2s;
+    }
+
+    .checklist li:hover {
+      background: #FAF8F4;
+    }
+
+    .checklist li::before {
+      content: "☐";
+      font-size: 1.2rem;
+      color: #5C6B40;
+      flex-shrink: 0;
+    }
+
+    /* Grid layout */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1.5rem;
+      margin: 1.5rem 0;
+    }
+
+    .card {
+      border: 1px solid #E8DDD0;
+      border-radius: 1rem;
+      padding: 1.5rem;
+      background: white;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 24px rgba(92, 107, 64, 0.15);
+    }
+
+    .card h4 {
+      color: #3D4A2A;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .card p {
+      margin: 0;
+      font-size: 0.9rem;
+    }
+
+    /* Footer */
+    .footer {
+      text-align: center;
+      padding: 2rem;
+      color: #8C7B65;
+      font-size: 0.9rem;
+    }
+
+    /* Print styles */
+    @media print {
+      body {
+        background: white;
+      }
+
+      .section {
+        break-inside: avoid;
+        box-shadow: none;
+        border: 1px solid #ccc;
+      }
+
+      .header {
+        background: #5C6B40 !important;
+        -webkit-print-color-adjust: exact;
+      }
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .container {
+        padding: 1rem;
+      }
+
+      .header {
+        padding: 2rem 1rem;
+      }
+
+      .header h1 {
+        font-size: 2rem;
+      }
+
+      .section {
+        padding: 1.5rem;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="emoji">🫒</div>
+      <h1>Guide de Lancement</h1>
+      <div class="subtitle">Maison Olive Shop - De votre PC à la production</div>
+      <p style="margin-top: 1rem; opacity: 0.9;">
+        📅 Créé le 30 mars 2026 | 🔄 Dernière mise à jour : 30 mars 2026
+      </p>
+    </div>
+
+    <!-- Table des matières -->
+    <div class="section">
+      <h2>📋 Table des matières</h2>
+      <ol>
+        <li><a href="#prerequis">Prérequis et outils nécessaires</a></li>
+        <li><a href="#hebergement">Choix de l'hébergement</a></li>
+        <li><a href="#domaine">Configuration du nom de domaine</a></li>
+        <li><a href="#dns">Configuration DNS</a></li>
+        <li><a href="#installation">Installation sur le serveur</a></li>
+        <li><a href="#ssl">Configuration SSL/HTTPS</a></li>
+        <li><a href="#env">Configuration des variables d'environnement</a></li>
+        <li><a href="#pm2">Déploiement avec PM2</a></li>
+        <li><a href="#nginx">Configuration Nginx</a></li>
+        <li><a href="#tests">Tests et vérifications</a></li>
+        <li><a href="#maintenance">Maintenance et monitoring</a></li>
+        <li><a href="#depannage">Dépannage courant</a></li>
+      </ol>
+    </div>
+
+    <!-- 1. Prérequis -->
+    <div class="section" id="prerequis">
+      <h2>✅ 1. Prérequis</h2>
+      
+      <h3>Ce que vous avez déjà :</h3>
+      <ul class="checklist">
+        <li>Un nom de domaine acheté</li>
+        <li>Le code source de Maison Olive Shop</li>
+        <li>Node.js installé sur votre PC</li>
+      </ul>
+
+      <h3>Ce dont vous avez besoin :</h3>
+      
+      <div class="grid">
+        <div class="card">
+          <h4>🖥️ Hébergement VPS</h4>
+          <p>DigitalOcean, Vultr, Hetzner, ou OVH (~5-10€/mois)</p>
+          <span class="badge badge-warning">Obligatoire</span>
+        </div>
+
+        <div class="card">
+          <h4>💾 Base de données</h4>
+          <p>Turso (gratuit) ou PostgreSQL</p>
+          <span class="badge badge-warning">Obligatoire</span>
+        </div>
+
+        <div class="card">
+          <h4>📧 Email transactionnel</h4>
+          <p>Resend (gratuit jusqu'à 100 emails/jour)</p>
+          <span class="badge badge-info">Recommandé</span>
+        </div>
+
+        <div class="card">
+          <h4>💳 Paiements</h4>
+          <p>Stripe (optionnel, gratuit pour tester)</p>
+          <span class="badge badge-info">Optionnel</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. Choix de l'hébergement -->
+    <div class="section" id="hebergement">
+      <h2>🖥️ 2. Choix de l'hébergement</h2>
+      
+      <div class="alert alert-info">
+        <strong>💡 Recommandation :</strong> VPS avec Ubuntu 22.04 LTS
+      </div>
+
+      <h3>Pourquoi un VPS ?</h3>
+      <ul>
+        <li>Contrôle total sur l'environnement</li>
+        <li>Meilleures performances que l'hébergement mutualisé</li>
+        <li>Prix raisonnable (5-10€/mois)</li>
+        <li>Support de PM2 pour garder l'app active</li>
+      </ul>
+
+      <h3>Options populaires :</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Fournisseur</th>
+            <th>Prix/mois</th>
+            <th>RAM</th>
+            <th>Stockage</th>
+            <th>Idéal pour</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Hetzner</strong></td>
+            <td>~4€</td>
+            <td>4GB</td>
+            <td>40GB</td>
+            <td>Meilleur rapport qualité/prix</td>
+          </tr>
+          <tr>
+            <td><strong>DigitalOcean</strong></td>
+            <td>~6€</td>
+            <td>1GB</td>
+            <td>25GB</td>
+            <td>Interface simple</td>
+          </tr>
+          <tr>
+            <td><strong>Vultr</strong></td>
+            <td>~5€</td>
+            <td>1GB</td>
+            <td>25GB</td>
+            <td>Bonne performance</td>
+          </tr>
+          <tr>
+            <td><strong>OVH</strong></td>
+            <td>~5€</td>
+            <td>2GB</td>
+            <td>40GB</td>
+            <td>Serveurs en France</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="alert alert-success">
+        <strong>🎯 Mon choix recommandé :</strong> Hetzner CX21 (4€/mois, 4GB RAM, 40GB SSD)
+      </div>
+    </div>
+
+    <!-- 3. Configuration du nom de domaine -->
+    <div class="section" id="domaine">
+      <h2>🌐 3. Configuration du nom de domaine</h2>
+      
+      <div class="steps">
+        <div class="step">
+          <div class="step-number">1</div>
+          <div class="step-content">
+            <h4>Accédez au panneau de votre registrar</h4>
+            <p>Où avez-vous acheté votre domaine ? (GoDaddy, Namecheap, OVH, etc.)</p>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-number">2</div>
+          <div class="step-content">
+            <h4>Trouvez la section DNS</h4>
+            <p>Cherchez "DNS Management", "Zone DNS", ou "Nameservers"</p>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-number">3</div>
+          <div class="step-content">
+            <h4>Notez les informations importantes</h4>
+            <p><strong>Nom de domaine :</strong> votredomaine.com</p>
+            <p><strong>Registrar :</strong> (GoDaddy, Namecheap, etc.)</p>
+            <p><strong>Nameservers actuels :</strong> (à noter au cas où)</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. Configuration DNS -->
+    <div class="section" id="dns">
+      <h2>🔧 4. Configuration DNS</h2>
+      
+      <h3>Étape 1 : Obtenez l'IP de votre serveur</h3>
+      <p>Une fois votre VPS créé, vous recevrez une IP publique :</p>
+      <pre>Exemple : 123.456.789.012</pre>
+
+      <h3>Étape 2 : Configurez les enregistrements DNS</h3>
+      <p>Dans le panneau DNS de votre registrar, ajoutez :</p>
+
+      <h4>Enregistrements obligatoires :</h4>
+      <table>
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Nom</th>
+            <th>Valeur</th>
+            <th>TTL</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>A</code></td>
+            <td>@</td>
+            <td>IP_DE_VOTRE_SERVEUR</td>
+            <td>3600</td>
+          </tr>
+          <tr>
+            <td><code>A</code></td>
+            <td>www</td>
+            <td>IP_DE_VOTRE_SERVEUR</td>
+            <td>3600</td>
+          </tr>
+          <tr>
+            <td><code>AAAA</code></td>
+            <td>@</td>
+            <td>IPv6_SI_DISPONIBLE</td>
+            <td>3600</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Étape 3 : Attendez la propagation</h3>
+      <ul>
+        <li><strong>Délai :</strong> 5 minutes à 48 heures</li>
+        <li><strong>Vérifiez :</strong> avec <code>nslookup votredomaine.com</code> ou <a href="https://whatsmydns.net">whatsmydns.net</a></li>
+      </ul>
+    </div>
+
+    <!-- 5. Installation sur le serveur -->
+    <div class="section" id="installation">
+      <h2>⚙️ 5. Installation sur le serveur</h2>
+      
+      <h3>Étape 1 : Connectez-vous en SSH</h3>
+      <pre>ssh root@IP_DE_VOTRE_SERVEUR</pre>
+
+      <h3>Étape 2 : Mise à jour du système</h3>
+      <pre>apt update && apt upgrade -y</pre>
+
+      <h3>Étape 3 : Installez Node.js</h3>
+      <pre># Installez Node.js 20 LTS
+curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+apt install -y nodejs
+
+# Vérifiez l'installation
+node --version
+npm --version</pre>
+
+      <h3>Étape 4 : Installez PM2</h3>
+      <pre>npm install -g pm2</pre>
+
+      <h3>Étape 5 : Installez Nginx</h3>
+      <pre>apt install -y nginx
+systemctl enable nginx
+systemctl start nginx</pre>
+
+      <h3>Étape 6 : Clonez votre projet</h3>
+      <pre># Créez un utilisateur dédié (sécurité)
+adduser maisonolive
+usermod -aG sudo maisonolive
+su - maisonolive
+
+# Clonez le repository
+cd /home/maisonolive
+git clone https://github.com/votre-username/maison-olive-shop.git
+cd maison-olive-shop</pre>
+
+      <h3>Étape 7 : Installez les dépendances</h3>
+      <pre>npm ci</pre>
+
+      <h3>Étape 8 : Générez le client Prisma</h3>
+      <pre>npx prisma generate</pre>
+    </div>
+
+    <!-- 6. Configuration SSL/HTTPS -->
+    <div class="section" id="ssl">
+      <h2>🔒 6. Configuration SSL/HTTPS</h2>
+      
+      <div class="alert alert-warning">
+        <strong>⚠️ Important :</strong> Ne jamais utiliser un certificat auto-signé en production !
+      </div>
+
+      <h3>Option A : Let's Encrypt (Gratuit et recommandé)</h3>
+      <pre># Installez Certbot
+apt install -y certbot python3-certbot-nginx
+
+# Obtenez un certificat
+certbot --nginx -d votredomaine.com -d www.votredomaine.com
+
+# Configurez le renouvellement automatique
+crontab -e
+# Ajoutez cette ligne :
+0 12 * * * /usr/bin/certbot renew --quiet</pre>
+
+      <h3>Option B : Certificat auto-signé (pour les tests uniquement)</h3>
+      <pre>openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+  -keyout /etc/ssl/private/nginx-selfsigned.key \
+  -out /etc/ssl/certs/nginx-selfsigned.crt</pre>
+    </div>
+
+    <!-- 7. Configuration des variables d'environnement -->
+    <div class="section" id="env">
+      <h2>🔐 7. Configuration des variables d'environnement</h2>
+      
+      <h3>Étape 1 : Créez le fichier .env</h3>
+      <pre>cp .env.example .env
+nano .env</pre>
+
+      <h3>Étape 2 : Configurez les variables</h3>
+      <pre># Base de données (Turso - gratuit)
+DATABASE_URL="libsql://votre-base.turso.io"
+DATABASE_AUTH_TOKEN="votre-token-turso"
+
+# Sécurité session (GÉNÉREZ UN VRAI SECRET !)
+SESSION_SECRET="$(openssl rand -hex 32)"
+SESSION_COOKIE_NAME="maisonolive_session"
+SESSION_DURATION_DAYS="30"
+
+# Business rules
+TAX_RATE="0.14975"
+SHIPPING_FLAT_CENTS="899"
+SHIPPING_FREE_THRESHOLD_CENTS="7500"
+
+# URLs (IMPORTANT : HTTPS !)
+NEXT_PUBLIC_SITE_URL="https://votredomaine.com"
+
+# Stripe (optionnel)
+STRIPE_SECRET_KEY="sk_live_..."
+STRIPE_WEBHOOK_SECRET="whsec_..."
+
+# Support / business (UTILISEZ UN EMAIL PROFESSIONNEL !)
+BUSINESS_SUPPORT_EMAIL="support@votredomaine.com"
+
+# Email transactionnel (Resend)
+RESEND_API_KEY="re_..."
+RESEND_FROM_EMAIL="Maison Olive <noreply@votredomaine.com>"</pre>
+
+      <h3>Étape 3 : Validez la configuration</h3>
+      <pre>npm run validate:env:prod</pre>
+    </div>
+
+    <!-- 8. Déploiement avec PM2 -->
+    <div class="section" id="pm2">
+      <h2>🚀 8. Déploiement avec PM2</h2>
+      
+      <h3>Étape 1 : Créez le fichier ecosystem.config.cjs</h3>
+      <pre>module.exports = {
+  apps: [{
+    name: 'maison-olive-shop',
+    script: 'node_modules/.bin/next',
+    args: 'start',
+    instances: 1,
+    autorestart: true,
+    watch: false,
+    max_memory_restart: '1G',
+    env: {
+      NODE_ENV: 'production',
+      PORT: 3000
+    }
+  }]
+};</pre>
+
+      <h3>Étape 2 : Build et démarrage</h3>
+      <pre># Build de production
+npm run prisma:generate
+npm run build
+
+# Démarrez avec PM2
+pm2 start ecosystem.config.cjs
+
+# Sauvegardez la config PM2
+pm2 save
+
+# Configurez le démarrage automatique
+pm2 startup</pre>
+
+      <h3>Étape 3 : Vérifiez le statut</h3>
+      <pre>pm2 status
+pm2 logs maison-olive-shop</pre>
+    </div>
+
+    <!-- 9. Configuration Nginx -->
+    <div class="section" id="nginx">
+      <h2>🌐 9. Configuration Nginx (reverse proxy)</h2>
+      
+      <h3>Étape 1 : Créez la configuration Nginx</h3>
+      <pre>sudo nano /etc/nginx/sites-available/maison-olive-shop</pre>
+
+      <h3>Étape 2 : Ajoutez la configuration</h3>
+      <pre>server {
+    listen 80;
+    listen [::]:80;
+    server_name votredomaine.com www.votredomaine.com;
+
+    # Redirection HTTPS (optionnel mais recommandé)
+    return 301 https://$server_name$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name votredomaine.com www.votredomaine.com;
+
+    # Certificats SSL (Let's Encrypt)
+    ssl_certificate /etc/letsencrypt/live/votredomaine.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/votredomaine.com/privkey.pem;
+
+    # Configuration SSL sécurisée
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512;
+    ssl_prefer_server_ciphers off;
+
+    # Headers de sécurité
+    add_header X-Frame-Options DENY;
+    add_header X-Content-Type-Options nosniff;
+    add_header X-XSS-Protection "1; mode=block";
+
+    # Proxy vers Next.js
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+
+    # Fichiers statiques (optimisé)
+    location /_next/static {
+        proxy_pass http://127.0.0.1:3000;
+        expires 365d;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # Images (optimisé)
+    location ~* \.(jpg|jpeg|png|gif|ico|svg)$ {
+        proxy_pass http://127.0.0.1:3000;
+        expires 30d;
+        add_header Cache-Control "public";
+    }
+}</pre>
+
+      <h3>Étape 3 : Activez le site</h3>
+      <pre># Créez le lien symbolique
+sudo ln -s /etc/nginx/sites-available/maison-olive-shop /etc/nginx/sites-enabled/
+
+# Testez la configuration
+sudo nginx -t
+
+# Redémarrez Nginx
+sudo systemctl restart nginx</pre>
+    </div>
+
+    <!-- 10. Tests et vérifications -->
+    <div class="section" id="tests">
+      <h2>✅ 10. Tests et vérifications</h2>
+      
+      <h3>Checklist de vérification</h3>
+      <ul class="checklist">
+        <li>
+          <strong>Test 1 : Accessibilité du site</strong>
+          <pre style="margin-top: 0.5rem; margin-bottom: 0;">curl -I https://votredomaine.com
+# Doit retourner : HTTP/2 200</pre>
+        </li>
+        <li>
+          <strong>Test 2 : Health check</strong>
+          <pre style="margin-top: 0.5rem; margin-bottom: 0;">curl https://votredomaine.com/api/health
+# Doit retourner : {"status":"ok"}</pre>
+        </li>
+        <li>
+          <strong>Test 3 : Base de données</strong>
+          <pre style="margin-top: 0.5rem; margin-bottom: 0;">npx prisma db push
+npx prisma db seed</pre>
+        </li>
+        <li>
+          <strong>Test 4 : Paiements (si Stripe configuré)</strong>
+          <p style="margin-top: 0.5rem; margin-bottom: 0;">
+            1. Allez sur https://votredomaine.com<br>
+            2. Ajoutez un produit au panier<br>
+            3. Procédez au checkout<br>
+            4. Utilisez la carte test : <code>4242 4242 4242 4242</code>
+          </p>
+        </li>
+        <li>
+          <strong>Test 5 : Emails (si Resend configuré)</strong>
+          <p style="margin-top: 0.5rem; margin-bottom: 0;">
+            1. Créez un compte<br>
+            2. Vérifiez que vous recevez l'email de confirmation
+          </p>
+        </li>
+        <li>
+          <strong>Test 6 : Support chat</strong>
+          <p style="margin-top: 0.5rem; margin-bottom: 0;">
+            1. Ouvrez le widget de support<br>
+            2. Envoyez un message<br>
+            3. Vérifiez qu'il apparaît dans le panneau admin
+          </p>
+        </li>
+      </ul>
+
+      <h3>Outils de vérification en ligne</h3>
+      <div class="grid">
+        <div class="card">
+          <h4>🚀 Performance</h4>
+          <p><a href="https://pagespeed.web.dev/">PageSpeed Insights</a></p>
+        </div>
+        <div class="card">
+          <h4>🔒 SSL</h4>
+          <p><a href="https://www.ssllabs.com/ssltest/">SSL Labs</a></p>
+        </div>
+        <div class="card">
+          <h4>🛡️ Sécurité</h4>
+          <p><a href="https://securityheaders.com/">Security Headers</a></p>
+        </div>
+        <div class="card">
+          <h4>🌐 DNS</h4>
+          <p><a href="https://dnschecker.org/">DNS Checker</a></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 11. Maintenance et monitoring -->
+    <div class="section" id="maintenance">
+      <h2>🔧 11. Maintenance et monitoring</h2>
+      
+      <h3>Commandes PM2 utiles</h3>
+      <pre># Voir les logs en temps réel
+pm2 logs maison-olive-shop
+
+# Redémarrer l'application
+pm2 restart maison-olive-shop
+
+# Voir les métriques
+pm2 monit
+
+# Sauvegarder la base de données
+npm run db:backup</pre>
+
+      <h3>Sauvegardes automatiques</h3>
+      <p>Créez un script de backup :</p>
+      <pre>nano ~/backup-maison-olive.sh</pre>
+      <pre>#!/bin/bash
+DATE=$(date +%Y%m%d_%H%M%S)
+BACKUP_DIR="/home/maisonolive/backups"
+
+# Backup de la base de données
+cd /home/maisonolive/maison-olive-shop
+npm run db:backup
+
+# Backup du code
+tar -czf $BACKUP_DIR/maison-olive-code-$DATE.tar.gz \
+  --exclude=node_modules \
+  --exclude=.next \
+  --exclude=.git \
+  .
+
+# Supprimez les backups de plus de 30 jours
+find $BACKUP_DIR -name "*.tar.gz" -mtime +30 -delete</pre>
+
+      <p>Configurez le crontab pour une sauvegarde quotidienne :</p>
+      <pre># Rendez le script exécutable
+chmod +x ~/backup-maison-olive.sh
+
+# Ajoutez au crontab
+crontab -e
+# Ajoutez :
+0 3 * * * /home/maisonolive/backup-maison-olive.sh</pre>
+
+      <h3>Monitoring avec PM2 Plus (optionnel)</h3>
+      <pre># Connectez-vous à PM2 Plus
+pm2 plus
+
+# Accédez au dashboard en ligne
+# https://app.pm2.io/</pre>
+
+      <h3>Logs Nginx</h3>
+      <pre># Voir les logs d'accès
+sudo tail -f /var/log/nginx/access.log
+
+# Voir les logs d'erreur
+sudo tail -f /var/log/nginx/error.log</pre>
+    </div>
+
+    <!-- 12. Dépannage courant -->
+    <div class="section" id="depannage">
+      <h2>🔧 12. Dépannage courant</h2>
+      
+      <h3>Problème : Le site ne se charge pas</h3>
+      <div class="alert alert-danger">
+        <strong>Vérifications :</strong>
+        <pre style="margin-top: 0.5rem; margin-bottom: 0;"># 1. PM2 tourne-t-il ?
+pm2 status
+
+# 2. Nginx tourne-t-il ?
+sudo systemctl status nginx
+
+# 3. Le port 3000 est-il ouvert ?
+netstat -tlnp | grep 3000
+
+# 4. Les logs PM2
+pm2 logs maison-olive-shop --lines 50
+
+# 5. Les logs Nginx
+sudo tail -f /var/log/nginx/error.log</pre>
+      </div>
+
+      <h3>Problème : Erreur 502 Bad Gateway</h3>
+      <div class="alert alert-warning">
+        <strong>Causes possibles :</strong>
+        <ul style="margin-top: 0.5rem;">
+          <li>Next.js n'est pas démarré</li>
+          <li>Le port est incorrect</li>
+          <li>Problème de permissions</li>
+        </ul>
+        <strong>Solution :</strong>
+        <pre style="margin-top: 0.5rem; margin-bottom: 0;"># Vérifiez que Next.js écoute sur le bon port
+pm2 logs maison-olive-shop
+
+# Redémarrez PM2
+pm2 restart maison-olive-shop</pre>
+      </div>
+
+      <h3>Problème : Les images ne se chargent pas</h3>
+      <div class="alert alert-info">
+        <strong>Vérifications :</strong>
+        <pre style="margin-top: 0.5rem; margin-bottom: 0;"># Vérifiez les permissions des fichiers
+ls -la /home/maisonolive/maison-olive-shop/public/
+
+# Corrigez les permissions si nécessaire
+sudo chown -R maisonolive:maisonolive /home/maisonolive/maison-olive-shop</pre>
+      </div>
+
+      <h3>Problème : Les emails ne s'envoient pas</h3>
+      <div class="alert alert-info">
+        <strong>Vérifications :</strong>
+        <pre style="margin-top: 0.5rem; margin-bottom: 0;"># 1. Vérifiez la variable RESEND_API_KEY
+grep RESEND_API_KEY /home/maisonolive/maison-olive-shop/.env
+
+# 2. Testez l'envoi d'email
+curl -X POST 'https://api.resend.com/emails' \
+  -H 'Authorization: Bearer re_...' \
+  -H 'Content-Type: application/json' \
+  -d '{"from":"test@resend.dev","to":"votre@email.com","subject":"Test","html":"<p>Test</p>"}'</pre>
+      </div>
+
+      <h3>Problème : Erreur de base de données</h3>
+      <div class="alert alert-info">
+        <strong>Vérifications :</strong>
+        <pre style="margin-top: 0.5rem; margin-bottom: 0;"># 1. Vérifiez la connexion à Turso
+npx prisma db push
+
+# 2. Vérifiez les migrations
+npx prisma migrate status
+
+# 3. Appliquez les migrations si nécessaire
+npx prisma migrate deploy</pre>
+      </div>
+    </div>
+
+    <!-- Résumé -->
+    <div class="section">
+      <h2>🎯 Résumé des étapes</h2>
+      
+      <div class="steps">
+        <div class="step">
+          <div class="step-number">1</div>
+          <div class="step-content">
+            <h4>Achetez un VPS</h4>
+            <p>Hetzner, DigitalOcean, Vultr, ou OVH (~5-10€/mois)</p>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-number">2</div>
+          <div class="step-content">
+            <h4>Configurez les DNS</h4>
+            <p>A et AAAA records pointant vers votre serveur</p>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-number">3</div>
+          <div class="step-content">
+            <h4>Installez Node.js et PM2</h4>
+            <p>Sur votre serveur VPS</p>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-number">4</div>
+          <div class="step-content">
+            <h4>Clonez le projet</h4>
+            <p>Et installez les dépendances</p>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-number">5</div>
+          <div class="step-content">
+            <h4>Configurez les variables d'environnement</h4>
+            <p>Fichier .env avec vos clés API</p>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-number">6</div>
+          <div class="step-content">
+            <h4>Build et démarrez avec PM2</h4>
+            <p>npm run build && pm2 start</p>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-number">7</div>
+          <div class="step-content">
+            <h4>Configurez Nginx</h4>
+            <p>Reverse proxy vers Next.js</p>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-number">8</div>
+          <div class="step-content">
+            <h4>Activez SSL</h4>
+            <p>Avec Let's Encrypt (gratuit)</p>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-number">9</div>
+          <div class="step-content">
+            <h4>Testez toutes les fonctionnalités</h4>
+            <p>Site, paiements, emails, support chat</p>
+          </div>
+        </div>
+
+        <div class="step">
+          <div class="step-number">10</div>
+          <div class="step-content">
+            <h4>Mettez en place les sauvegardes</h4>
+            <p>Automatiques et régulières</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="alert alert-success">
+        <strong>⏱️ Temps estimé :</strong> 2-4 heures pour une première installation<br>
+        <strong>💰 Coût mensuel :</strong> ~5-10€ (VPS + services gratuits)
+      </div>
+    </div>
+
+    <!-- Ressources utiles -->
+    <div class="section">
+      <h2>📚 Ressources utiles</h2>
+      
+      <h3>Documentation officielle</h3>
+      <ul>
+        <li><a href="https://nextjs.org/docs/deployment">Next.js Deployment</a></li>
+        <li><a href="https://pm2.keymetrics.io/docs/usage/quick-start/">PM2 Documentation</a></li>
+        <li><a href="https://nginx.org/en/docs/">Nginx Documentation</a></li>
+        <li><a href="https://letsencrypt.org/getting-started/">Let's Encrypt</a></li>
+      </ul>
+
+      <h3>Outils en ligne</h3>
+      <ul>
+        <li><a href="https://dnschecker.org/">DNS Checker</a></li>
+        <li><a href="https://www.ssllabs.com/ssltest/">SSL Labs</a></li>
+        <li><a href="https://pagespeed.web.dev/">PageSpeed Insights</a></li>
+        <li><a href="https://securityheaders.com/">Security Headers</a></li>
+      </ul>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <p>🫒 <strong>Maison Olive Shop</strong> - Guide de Lancement</p>
+      <p>Créé le 30 mars 2026 | Bonne chance avec votre lancement ! 🚀</p>
+    </div>
+  </div>
+</body>
+</html>
