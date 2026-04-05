@@ -8,6 +8,7 @@
     "start": "next start",
     "start:lan": "next start --hostname 0.0.0.0 --port 3101",
     "test": "vitest run",
+    "test:maintenance": "vitest run src/tests/maintenance.test.ts src/tests/admin-maintenance-route.test.ts src/tests/auth-login-route.test.ts src/tests/orders-delivery-zone.test.ts",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint",
@@ -31,7 +32,10 @@
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:seed": "prisma db seed",
     "prisma:studio": "prisma studio",
-    "seed": "npm run prisma:seed"
+    "seed": "npm run prisma:seed",
+    "site:close": "cross-env MAINTENANCE_MODE=true npm run host:pm2:restart",
+    "site:open": "cross-env MAINTENANCE_MODE=false npm run host:pm2:restart",
+    "site:status": "node -e \"console.log('Mode Maintenance:', process.env.MAINTENANCE_MODE === 'true' ? '🔴 FERMÉ' : '🟢 OUVERT')\""
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -44,20 +48,27 @@
     "next": "16.2.1",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3",
     "stripe": "^18.4.0",
     "zod": "^4.1.11"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^6.0.1",
     "eslint": "^9",
     "eslint-config-next": "16.2.1",
+    "jsdom": "^29.0.1",
     "pm2": "^6.0.14",
     "prisma": "^7.5.0",
     "tailwindcss": "^4",
     "tsx": "^4.20.6",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.2"
   }
 }

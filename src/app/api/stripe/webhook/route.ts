@@ -1,136 +1,156 @@
-import Stripe from "stripe";
-import { prisma } from "@/lib/prisma";
-import { stripe } from "@/lib/stripe";
-import { sendOrderConfirmationEmail } from "@/lib/business";
-import { env } from "@/lib/env";
+import { NextResponse } from 'next/server'
+import Stripe from 'stripe'
+import { SubscriptionStatus } from '@prisma/client'
+
+const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!
+
+const getStripeClient = () => {
+  const stripeSecretKey = process.env.STRIPE_SECRET_KEY
+  if (!stripeSecretKey) return null
+
+  return new Stripe(stripeSecretKey, {
+    apiVersion: '2025-08-27.basil',
+  })
+}
+
+function mapStripeSubscriptionStatus(status: Stripe.Subscription.Status): SubscriptionStatus {
+  switch (status) {
+    case 'active':
+    case 'trialing':
+      return SubscriptionStatus.ACTIVE
+    case 'past_due':
+    case 'unpaid':
+    case 'incomplete':
+    case 'incomplete_expired':
+      return SubscriptionStatus.PAST_DUE
+    case 'canceled':
+      return SubscriptionStatus.CANCELED
+    case 'paused':
+      return SubscriptionStatus.PAUSED
+    default:
+      return SubscriptionStatus.EXPIRED
+  }
+}
+
+type StripeSubscriptionSnapshot = {
+  id: string
+  status: Stripe.Subscription.Status
+  current_period_start: number
+  current_period_end: number
+  cancel_at_period_end: boolean
+  canceled_at: number | null
+}
+
+type StripeInvoiceSnapshot = {
+  subscription?: string | null
+  status_transitions?: {
+    paid_at?: number | null
+  }
+}
 
 export async function POST(request: Request) {
-  if (!stripe) {
-    return new Response("Stripe not configured", { status: 400 });
+  const stripe = getStripeClient()
+  if (!stripe || !webhookSecret) {
+    return NextResponse.json({ error: 'Stripe is not configured' }, { status: 503 })
   }
 
-  const sig = request.headers.get("stripe-signature");
-  const webhookSecret = env.stripeWebhookSecret;
-
-  if (!sig || !webhookSecret) {
-    return new Response("Missing webhook signature", { status: 400 });
-  }
-
-  const body = await request.text();
-  let event: Stripe.Event;
+  const sig = request.headers.get('stripe-signature')!
+  const rawBody = Buffer.from(await request.arrayBuffer())
+  
+  let event: Stripe.Event
 
   try {
-    event = stripe.webhooks.constructEvent(body, sig, webhookSecret);
-  } catch {
-    return new Response("Invalid signature", { status: 400 });
+    event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret)
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Unknown webhook error'
+    return NextResponse.json({ error: `Webhook Error: ${message}` }, { status: 400 })
   }
 
-  if (event.type === "checkout.session.completed") {
-    const session = event.data.object as Stripe.Checkout.Session;
-    const orderId = session.metadata?.orderId ?? session.client_reference_id;
+  try {
+    const { prisma } = await import('@/lib/prisma')
 
-    if (orderId) {
-      const existingOrder = await prisma.order.findUnique({
-        where: { id: orderId },
-        include: { user: true },
-      });
-
-      if (existingOrder) {
-        const result = await prisma.$transaction(async (tx) => {
-          const updated = await tx.order.updateMany({
-            where: { id: orderId, paymentStatus: "PENDING" },
+    switch (event.type) {
+      case 'checkout.session.completed': {
+        const session = event.data.object as Stripe.Checkout.Session
+        if (session.mode === 'subscription' && session.subscription) {
+          const subscription = await stripe.subscriptions.retrieve(session.subscription as string)
+          const sub = subscription as unknown as StripeSubscriptionSnapshot
+          
+          await prisma.subscription.create({
             data: {
-              paymentStatus: "PAID",
-              status: "PAID",
-              stripeSessionId: session.id,
-            },
-          });
-
-          if (updated.count === 0) {
-            return { transitionedToPaid: false };
-          }
-
-          await tx.auditLog.create({
-            data: {
-              actorUserId: existingOrder.userId,
-              action: "STRIPE_CHECKOUT_COMPLETED",
-              entity: "Order",
-              entityId: orderId,
-              metadata: JSON.stringify({ sessionId: session.id }),
-            },
-          });
-
-          return { transitionedToPaid: true };
-        });
-
-        if (!result.transitionedToPaid) {
-          return new Response("ok", { status: 200 });
+              stripeSubscriptionId: sub.id,
+              userId: session.metadata!.userId,
+              productId: session.metadata!.productId,
+              quantity: parseInt(session.metadata!.quantity || '1'),
+              currentPeriodStart: new Date(sub.current_period_start * 1000),
+              currentPeriodEnd: new Date(sub.current_period_end * 1000),
+              nextPaymentDate: new Date(sub.current_period_end * 1000),
+            }
+          })
         }
+        break
+      }
 
-        await sendOrderConfirmationEmail({
-          orderNumber: existingOrder.orderNumber,
-          customerName: existingOrder.customerName,
-          customerEmail: existingOrder.customerEmail,
-          totalCents: existingOrder.totalCents,
-          currency: existingOrder.currency,
-          language: existingOrder.user.language === "en" ? "en" : "fr",
-        });
+      case 'customer.subscription.updated': {
+        const subscription = event.data.object as unknown as StripeSubscriptionSnapshot
+        
+        await prisma.subscription.updateMany({
+          where: { stripeSubscriptionId: subscription.id },
+          data: {
+            status: mapStripeSubscriptionStatus(subscription.status),
+            currentPeriodStart: new Date(subscription.current_period_start * 1000),
+            currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+            cancelAtPeriodEnd: subscription.cancel_at_period_end,
+            canceledAt: subscription.canceled_at ? new Date(subscription.canceled_at * 1000) : null,
+            nextPaymentDate: new Date(subscription.current_period_end * 1000),
+          }
+        })
+        break
+      }
+
+      case 'customer.subscription.deleted': {
+        const subscription = event.data.object as Stripe.Subscription
+        
+        await prisma.subscription.updateMany({
+          where: { stripeSubscriptionId: subscription.id },
+          data: {
+            status: 'CANCELED',
+            canceledAt: new Date(),
+          }
+        })
+        break
+      }
+
+      case 'invoice.paid': {
+        const invoice = event.data.object as unknown as StripeInvoiceSnapshot
+        if (invoice.subscription && invoice.status_transitions?.paid_at) {
+          await prisma.subscription.updateMany({
+            where: { stripeSubscriptionId: invoice.subscription },
+            data: {
+              lastPaymentDate: new Date(invoice.status_transitions.paid_at * 1000),
+            }
+          })
+        }
+        break
+      }
+
+      case 'invoice.payment_failed': {
+        const invoice = event.data.object as unknown as StripeInvoiceSnapshot
+        if (invoice.subscription) {
+          await prisma.subscription.updateMany({
+            where: { stripeSubscriptionId: invoice.subscription },
+            data: {
+              status: 'PAST_DUE',
+            }
+          })
+        }
+        break
       }
     }
+
+    return NextResponse.json({ received: true })
+  } catch (error) {
+    console.error('Webhook handler error:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-
-  if (event.type === "checkout.session.expired") {
-    const session = event.data.object as Stripe.Checkout.Session;
-    const orderId = session.metadata?.orderId ?? session.client_reference_id;
-
-    if (orderId) {
-      await prisma.$transaction(async (tx) => {
-        const order = await tx.order.findUnique({
-          where: { id: orderId },
-          include: { items: true },
-        });
-
-        if (!order || order.paymentStatus !== "PENDING") {
-          return;
-        }
-
-        await tx.order.update({
-          where: { id: orderId },
-          data: {
-            paymentStatus: "FAILED",
-            status: "CANCELLED",
-            stripeSessionId: session.id,
-          },
-        });
-
-        for (const item of order.items) {
-          await tx.product.update({
-            where: { id: item.productId },
-            data: { stock: { increment: item.quantity } },
-          });
-
-          await tx.inventoryMovement.create({
-            data: {
-              productId: item.productId,
-              orderId: order.id,
-              quantityChange: item.quantity,
-              reason: "STRIPE_CHECKOUT_EXPIRED_RESTOCK",
-            },
-          });
-        }
-
-        await tx.auditLog.create({
-          data: {
-            actorUserId: order.userId,
-            action: "STRIPE_CHECKOUT_EXPIRED",
-            entity: "Order",
-            entityId: orderId,
-            metadata: JSON.stringify({ sessionId: session.id, restocked: true }),
-          },
-        });
-      });
-    }
-  }
-
-  return new Response("ok", { status: 200 });
 }
