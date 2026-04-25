@@ -1,6 +1,6 @@
-# Tests Automatisés — Maison Olive Shop 🧪
+﻿# Tests Automatisés — Chez Olive Shop 🧪
 
-Ce dossier contient la suite de tests automatisés du projet **maison-olive-shop**.
+Ce dossier contient la suite de tests automatisés du projet **Chez-olive-shop**.
 
 ## 📋 Sommaire
 
@@ -54,7 +54,7 @@ src/tests/
 
 ---
 
-## Exécuter les tests ▶️
+## Executer les tests
 
 ### Prérequis
 
@@ -66,7 +66,7 @@ npm install
 
 ### Commandes disponibles
 
-Depuis la **racine du projet** (`C:\Users\Gary\Desktop\Cline\maison-olive-shop`) :
+Depuis la **racine du projet** (`C:\Users\Gary\Desktop\Cline\Chez-olive-shop`) :
 
 ```bash
 # Exécuter tous les tests une fois
@@ -77,6 +77,28 @@ npm run test:watch
 
 # Avec rapport de couverture de code (coverage)
 npm run test:coverage
+```
+
+### Validation par module
+
+```bash
+# Authentification / session
+npm run test:module:auth
+
+# Fiches chien / QR public
+npm run test:module:dogs
+
+# Commandes / livraison
+npm run test:module:orders
+
+# Stripe / abonnements / webhooks
+npm run test:module:stripe
+
+# Support / email
+npm run test:module:support
+
+# Back-office admin
+npm run test:module:admin
 ```
 
 ### Exécuter un fichier de test spécifique
@@ -114,7 +136,7 @@ npx vitest run --pool=forks --poolOptions.forks.singleFork
 
 ---
 
-## Écrire de nouveaux tests ✍️
+## Ecrire de nouveaux tests
 
 ### Modèle de base
 
@@ -292,7 +314,7 @@ describe('mon module', () => {
 Vérifiez que vous êtes dans le bon répertoire :
 
 ```bash
-cd C:\Users\Gary\Desktop\Cline\maison-olive-shop
+cd C:\Users\Gary\Desktop\Cline\Chez-olive-shop
 npm run test
 ```
 

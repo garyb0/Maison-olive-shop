@@ -1,3 +1,5 @@
+import { resolvePublicSiteUrl } from "../src/lib/site-url";
+
 type CheckResult = {
   name: string;
   ok: boolean;
@@ -36,11 +38,35 @@ async function checkUnauthorized(baseUrl: string, path: string): Promise<CheckRe
   }
 }
 
+async function checkSiteAvailability(baseUrl: string): Promise<CheckResult> {
+  try {
+    const res = await fetch(baseUrl, { redirect: "manual" });
+    const maintenanceRewrite = res.headers.get("x-middleware-rewrite");
+    const isMaintenance = maintenanceRewrite === "/maintenance";
+
+    return {
+      name: "site",
+      ok: res.ok && !isMaintenance,
+      details: isMaintenance ? "maintenance mode active" : `HTTP ${res.status}`,
+    };
+  } catch (error) {
+    return {
+      name: "site",
+      ok: false,
+      details: error instanceof Error ? error.message : "unknown error",
+    };
+  }
+}
+
 async function main() {
-  const baseUrl = (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3101").replace(/\/+$/, "");
+  const baseUrl = resolvePublicSiteUrl({
+    configuredUrl: process.env.NEXT_PUBLIC_SITE_URL,
+    nodeEnv: process.env.NODE_ENV,
+  });
 
   const checks: CheckResult[] = [];
   checks.push(await checkHealth(baseUrl));
+  checks.push(await checkSiteAvailability(baseUrl));
   checks.push(await checkUnauthorized(baseUrl, "/api/admin/orders"));
   checks.push(await checkUnauthorized(baseUrl, "/api/admin/customers"));
   checks.push(await checkUnauthorized(baseUrl, "/api/admin/taxes"));
@@ -49,11 +75,11 @@ async function main() {
   console.log(`Smoke check target: ${baseUrl}`);
   for (const c of checks) {
     if (!c.ok) hasFailure = true;
-    console.log(`${c.ok ? "✅" : "❌"} ${c.name}${c.details ? ` -> ${c.details}` : ""}`);
+    console.log(`${c.ok ? "OK" : "FAIL"} ${c.name}${c.details ? ` -> ${c.details}` : ""}`);
   }
 
   if (hasFailure) {
-    process.exit(1);
+    process.exitCode = 1;
   }
 }
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+/// <reference types="vitest/globals" />
 
 // Mock de env.ts avant l'import des fonctions à tester
 vi.mock('@/lib/env', () => ({
@@ -31,8 +31,8 @@ describe('computeShipping', () => {
 
 describe('computeTaxes', () => {
   it('devrait calculer les taxes TPS + TVQ (14.975%)', () => {
-    // 100$ = 10000 cents, taxes = 10000 * 0.14975 = 1497.5 -> 1498 cents arrondis
-    expect(computeTaxes(10000)).toBe(1498);
+    // 100$ = TPS 500 + TVQ 997 = 1497 cents apres arrondi par taxe
+    expect(computeTaxes(10000)).toBe(1497);
     
     // 50$ = 5000 cents, taxes = 5000 * 0.14975 = 748.75 -> 749 cents arrondis
     expect(computeTaxes(5000)).toBe(749);
@@ -52,14 +52,14 @@ describe('computeTaxes', () => {
 
 describe('computeOrderAmounts', () => {
   it('devrait calculer correctement une commande simple sans remise', () => {
-    const result = computeOrderAmounts(10000); // 100$
+    const result = computeOrderAmounts(7000); // 70$
     
-    expect(result.subtotalCents).toBe(10000);
+    expect(result.subtotalCents).toBe(7000);
     expect(result.discountCents).toBe(0);
     expect(result.shippingCents).toBe(899); // < 75$ donc frais appliqués
-    // Taxes sur (10000 + 899) = 10899 * 0.14975 = 1632.11 -> 1632
-    expect(result.taxCents).toBe(1632);
-    expect(result.totalCents).toBe(10000 + 899 + 1632); // 12531
+    // Taxes sur (7000 + 899) = 7899 * 0.14975 = 1182.875 -> 1183
+    expect(result.taxCents).toBe(1183);
+    expect(result.totalCents).toBe(7000 + 899 + 1183); // 9082
   });
 
   it('devrait calculer correctement une commande avec livraison gratuite', () => {

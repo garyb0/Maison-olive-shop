@@ -2,16 +2,14 @@ import { spawnSync } from "node:child_process";
 import path from "node:path";
 import {
   createSqliteBackup,
-  loadEnvFilesInOrder,
+  getPositionalScriptArgs,
+  loadDatabaseEnvForTarget,
+  resolveEnvTargetFromArgs,
   resolveDatabaseFromEnv,
 } from "./db-utils";
 
-loadEnvFilesInOrder([
-  ".env.production.local",
-  ".env.production",
-  ".env.local",
-  ".env",
-]);
+const envTarget = resolveEnvTargetFromArgs();
+loadDatabaseEnvForTarget(envTarget);
 
 const db = resolveDatabaseFromEnv();
 const isSqlite = db.kind === "sqlite";
@@ -26,6 +24,7 @@ if (isSqlite) {
   const backup = createSqliteBackup(db.dbPath, backupDir, "before-migrate");
 
   console.log("Pre-migration SQLite backup created:");
+  console.log(`- Environment: ${envTarget}`);
   console.log(`- ${backup.dbBackupPath}`);
   console.log(`- ${backup.manifestPath}`);
 }
@@ -35,7 +34,7 @@ if (db.kind === "non-sqlite") {
   console.warn("Make sure provider snapshot/backup exists before migration.");
 }
 
-const migrationName = process.argv[2] ?? "safe-migration";
+const [migrationName = "safe-migration"] = getPositionalScriptArgs();
 
 const result = spawnSync(
   process.platform === "win32" ? "cmd" : "npm",

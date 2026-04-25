@@ -1,0 +1,72 @@
+src/app/storefront-client.tsx:268: '                <span>âš\xa0ï¸\x8f</span> {error}'
+  pos 22: U+00E2 bytes=c3a2
+  pos 23: U+0161 bytes=c5a1
+  pos 24: U+00A0 bytes=c2a0
+  pos 25: U+00EF bytes=c3af
+  pos 26: U+00B8 bytes=c2b8
+  pos 27: U+008F bytes=c28f
+src/app/checkout/checkout-client.tsx:406: '                      âš\xa0ï¸\x8f {addressError}'
+  pos 22: U+00E2 bytes=c3a2
+  pos 23: U+0161 bytes=c5a1
+  pos 24: U+00A0 bytes=c2a0
+  pos 25: U+00EF bytes=c3af
+  pos 26: U+00B8 bytes=c2b8
+  pos 27: U+008F bytes=c28f
+src/app/forgot-password/page.tsx:107: '                <span>âš\xa0ï¸\x8f</span> {error}'
+  pos 22: U+00E2 bytes=c3a2
+  pos 23: U+0161 bytes=c5a1
+  pos 24: U+00A0 bytes=c2a0
+  pos 25: U+00EF bytes=c3af
+  pos 26: U+00B8 bytes=c2b8
+  pos 27: U+008F bytes=c28f
+src/app/reset-password/page.tsx:117: '                <span>âš\xa0ï¸\x8f</span> {error}'
+  pos 22: U+00E2 bytes=c3a2
+  pos 23: U+0161 bytes=c5a1
+  pos 24: U+00A0 bytes=c2a0
+  pos 25: U+00EF bytes=c3af
+  pos 26: U+00B8 bytes=c2b8
+  pos 27: U+008F bytes=c28f
+README.md:143: "## ðŸ”\x90 Variables d'Environnement"
+  pos 3: U+00F0 bytes=c3b0
+  pos 4: U+0178 bytes=c5b8
+  pos 5: U+201D bytes=e2809d
+  pos 6: U+0090 bytes=c290
+README.md:314: '## ðŸ›¡ï¸\x8f Sécurité'
+  pos 3: U+00F0 bytes=c3b0
+  pos 4: U+0178 bytes=c5b8
+  pos 5: U+203A bytes=e280ba
+  pos 6: U+00A1 bytes=c2a1
+  pos 7: U+00EF bytes=c3af
+  pos 8: U+00B8 bytes=c2b8
+  pos 9: U+008F bytes=c28f
+  pos 12: U+00E9 bytes=c3a9
+  pos 18: U+00E9 bytes=c3a9
+README-LANCEMENT.html:413: '          <h4>ðŸ–¥ï¸\x8f Hébergement VPS</h4>'
+  pos 14: U+00F0 bytes=c3b0
+  pos 15: U+0178 bytes=c5b8
+  pos 16: U+2013 bytes=e28093
+  pos 17: U+00A5 bytes=c2a5
+  pos 18: U+00EF bytes=c3af
+  pos 19: U+00B8 bytes=c2b8
+  pos 20: U+008F bytes=c28f
+  pos 23: U+00E9 bytes=c3a9
+OLIVE_MODE_GUIDE.md:64: "- âš\xa0ï¸\x8f Le changement nécessite un **redémarrage du serveur** (c'est une variable server-side)"
+  pos 2: U+00E2 bytes=c3a2
+  pos 3: U+0161 bytes=c5a1
+  pos 4: U+00A0 bytes=c2a0
+  pos 5: U+00EF bytes=c3af
+  pos 6: U+00B8 bytes=c2b8
+  pos 7: U+008F bytes=c28f
+  pos 24: U+00E9 bytes=c3a9
+  pos 41: U+00E9 bytes=c3a9
+OLIVE_MODE_GUIDE.md:68: "- ðŸ–¼ï¸\x8f Les 3 logos d'Olive (séparés depuis `a424ec22...png`) sont toujours affichés dans les deux"
+  pos 2: U+00F0 bytes=c3b0
+  pos 3: U+0178 bytes=c5b8
+  pos 4: U+2013 bytes=e28093
+  pos 5: U+00BC bytes=c2bc
+  pos 6: U+00EF bytes=c3af
+  pos 7: U+00B8 bytes=c2b8
+  pos 8: U+008F bytes=c28f
+  pos 32: U+00E9 bytes=c3a9
+  pos 36: U+00E9 bytes=c3a9
+  pos 84: U+00E9 bytes=c3a9

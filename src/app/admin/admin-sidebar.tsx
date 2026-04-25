@@ -3,11 +3,10 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { Dictionary, Language } from "@/lib/i18n";
+import type { Language } from "@/lib/i18n";
 
 type Props = {
   language: Language;
-  t: Dictionary;
 };
 
 type NavItem = {
@@ -19,15 +18,26 @@ type NavItem = {
 };
 
 const navItems: NavItem[] = [
-  { href: "/admin", icon: "🏠", labelFr: "Dashboard", labelEn: "Dashboard" },
-  { href: "/admin/products", icon: "📦", labelFr: "Produits", labelEn: "Products" },
-  { href: "/admin/orders", icon: "🛒", labelFr: "Commandes", labelEn: "Orders" },
-  { href: "/admin/customers", icon: "👥", labelFr: "Clients", labelEn: "Customers" },
-  { href: "/admin/taxes", icon: "💰", labelFr: "Taxes", labelEn: "Taxes" },
-  { href: "/admin/promo", icon: "🏷️", labelFr: "Bannières", labelEn: "Banners" },
+  { href: "/admin", icon: "\u{1F3E2}", labelFr: "Tableau de bord", labelEn: "Dashboard" },
+  { href: "/admin/products", icon: "\u{1F6D2}", labelFr: "Produits", labelEn: "Products" },
+  { href: "/admin/orders", icon: "\u{1F4E6}", labelFr: "Commandes", labelEn: "Orders" },
+  {
+    href: "/admin/delivery",
+    icon: "\u{1F69A}",
+    labelFr: "Livraisons",
+    labelEn: "Delivery",
+    children: [
+      { href: "/admin/delivery", labelFr: "Créneaux", labelEn: "Slots" },
+      { href: "/admin/delivery/runs", labelFr: "Tournées", labelEn: "Runs" },
+    ],
+  },
+  { href: "/admin/customers", icon: "\u{1F465}", labelFr: "Clients", labelEn: "Customers" },
+  { href: "/admin/dogs", icon: "\u{1F436}", labelFr: "Chiens QR", labelEn: "Dog QR" },
+  { href: "/admin/taxes", icon: "\u{1F4B0}", labelFr: "Taxes", labelEn: "Taxes" },
+  { href: "/admin/promo", icon: "\u{1F4E3}", labelFr: "Promotions", labelEn: "Promotions" },
   {
     href: "/admin/support",
-    icon: "💬",
+    icon: "\u{1F4AC}",
     labelFr: "Support",
     labelEn: "Support",
     children: [
@@ -37,10 +47,9 @@ const navItems: NavItem[] = [
   },
 ];
 
-export function AdminSidebar({ language, t }: Props) {
+export function AdminSidebar({ language }: Props) {
   const pathname = usePathname();
   const [expandedItems, setExpandedItems] = useState<string[]>(() => {
-    // Auto-expand if we're on a support page
     if (pathname.startsWith("/admin/support")) {
       return ["/admin/support"];
     }
@@ -49,7 +58,7 @@ export function AdminSidebar({ language, t }: Props) {
 
   const toggleExpand = (href: string) => {
     setExpandedItems((prev) =>
-      prev.includes(href) ? prev.filter((item) => item !== href) : [...prev, href]
+      prev.includes(href) ? prev.filter((item) => item !== href) : [...prev, href],
     );
   };
 
@@ -82,10 +91,10 @@ export function AdminSidebar({ language, t }: Props) {
                     <span className="admin-nav-icon">{item.icon}</span>
                     <span className="admin-nav-label">{label}</span>
                     <span className={`admin-nav-chevron ${expanded ? "expanded" : ""}`}>
-                      ▸
+                      {expanded ? "\u{25B2}" : "\u{25BC}"}
                     </span>
                   </button>
-                  {expanded && (
+                  {expanded ? (
                     <ul className="admin-nav-children">
                       {(item.children ?? []).map((child) => {
                         const childLabel = language === "fr" ? child.labelFr : child.labelEn;
@@ -104,13 +113,10 @@ export function AdminSidebar({ language, t }: Props) {
                         );
                       })}
                     </ul>
-                  )}
+                  ) : null}
                 </>
               ) : (
-                <Link
-                  href={item.href}
-                  className={`admin-nav-item ${active ? "active" : ""}`}
-                >
+                <Link href={item.href} className={`admin-nav-item ${active ? "active" : ""}`}>
                   <span className="admin-nav-icon">{item.icon}</span>
                   <span className="admin-nav-label">{label}</span>
                 </Link>

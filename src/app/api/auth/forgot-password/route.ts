@@ -6,19 +6,40 @@ import { forgotPasswordSchema } from "@/lib/validators";
 import { env } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import { applyRateLimit } from "@/lib/rate-limit";
+import { resolvePublicSiteUrl } from "@/lib/site-url";
 
 export async function POST(request: Request) {
-  const rate = applyRateLimit(request, { namespace: "auth:forgot-password", windowMs: 10 * 60_000, max: 10 });
+  const rate = await applyRateLimit(request, { namespace: "auth:forgot-password", windowMs: 10 * 60_000, max: 10 });
   if (!rate.ok) {
     return jsonError("Too many requests", 429);
   }
 
   try {
-    const body = await request.json();
-    const input = forgotPasswordSchema.parse(body);
+    const body = await request.json().catch(() => null);
+    const parsed = forgotPasswordSchema.safeParse(body);
+    if (!parsed.success) {
+      logApiEvent({
+        level: "WARN",
+        route: "/api/auth/forgot-password",
+        event: "PASSWORD_RESET_INVALID_PAYLOAD",
+        status: 400,
+        details: {
+          issues: parsed.error.issues.map((issue) => ({
+            path: issue.path.join("."),
+            code: issue.code,
+            message: issue.message,
+          })),
+        },
+      });
+      return jsonError("Invalid request payload", 400);
+    }
+    const input = parsed.data;
 
     const token = await requestPasswordReset(input.email);
 
+    let emailStatus = 'sent';
+    let resetUrl: string | undefined;
+    
     if (token) {
       // Detect user's language preference to send email in the right language
       const user = await prisma.user.findUnique({
@@ -27,14 +48,28 @@ export async function POST(request: Request) {
       });
 
       const lang = user?.language === "en" ? "en" : "fr";
-      const resetUrl = `${env.siteUrl}/reset-password?token=${token}`;
+      
+      // Détecter automatiquement l'URL originale depuis la requête (fonctionne avec localhost, IP, domaine, ngrok...)
+      const baseUrl = resolvePublicSiteUrl({ request, configuredUrl: env.siteUrl, nodeEnv: env.nodeEnv });
+      resetUrl = `${baseUrl}/reset-password?token=${token}`;
 
       const { subject, html } =
         lang === "en"
           ? buildPasswordResetEmailEn(resetUrl)
           : buildPasswordResetEmailFr(resetUrl);
 
-      await sendEmail({ to: input.email.toLowerCase(), subject, html });
+      try {
+        await sendEmail({ to: input.email.toLowerCase(), subject, html });
+      } catch (emailError) {
+        emailStatus = 'failed';
+        logApiEvent({
+          level: "WARN",
+          route: "/api/auth/forgot-password",
+          event: "PASSWORD_RESET_EMAIL_FAILED_SILENT",
+          status: 200,
+          details: { email: input.email, error: emailError },
+        });
+      }
 
       logApiEvent({
         level: "INFO",
@@ -54,7 +89,7 @@ export async function POST(request: Request) {
     }
 
     // Always return 200 so we don't reveal whether the address exists
-    return jsonOk({ ok: true });
+    return jsonOk({ ok: true, emailStatus, resetUrl: process.env.NODE_ENV === 'development' ? resetUrl : undefined });
   } catch (error) {
     logApiEvent({
       level: "ERROR",
