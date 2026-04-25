@@ -1,6 +1,6 @@
-# Guide de Configuration Admin 👑
+﻿# Guide de Configuration Admin 👑
 
-Ce guide explique comment créer ton compte administrateur pour accéder au panel admin de Maison Olive.
+Ce guide explique comment créer ton compte administrateur pour accéder au panel admin de Chez Olive.
 
 ## Méthode 1: Via SQL Direct (Recommandée)
 
@@ -111,3 +111,6 @@ UPDATE User SET role = 'CUSTOMER' WHERE email = 'ancien-admin@example.com';
 ---
 
 💡 **Astuce**: Tu peux créer plusieurs comptes admins en répétant le processus!
+
+
+

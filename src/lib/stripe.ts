@@ -1,10 +1,21 @@
-import Stripe from "stripe";
 import { env } from "@/lib/env";
+import {
+  createStripeServerClient,
+  STRIPE_API_VERSION,
+} from "@/lib/stripe-server";
+
+export { STRIPE_API_VERSION };
 
 export const stripe = env.stripeSecretKey
-  ? new Stripe(env.stripeSecretKey, {
-      apiVersion: "2025-08-27.basil",
-    })
+  ? createStripeServerClient(env.stripeSecretKey)
   : null;
 
 export const stripeEnabled = Boolean(stripe);
+
+export async function getCheckoutSession(sessionId: string) {
+  if (!stripe) {
+    return null;
+  }
+
+  return stripe.checkout.sessions.retrieve(sessionId);
+}

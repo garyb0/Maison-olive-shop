@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 
@@ -22,7 +22,6 @@ export default function AdminSupportSettingsPage() {
   const [testEmailSent, setTestEmailSent] = useState(false);
   const [sendingTest, setSendingTest] = useState(false);
 
-  // Load preferences from localStorage on mount
   useEffect(() => {
     try {
       const stored = localStorage.getItem("admin_notification_preferences");
@@ -39,13 +38,8 @@ export default function AdminSupportSettingsPage() {
     setSaving(true);
     setError("");
     try {
-      // In a real implementation, this would save to the server
-      // For now, we'll save to localStorage
       localStorage.setItem("admin_notification_preferences", JSON.stringify(preferences));
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
+      await new Promise((resolve) => setTimeout(resolve, 500));
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch {
@@ -59,9 +53,7 @@ export default function AdminSupportSettingsPage() {
     setSendingTest(true);
     setTestEmailSent(false);
     try {
-      // In a real implementation, this would call an API endpoint
-      // to send a test email to the admin
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
       setTestEmailSent(true);
       setTimeout(() => setTestEmailSent(false), 5000);
     } catch {
@@ -75,94 +67,89 @@ export default function AdminSupportSettingsPage() {
     <div className="container" style={{ maxWidth: "800px", margin: "0 auto", padding: "2rem 1rem" }}>
       <div className="section">
         <h1 style={{ fontSize: "1.75rem", fontWeight: "700", marginBottom: "0.5rem" }}>
-          ⚙️ Paramètres de notification
+          Paramètres de notification
         </h1>
         <p style={{ color: "var(--muted)", marginBottom: "2rem" }}>
-          Gérez comment vous recevez les notifications pour le support client
+          Gère comment tu reçois les notifications pour le support client.
         </p>
 
-        {error && (
+        {error ? (
           <div className="alert alert-error" style={{ marginBottom: "1.5rem" }}>
             {error}
           </div>
-        )}
+        ) : null}
 
-        {saved && (
+        {saved ? (
           <div className="alert alert-success" style={{ marginBottom: "1.5rem" }}>
-            ✓ Préférences sauvegardées
+            Préférences sauvegardées
           </div>
-        )}
+        ) : null}
 
-        {testEmailSent && (
+        {testEmailSent ? (
           <div className="alert alert-success" style={{ marginBottom: "1.5rem" }}>
-            ✓ Email de test envoyé ! Vérifiez votre boîte de réception.
+            Email de test envoyé. Vérifie ta boîte de réception.
           </div>
-        )}
+        ) : null}
 
-        {/* Email Notifications */}
         <div style={{ marginBottom: "2rem" }}>
           <h2 style={{ fontSize: "1.25rem", fontWeight: "600", marginBottom: "1rem" }}>
-            📧 Notifications par email
+            Notifications par email
           </h2>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-            {/* New Conversation */}
             <label style={{ display: "flex", alignItems: "center", gap: "0.75rem", cursor: "pointer" }}>
               <input
                 type="checkbox"
                 checked={preferences.emailNewConversation}
-                onChange={(e) => setPreferences(prev => ({ ...prev, emailNewConversation: e.target.checked }))}
+                onChange={(e) => setPreferences((prev) => ({ ...prev, emailNewConversation: e.target.checked }))}
                 style={{ width: "18px", height: "18px", cursor: "pointer" }}
               />
               <div>
                 <strong>Nouvelle conversation</strong>
                 <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--muted)" }}>
-                  Recevoir un email quand un client démarre une nouvelle conversation
+                  Recevoir un email quand un client démarre une nouvelle conversation.
                 </p>
               </div>
             </label>
 
-            {/* New Message */}
             <label style={{ display: "flex", alignItems: "center", gap: "0.75rem", cursor: "pointer" }}>
               <input
                 type="checkbox"
                 checked={preferences.emailNewMessage}
-                onChange={(e) => setPreferences(prev => ({ ...prev, emailNewMessage: e.target.checked }))}
+                onChange={(e) => setPreferences((prev) => ({ ...prev, emailNewMessage: e.target.checked }))}
                 style={{ width: "18px", height: "18px", cursor: "pointer" }}
               />
               <div>
                 <strong>Nouveau message</strong>
                 <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--muted)" }}>
-                  Recevoir un email quand un client répond à une conversation qui vous est assignée
+                  Recevoir un email quand un client répond à une conversation qui t&apos;est assignée.
                 </p>
               </div>
             </label>
 
-            {/* Conversation Assigned */}
             <label style={{ display: "flex", alignItems: "center", gap: "0.75rem", cursor: "pointer" }}>
               <input
                 type="checkbox"
                 checked={preferences.emailConversationAssigned}
-                onChange={(e) => setPreferences(prev => ({ ...prev, emailConversationAssigned: e.target.checked }))}
+                onChange={(e) => setPreferences((prev) => ({ ...prev, emailConversationAssigned: e.target.checked }))}
                 style={{ width: "18px", height: "18px", cursor: "pointer" }}
               />
               <div>
                 <strong>Conversation assignée</strong>
                 <p style={{ margin: 0, fontSize: "0.875rem", color: "var(--muted)" }}>
-                  Recevoir un email quand une conversation vous est assignée
+                  Recevoir un email quand une conversation t&apos;est assignée.
                 </p>
               </div>
             </label>
           </div>
         </div>
 
-        {/* Digest Email */}
         <div style={{ marginBottom: "2rem" }}>
           <h2 style={{ fontSize: "1.25rem", fontWeight: "600", marginBottom: "1rem" }}>
-            📋 Résumé périodique
+            Résumé périodique
           </h2>
           <p style={{ fontSize: "0.875rem", color: "var(--muted)", marginBottom: "1rem" }}>
-            Recevez un résumé des activités de support
+            Reçois un résumé des activités de support.
           </p>
 
           <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
@@ -172,7 +159,7 @@ export default function AdminSupportSettingsPage() {
                 name="emailDigest"
                 value="none"
                 checked={preferences.emailDigest === "none"}
-                onChange={(e) => setPreferences(prev => ({ ...prev, emailDigest: e.target.value as "none" | "hourly" | "daily" }))}
+                onChange={(e) => setPreferences((prev) => ({ ...prev, emailDigest: e.target.value as "none" | "hourly" | "daily" }))}
                 style={{ cursor: "pointer" }}
               />
               <span>Désactivé</span>
@@ -183,10 +170,10 @@ export default function AdminSupportSettingsPage() {
                 name="emailDigest"
                 value="hourly"
                 checked={preferences.emailDigest === "hourly"}
-                onChange={(e) => setPreferences(prev => ({ ...prev, emailDigest: e.target.value as "none" | "hourly" | "daily" }))}
+                onChange={(e) => setPreferences((prev) => ({ ...prev, emailDigest: e.target.value as "none" | "hourly" | "daily" }))}
                 style={{ cursor: "pointer" }}
               />
-              <span>Résumé horaire (toutes les heures)</span>
+              <span>Résumé horaire</span>
             </label>
             <label style={{ display: "flex", alignItems: "center", gap: "0.75rem", cursor: "pointer" }}>
               <input
@@ -194,54 +181,42 @@ export default function AdminSupportSettingsPage() {
                 name="emailDigest"
                 value="daily"
                 checked={preferences.emailDigest === "daily"}
-                onChange={(e) => setPreferences(prev => ({ ...prev, emailDigest: e.target.value as "none" | "hourly" | "daily" }))}
+                onChange={(e) => setPreferences((prev) => ({ ...prev, emailDigest: e.target.value as "none" | "hourly" | "daily" }))}
                 style={{ cursor: "pointer" }}
               />
-              <span>Résumé quotidien (une fois par jour)</span>
+              <span>Résumé quotidien</span>
             </label>
           </div>
         </div>
 
-        {/* Test Email */}
         <div style={{ marginBottom: "2rem", padding: "1.5rem", background: "var(--card-bg)", borderRadius: "12px", border: "1px solid var(--border)" }}>
           <h3 style={{ fontSize: "1rem", fontWeight: "600", marginBottom: "0.75rem" }}>
-            🧪 Email de test
+            Email de test
           </h3>
           <p style={{ fontSize: "0.875rem", color: "var(--muted)", marginBottom: "1rem" }}>
-            Envoyez un email de test pour vérifier que les notifications fonctionnent correctement
+            Envoie un email de test pour vérifier que les notifications fonctionnent correctement.
           </p>
-          <button
-            className="btn btn-secondary"
-            onClick={sendTestEmail}
-            disabled={sendingTest}
-            style={{ fontSize: "0.875rem" }}
-          >
+          <button className="btn btn-secondary" onClick={sendTestEmail} disabled={sendingTest} style={{ fontSize: "0.875rem" }}>
             {sendingTest ? "Envoi en cours..." : "Envoyer un email de test"}
           </button>
         </div>
 
-        {/* Save Button */}
-        <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
-          <button
-            className="btn"
-            onClick={savePreferences}
-            disabled={saving}
-          >
+        <div style={{ display: "flex", gap: "1rem", alignItems: "center", flexWrap: "wrap" }}>
+          <button className="btn" onClick={savePreferences} disabled={saving}>
             {saving ? "Sauvegarde..." : "Sauvegarder les préférences"}
           </button>
           <span style={{ fontSize: "0.875rem", color: "var(--muted)" }}>
-            Les préférences sont sauvegardées localement dans votre navigateur
+            Les préférences sont sauvegardées localement dans ton navigateur.
           </span>
         </div>
 
-        {/* Info Box */}
         <div style={{ marginTop: "2rem", padding: "1rem", background: "#eff6ff", borderRadius: "8px", border: "1px solid #bfdbfe" }}>
           <p style={{ margin: 0, fontSize: "0.875rem", color: "#1e40af" }}>
-            💡 <strong>Note :</strong> Pour que les notifications par email fonctionnent, assurez-vous que les variables d'environnement 
-            <code style={{ background: "#dbeafe", padding: "0.125rem 0.375rem", borderRadius: "4px", margin: "0 0.25rem" }}>RESEND_API_KEY</code> 
-            ou 
-            <code style={{ background: "#dbeafe", padding: "0.125rem 0.375rem", borderRadius: "4px", margin: "0 0.25rem" }}>SMTP_HOST</code> 
-            sont configurées dans votre fichier .env.
+            <strong>Note :</strong> pour que les notifications email fonctionnent, assure-toi que
+            <code style={{ background: "#dbeafe", padding: "0.125rem 0.375rem", borderRadius: "4px", margin: "0 0.25rem" }}>RESEND_API_KEY</code>
+            ou
+            <code style={{ background: "#dbeafe", padding: "0.125rem 0.375rem", borderRadius: "4px", margin: "0 0.25rem" }}>SMTP_HOST</code>
+            sont bien configurés dans ton fichier <code style={{ background: "#dbeafe", padding: "0.125rem 0.375rem", borderRadius: "4px", marginLeft: "0.25rem" }}>.env</code>.
           </p>
         </div>
       </div>

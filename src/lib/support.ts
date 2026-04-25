@@ -1,10 +1,13 @@
-import { prisma } from "@/lib/prisma";
+﻿import { prisma } from "@/lib/prisma";
 import type { CurrentUser } from "@/lib/types";
 import { sendSmsNotification } from "@/lib/email";
+import { logApiEvent } from "@/lib/observability";
+import { sendNewConversationEmail, sendNewMessageEmail } from "@/lib/support-email";
 import { env } from "@/lib/env";
-import { sendNewConversationEmail, sendNewMessageEmail, sendConversationClosedEmail } from "@/lib/support-email";
+import crypto from "crypto";
 
 const ACTIVE_STATUSES = ["WAITING", "OPEN", "ASSIGNED"] as const;
+const SUPPORT_GUEST_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 const conversationInclude = {
   customerUser: {
@@ -29,6 +32,47 @@ function getDisplayName(user: CurrentUser | null, fallbackName?: string) {
     return [user.firstName, user.lastName].filter(Boolean).join(" " ).trim();
   }
   return (fallbackName ?? "").trim();
+}
+
+function normalizeGuestEmail(email: string) {
+  return email.trim().toLowerCase();
+}
+
+export function createSupportGuestAccessToken(conversationId: string, guestEmail: string): string {
+  const normalizedEmail = normalizeGuestEmail(guestEmail);
+  const issuedAt = Date.now().toString();
+  const payload = `${conversationId}:${normalizedEmail}:${issuedAt}`;
+  const signature = crypto.createHmac("sha256", env.sessionSecret).update(payload).digest("hex");
+  return Buffer.from(`${conversationId}:${normalizedEmail}:${issuedAt}:${signature}`).toString("base64");
+}
+
+export function verifySupportGuestAccessToken(
+  token: string,
+  conversationId: string,
+  guestEmail: string,
+): boolean {
+  try {
+    const decoded = Buffer.from(token, "base64").toString("utf-8");
+    const [tokenConversationId, tokenEmail, tokenIssuedAt, tokenSignature] = decoded.split(":");
+    if (!tokenConversationId || !tokenEmail || !tokenIssuedAt || !tokenSignature) return false;
+    if (tokenConversationId !== conversationId) return false;
+
+    const normalizedGuestEmail = normalizeGuestEmail(guestEmail);
+    if (tokenEmail !== normalizedGuestEmail) return false;
+
+    const payload = `${tokenConversationId}:${tokenEmail}:${tokenIssuedAt}`;
+    const expectedSignature = crypto.createHmac("sha256", env.sessionSecret).update(payload).digest("hex");
+    if (tokenSignature.length !== expectedSignature.length) return false;
+    if (!crypto.timingSafeEqual(Buffer.from(tokenSignature), Buffer.from(expectedSignature))) return false;
+
+    const issuedAtMs = Number.parseInt(tokenIssuedAt, 10);
+    if (!Number.isFinite(issuedAtMs)) return false;
+    if (Date.now() - issuedAtMs > SUPPORT_GUEST_TOKEN_TTL_MS) return false;
+
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function isAnyAdminAvailable() {
@@ -113,26 +157,23 @@ export async function createSupportConversation(input: {
       },
     });
 
-    // Send SMS notification to admin if configured
     const customerName = getDisplayName(input.user, input.name) || "Client";
-    const smsMessage = `🔔 Nouveau chat Maison Olive!\nDe: ${customerName}\n${input.message.slice(0, 50)}${input.message.length > 50 ? '...' : ''}`;
-    
-    console.log("[SUPPORT DEBUG] About to send SMS notification for new conversation");
-    console.log("[SUPPORT DEBUG] Customer name:", customerName);
-    console.log("[SUPPORT DEBUG] SMS message:", smsMessage);
-    
-    // Don't block the response for SMS notification
+    const smsMessage = `🔔 Nouveau chat Chez Olive!\nDe: ${customerName}\n${input.message.slice(0, 50)}${input.message.length > 50 ? "..." : ""}`;
     sendSmsNotification(smsMessage).catch((err) => {
-      console.log("[SUPPORT DEBUG] SMS notification failed (non-critical):", err);
+      logApiEvent({
+        level: "WARN",
+        route: "lib/support",
+        event: "SUPPORT_SMS_NOTIFICATION_FAILED",
+        details: { conversationId: conversation.id, error: err },
+      });
     });
 
-    // Send email notifications to all admins (non-blocking)
     const adminUsers = await tx.user.findMany({
       where: { role: "ADMIN" },
       select: { email: true, firstName: true, lastName: true },
     });
     
-    const adminEmails = adminUsers.map(a => a.email).filter(Boolean) as string[];
+    const adminEmails = adminUsers.map((a) => a.email).filter(Boolean) as string[];
     
     if (adminEmails.length > 0) {
       sendNewConversationEmail({
@@ -141,8 +182,13 @@ export async function createSupportConversation(input: {
         customerEmail: input.user?.email ?? input.email ?? "",
         messageContent: input.message,
         adminEmails,
-      }).catch(err => {
-        console.log("[SUPPORT DEBUG] Email notification failed (non-critical):", err);
+      }).catch((err) => {
+        logApiEvent({
+          level: "WARN",
+          route: "lib/support",
+          event: "SUPPORT_NEW_CONVERSATION_EMAIL_FAILED",
+          details: { conversationId: conversation.id, error: err },
+        });
       });
     }
 
@@ -201,9 +247,14 @@ export async function createSupportMessageAsCustomer(conversationId: string, use
         customerEmail: result.customerEmail,
         messageContent: content,
         adminEmail: result.assignedAdmin.email,
-        adminName: [result.assignedAdmin.firstName, result.assignedAdmin.lastName].filter(Boolean).join(' '),
-      }).catch(err => {
-        console.log("[SUPPORT DEBUG] Email notification to admin failed (non-critical):", err);
+        adminName: [result.assignedAdmin.firstName, result.assignedAdmin.lastName].filter(Boolean).join(" "),
+      }).catch((err) => {
+        logApiEvent({
+          level: "WARN",
+          route: "lib/support",
+          event: "SUPPORT_ASSIGNED_ADMIN_EMAIL_FAILED",
+          details: { conversationId, adminEmail: result.assignedAdmin?.email, error: err },
+        });
       });
     }
 
@@ -213,14 +264,17 @@ export async function createSupportMessageAsCustomer(conversationId: string, use
 
 export async function getAdminSupportConversations() {
   try {
-    const conversations = await prisma.supportConversation.findMany({
+    return await prisma.supportConversation.findMany({
       orderBy: [{ status: "asc" }, { lastMessageAt: "desc" }],
       include: conversationInclude,
     });
-    console.log(`[DEBUG] getAdminSupportConversations: Found ${conversations.length} conversations`);
-    return conversations;
   } catch (error) {
-    console.error("[DEBUG] getAdminSupportConversations error:", error);
+    logApiEvent({
+      level: "ERROR",
+      route: "lib/support",
+      event: "SUPPORT_ADMIN_CONVERSATIONS_FETCH_FAILED",
+      details: { error },
+    });
     throw error;
   }
 }
@@ -282,21 +336,38 @@ export async function closeSupportConversation(conversationId: string, admin: Cu
   });
 }
 
-export async function getSupportConversationPublic(conversationId: string) {
-  return prisma.supportConversation.findUnique({
+export async function getSupportConversationPublic(conversationId: string, guestToken: string) {
+  const conversation = await prisma.supportConversation.findUnique({
     where: { id: conversationId },
     include: conversationInclude,
   });
+
+  if (!conversation) return null;
+
+  if (!verifySupportGuestAccessToken(guestToken, conversation.id, conversation.customerEmail)) {
+    return null;
+  }
+
+  return conversation;
 }
 
-export async function createSupportMessageAsGuest(conversationId: string, guestEmail: string, content: string) {
+export async function createSupportMessageAsGuest(
+  conversationId: string,
+  guestEmail: string,
+  guestToken: string,
+  content: string,
+) {
   return prisma.$transaction(async (tx) => {
     const conversation = await tx.supportConversation.findUnique({ where: { id: conversationId } });
     if (!conversation) throw new Error("CONVERSATION_NOT_FOUND");
     if (conversation.status === "CLOSED") throw new Error("CONVERSATION_CLOSED");
 
-    // Verify email matches to prevent unauthorized access
-    if (conversation.customerEmail.toLowerCase() !== guestEmail.toLowerCase()) {
+    const normalizedGuestEmail = normalizeGuestEmail(guestEmail);
+    if (conversation.customerEmail.toLowerCase() !== normalizedGuestEmail) {
+      throw new Error("FORBIDDEN");
+    }
+
+    if (!verifySupportGuestAccessToken(guestToken, conversation.id, conversation.customerEmail)) {
       throw new Error("FORBIDDEN");
     }
 
@@ -363,3 +434,4 @@ export async function createSupportMessageAsAdmin(conversationId: string, admin:
     });
   });
 }
+

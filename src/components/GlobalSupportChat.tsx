@@ -1,6 +1,6 @@
 import { getCurrentUser } from "@/lib/auth";
 import { getCurrentLanguage } from "@/lib/language";
-import { SupportChatWidget } from "@/components/SupportChatWidget";
+import { ConditionalSupportChat } from "@/components/ConditionalSupportChat";
 
 export async function GlobalSupportChat() {
   const [language, user] = await Promise.all([
@@ -8,5 +8,5 @@ export async function GlobalSupportChat() {
     getCurrentUser(),
   ]);
 
-  return <SupportChatWidget language={language} user={user} />;
+  return <ConditionalSupportChat language={language} user={user} />;
 }

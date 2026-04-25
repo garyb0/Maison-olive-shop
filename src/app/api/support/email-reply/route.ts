@@ -24,7 +24,9 @@ import type { CurrentUser } from "@/lib/types";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { token, content, fromEmail } = body;
+    const token = typeof body?.token === "string" ? body.token.trim() : "";
+    const content = typeof body?.content === "string" ? body.content.trim() : "";
+    const fromEmail = typeof body?.fromEmail === "string" ? body.fromEmail.trim().toLowerCase() : "";
 
     // Validate required fields
     if (!token || !content) {
@@ -43,11 +45,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { conversationId, adminId } = tokenData;
+    const { conversationId, adminEmail } = tokenData;
 
     // Get admin user
     const admin = await prisma.user.findUnique({
-      where: { id: adminId },
+      where: { email: adminEmail },
       select: { id: true, email: true, firstName: true, lastName: true, role: true },
     });
 
@@ -59,10 +61,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify the from email matches admin email (additional security)
-    if (fromEmail && fromEmail.toLowerCase() !== admin.email.toLowerCase()) {
+    if (fromEmail && fromEmail !== admin.email.toLowerCase()) {
       logApiEvent({
         level: "WARN",
-        route: "api/support/email-reply",
+        route: "/api/support/email-reply",
         event: "EMAIL_REPLY_MISMATCH",
         details: { conversationId, fromEmail, adminEmail: admin.email },
       });
@@ -90,7 +92,7 @@ export async function POST(request: NextRequest) {
 
     logApiEvent({
       level: "INFO",
-      route: "api/support/email-reply",
+      route: "/api/support/email-reply",
       event: "EMAIL_REPLY_SUCCESS",
       details: {
         conversationId,
@@ -111,7 +113,7 @@ export async function POST(request: NextRequest) {
     console.error("[API] Email reply error:", error);
     logApiEvent({
       level: "ERROR",
-      route: "api/support/email-reply",
+      route: "/api/support/email-reply",
       event: "EMAIL_REPLY_ERROR",
       details: { error: error instanceof Error ? error.message : "Unknown error" },
     });

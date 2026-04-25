@@ -2,6 +2,12 @@ import { Server as HTTPServer } from "http";
 import { Server as SocketIOServer, Socket, DefaultEventsMap } from "socket.io";
 import { prisma } from "@/lib/prisma";
 import { logApiEvent } from "@/lib/observability";
+import { resolvePublicSiteUrl } from "@/lib/site-url";
+import { env } from "@/lib/env";
+
+type ConversationMessagePayload = Record<string, unknown>;
+
+type AppSocket = Socket<ClientToServerEvents, ServerToClientEvents, DefaultEventsMap, SocketData>;
 
 // Socket.IO server instance (will be initialized when the app starts)
 let io: SocketIOServer | null = null;
@@ -15,7 +21,7 @@ const onlineAdmins = new Map<string, string>(); // adminId -> socketId
 export interface ServerToClientEvents {
   // Conversation events
   "conversation:new": (data: { conversationId: string; customerName: string; customerEmail: string; message: string }) => void;
-  "conversation:message": (data: { conversationId: string; message: any; senderType: string }) => void;
+  "conversation:message": (data: { conversationId: string; message: ConversationMessagePayload; senderType: string }) => void;
   "conversation:status": (data: { conversationId: string; status: string; assignedAdminId?: string }) => void;
   "conversation:closed": (data: { conversationId: string }) => void;
   
@@ -56,11 +62,56 @@ export interface SocketData {
   userName: string;
 }
 
+function parseCookieHeader(cookieHeader: string | undefined) {
+  const cookies = new Map<string, string>();
+  if (!cookieHeader) return cookies;
+
+  for (const part of cookieHeader.split(";")) {
+    const separatorIndex = part.indexOf("=");
+    if (separatorIndex === -1) continue;
+
+    const name = part.slice(0, separatorIndex).trim();
+    const value = part.slice(separatorIndex + 1).trim();
+    if (!name) continue;
+
+    try {
+      cookies.set(name, decodeURIComponent(value));
+    } catch {
+      cookies.set(name, value);
+    }
+  }
+
+  return cookies;
+}
+
+export async function resolveSocketUserFromCookieHeader(cookieHeader: string | undefined): Promise<SocketData | null> {
+  const sessionToken = parseCookieHeader(cookieHeader).get(env.sessionCookieName);
+  if (!sessionToken) return null;
+
+  const session = await prisma.session.findUnique({
+    where: { token: sessionToken },
+    include: { user: true },
+  });
+
+  if (!session || session.expiresAt < new Date()) {
+    return null;
+  }
+
+  return {
+    userId: session.user.id,
+    userEmail: session.user.email,
+    userRole: session.user.role,
+    userName: `${session.user.firstName} ${session.user.lastName}`.trim() || session.user.email,
+  };
+}
+
 // Initialize Socket.IO server
 export function initSocketIO(httpServer: HTTPServer) {
+  const publicSiteUrl = resolvePublicSiteUrl();
+
   io = new SocketIOServer<ServerToClientEvents, ClientToServerEvents>(httpServer, {
     cors: {
-      origin: process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3101",
+      origin: publicSiteUrl,
       methods: ["GET", "POST"],
       credentials: true,
     },
@@ -69,31 +120,36 @@ export function initSocketIO(httpServer: HTTPServer) {
   });
 
   // Middleware for authentication
-  io.use((socket: Socket<SocketData, ServerToClientEvents, ClientToServerEvents, any>, next: (err?: Error) => void) => {
-    const token = socket.handshake.auth.token;
-    const userId = socket.handshake.auth.userId;
-    const userRole = socket.handshake.auth.userRole;
-    const userEmail = socket.handshake.auth.userEmail;
-    const userName = socket.handshake.auth.userName;
+  io.use((socket: AppSocket, next: (err?: Error) => void) => {
+    void resolveSocketUserFromCookieHeader(socket.handshake.headers.cookie).then((socketUser) => {
+      if (!socketUser) {
+        return next(new Error("Authentication required"));
+      }
 
-    if (!token || !userId || !userRole) {
-      return next(new Error("Authentication required"));
-    }
-
-    socket.data = {
-      userId,
-      userEmail,
-      userRole: userRole as "ADMIN" | "CUSTOMER",
-      userName: userName || "Anonymous",
-    };
-
-    next();
+      socket.data = socketUser;
+      return next();
+    }).catch((error) => {
+      logApiEvent({
+        level: "WARN",
+        route: "lib/websocket",
+        event: "SOCKET_AUTH_ERROR",
+        status: 401,
+        details: { error },
+      });
+      return next(new Error("Authentication failed"));
+    });
   });
 
-  io.on("connection", (socket: Socket<SocketData>) => {
-    const { userId, userRole, userName, userEmail } = socket.data;
+  io.on("connection", (socket: AppSocket) => {
+    const { userId, userRole, userName } = socket.data;
 
-    console.log(`[WebSocket] User connected: ${userId} (${userRole})`);
+    logApiEvent({
+      level: "INFO",
+      route: "lib/websocket",
+      event: "SOCKET_CONNECTED",
+      status: 200,
+      details: { userId, role: userRole },
+    });
 
     // Handle joining a conversation room
     socket.on("join:conversation", async (data: { conversationId: string }, callback?: (result: { success: boolean; error?: string }) => void) => {
@@ -130,10 +186,22 @@ export function initSocketIO(httpServer: HTTPServer) {
         }
         userRooms.get(userId)?.add(conversationId);
 
-        console.log(`[WebSocket] User ${userId} joined conversation ${conversationId}`);
+        logApiEvent({
+          level: "INFO",
+          route: "lib/websocket",
+          event: "SOCKET_JOIN_CONVERSATION",
+          status: 200,
+          details: { userId, conversationId },
+        });
         callback?.({ success: true });
       } catch (error) {
-        console.error("[WebSocket] Error joining conversation:", error);
+        logApiEvent({
+          level: "WARN",
+          route: "lib/websocket",
+          event: "SOCKET_JOIN_CONVERSATION_FAILED",
+          status: 500,
+          details: { userId, conversationId, error },
+        });
         callback?.({ success: false, error: "Internal error" });
       }
     });
@@ -152,7 +220,13 @@ export function initSocketIO(httpServer: HTTPServer) {
         }
       }
 
-      console.log(`[WebSocket] User ${userId} left conversation ${conversationId}`);
+      logApiEvent({
+        level: "INFO",
+        route: "lib/websocket",
+        event: "SOCKET_LEAVE_CONVERSATION",
+        status: 200,
+        details: { userId, conversationId },
+      });
     });
 
     // Handle typing indicators
@@ -194,7 +268,13 @@ export function initSocketIO(httpServer: HTTPServer) {
           readAt: new Date().toISOString(),
         });
       } catch (error) {
-        console.error("[WebSocket] Error marking message as read:", error);
+        logApiEvent({
+          level: "WARN",
+          route: "lib/websocket",
+          event: "SOCKET_MESSAGE_READ_FAILED",
+          status: 500,
+          details: { userId, conversationId, messageId, error },
+        });
       }
     });
 
@@ -237,7 +317,13 @@ export function initSocketIO(httpServer: HTTPServer) {
 
     // Handle disconnection
     socket.on("disconnect", () => {
-      console.log(`[WebSocket] User disconnected: ${userId}`);
+      logApiEvent({
+      level: "INFO",
+        route: "lib/websocket",
+        event: "SOCKET_DISCONNECTED",
+        status: 200,
+        details: { userId },
+      });
 
       // Clean up rooms
       const rooms = userRooms.get(userId);
@@ -256,7 +342,13 @@ export function initSocketIO(httpServer: HTTPServer) {
     });
   });
 
-  console.log("[WebSocket] Socket.IO server initialized");
+  logApiEvent({
+    level: "INFO",
+    route: "lib/websocket",
+    event: "SOCKET_SERVER_INITIALIZED",
+    status: 200,
+    details: { origin: publicSiteUrl },
+  });
   return io;
 }
 
@@ -284,7 +376,7 @@ export function broadcastNewConversation(data: {
 // Broadcast new message to conversation participants
 export function broadcastNewMessage(data: {
   conversationId: string;
-  message: any;
+  message: ConversationMessagePayload;
   senderType: string;
 }) {
   io?.to(data.conversationId).emit("conversation:message", data);
