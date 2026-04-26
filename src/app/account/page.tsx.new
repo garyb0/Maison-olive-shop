@@ -1,0 +1,126 @@
+import Link from "next/link";
+import { getCurrentUser } from "@/lib/auth";
+import { getCurrentLanguage } from "@/lib/language";
+import { syncOrderPaymentFromStripeSessionForUser } from "@/lib/orders";
+import { prisma } from "@/lib/prisma";
+
+type AccountDashboardPageProps = {
+  searchParams?: Promise<{
+    paid?: string | string[];
+    cancelled?: string | string[];
+    session_id?: string | string[];
+  }>;
+};
+
+const getSearchParam = (value: string | string[] | undefined) =>
+  Array.isArray(value) ? value[0] : value;
+
+export default async function AccountDashboardPage({ searchParams }: AccountDashboardPageProps) {
+  const user = await getCurrentUser();
+  const language = await getCurrentLanguage();
+  const query = searchParams ? await searchParams : {};
+  const paid = getSearchParam(query.paid) === "1";
+  const cancelled = getSearchParam(query.cancelled) === "1";
+  const stripeSessionId = getSearchParam(query.session_id);
+
+  let paymentNotice: "paid" | "cancelled" | "syncing" | "sync_failed" | null = null;
+
+  if (paid && stripeSessionId && user) {
+    try {
+      const result = await syncOrderPaymentFromStripeSessionForUser(stripeSessionId, user.id);
+      paymentNotice = result?.transitionedToPaid || result?.reason === "ALREADY_FINALIZED" ? "paid" : "syncing";
+    } catch {
+      paymentNotice = "sync_failed";
+    }
+  } else if (cancelled) {
+    paymentNotice = "cancelled";
+  }
+
+  const ordersCount = await prisma.order.count({
+    where: { userId: user!.id },
+  });
+
+  const activeSubscriptionsCount = await prisma.subscription.count({
+    where: { userId: user!.id, status: "ACTIVE" },
+  });
+
+  return (
+    <section className="section">
+      <h1>
+        {language === "fr" ? "Bonjour" : "Hello"}, {user?.firstName}
+      </h1>
+      <p className="small" style={{ marginBottom: 32 }}>
+        {language === "fr" ? "Bienvenue sur ton compte Chez Olive." : "Welcome to your Chez Olive account."}
+      </p>
+
+      {paymentNotice ? (
+        <div className="card" style={{ padding: 18, marginBottom: 24 }}>
+          {paymentNotice === "paid" ? (
+            <p style={{ margin: 0, color: "var(--success)" }}>
+              {language === "fr"
+                ? "Paiement Stripe recu. Ta commande est maintenant confirmee."
+                : "Stripe payment received. Your order is now confirmed."}
+            </p>
+          ) : null}
+          {paymentNotice === "syncing" ? (
+            <p style={{ margin: 0 }}>
+              {language === "fr"
+                ? "Paiement recu par Stripe. La confirmation finale peut prendre quelques secondes."
+                : "Stripe received the payment. Final confirmation may take a few seconds."}
+            </p>
+          ) : null}
+          {paymentNotice === "sync_failed" ? (
+            <p style={{ margin: 0 }}>
+              {language === "fr"
+                ? "Paiement recu par Stripe. Si ta commande n'apparait pas encore payee, elle sera synchronisee par le webhook."
+                : "Stripe received the payment. If your order is not marked paid yet, the webhook will sync it."}
+            </p>
+          ) : null}
+          {paymentNotice === "cancelled" ? (
+            <p style={{ margin: 0 }}>
+              {language === "fr"
+                ? "Paiement annule. Ta commande n'est pas payee; tu peux refaire le checkout quand tu es pret."
+                : "Payment cancelled. Your order is not paid; you can restart checkout when ready."}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
+      <div className="admin-stats-grid" style={{ marginBottom: 32 }}>
+        <div className="card">
+          <div className="small muted">{language === "fr" ? "Commandes passees" : "Orders placed"}</div>
+          <div className="stat-value">{ordersCount}</div>
+        </div>
+        <div className="card">
+          <div className="small muted">{language === "fr" ? "Abonnements actifs" : "Active subscriptions"}</div>
+          <div className="stat-value">{activeSubscriptionsCount}</div>
+        </div>
+      </div>
+
+      <div className="card" style={{ padding: 24 }}>
+        <h3>{language === "fr" ? "Raccourcis rapides" : "Quick shortcuts"}</h3>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+            gap: 12,
+            marginTop: 16,
+          }}
+        >
+          <Link className="btn btn-secondary" href="/account/orders" style={{ textAlign: "center" }}>
+            {language === "fr" ? "Voir mes commandes" : "View my orders"}
+          </Link>
+          <Link className="btn btn-secondary" href="/account/dogs" style={{ textAlign: "center" }}>
+            {language === "fr" ? "Gerer mes chiens" : "Manage my dogs"}
+          </Link>
+          <Link className="btn btn-secondary" href="/account/subscriptions" style={{ textAlign: "center" }}>
+            {language === "fr" ? "Gerer mes abonnements" : "Manage my subscriptions"}
+          </Link>
+          <Link className="btn btn-secondary" href="/account/profile" style={{ textAlign: "center" }}>
+            {language === "fr" ? "Modifier mon profil" : "Edit my profile"}
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}

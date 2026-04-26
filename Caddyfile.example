@@ -1,0 +1,9 @@
+chezolive.ca, www.chezolive.ca {
+  encode gzip zstd
+
+  reverse_proxy 127.0.0.1:3101
+}
+
+chezolive.com, www.chezolive.com {
+  redir https://chezolive.ca{uri} permanent
+}

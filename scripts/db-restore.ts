@@ -1,21 +1,18 @@
 import path from "node:path";
 import {
   createSqliteBackup,
+  getPositionalScriptArgs,
   getLatestBackupDbPath,
-  loadEnvFilesInOrder,
+  loadDatabaseEnvForTarget,
+  resolveEnvTargetFromArgs,
   resolveDatabaseFromEnv,
   restoreSqliteBackup,
 } from "./db-utils";
 
-loadEnvFilesInOrder([
-  ".env.production.local",
-  ".env.production",
-  ".env.local",
-  ".env",
-]);
+const envTarget = resolveEnvTargetFromArgs();
+loadDatabaseEnvForTarget(envTarget);
 
-const backupArg = process.argv[2];
-const backupDir = process.argv[3] ?? path.resolve(process.cwd(), "backups");
+const [backupArg, backupDir = path.resolve(process.cwd(), "backups")] = getPositionalScriptArgs();
 const skipPreRestoreBackup = process.argv.includes("--no-pre-backup");
 
 const db = resolveDatabaseFromEnv();
@@ -49,6 +46,7 @@ if (!skipPreRestoreBackup) {
 const result = restoreSqliteBackup(backupPath, db.dbPath);
 
 console.log("SQLite restore completed.");
+console.log(`- Environment: ${envTarget}`);
 console.log(`- Restored from: ${backupPath}`);
 console.log(`- Target DB: ${db.dbPath}`);
 

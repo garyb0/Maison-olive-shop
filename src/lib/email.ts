@@ -1,13 +1,25 @@
-import { env } from "@/lib/env";
+﻿import { env } from "@/lib/env";
 import { logApiEvent } from "@/lib/observability";
-import * as fs from "fs";
-import * as path from "path";
+import net from "node:net";
+import tls from "node:tls";
 
 type SendEmailInput = {
   to: string;
   subject: string;
   html: string;
+  text?: string;
 };
+
+function logEmailDebug(event: string, details?: Record<string, unknown>) {
+  if (env.nodeEnv === "production") return;
+
+  logApiEvent({
+    level: "INFO",
+    route: "lib/email",
+    event,
+    details,
+  });
+}
 
 // ── SMS Notification via Email-to-SMS ─────────────────────────────────────────
 
@@ -16,32 +28,38 @@ type SendEmailInput = {
  * This is a free method that converts email to SMS through carrier gateways.
  */
 export async function sendSmsNotification(message: string): Promise<void> {
-  console.log("[SMS DEBUG] sendSmsNotification called with message:", message);
-  console.log("[SMS DEBUG] env.adminSmsEmail:", env.adminSmsEmail);
-  console.log("[SMS DEBUG] env.smtpHost:", env.smtpHost);
+  logEmailDebug("SMS_NOTIFICATION_ATTEMPT", {
+    hasAdminSmsEmail: Boolean(env.adminSmsEmail),
+    hasSmtpHost: Boolean(env.smtpHost),
+  });
 
   if (!env.adminSmsEmail) {
-    console.log("[SMS DEBUG] No adminSmsEmail configured, skipping");
+    logEmailDebug("SMS_NOTIFICATION_SKIPPED_NO_DESTINATION");
     return;
   }
 
   // For SMS, we need a simple text-only approach (max 160 chars for SMS)
   const smsContent = message.slice(0, 160);
-  console.log("[SMS DEBUG] SMS content (truncated to 160 chars):", smsContent);
+  logEmailDebug("SMS_NOTIFICATION_PREPARED", { preview: smsContent });
 
   try {
     // Use SMTP if configured
     if (env.smtpHost && env.smtpUser && env.smtpPass) {
-      console.log("[SMS DEBUG] Sending via SMTP to:", env.adminSmsEmail);
+      logEmailDebug("SMS_NOTIFICATION_SENDING_SMTP", { to: env.adminSmsEmail });
       await sendSmtpEmail({
         to: env.adminSmsEmail,
         subject: "", // Empty subject for SMS
         text: smsContent,
       });
-      console.log("[SMS DEBUG] SMS sent successfully via SMTP!");
+      logApiEvent({
+        level: "INFO",
+        route: "lib/email",
+        event: "SMS_NOTIFICATION_SENT_SMTP",
+        details: { to: env.adminSmsEmail },
+      });
     } else if (env.resendApiKey) {
       // Fallback to Resend API
-      console.log("[SMS DEBUG] Sending via Resend API...");
+      logEmailDebug("SMS_NOTIFICATION_SENDING_RESEND", { to: env.adminSmsEmail });
       const res = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: {
@@ -56,18 +74,39 @@ export async function sendSmsNotification(message: string): Promise<void> {
         }),
       });
 
-      console.log("[SMS DEBUG] Resend response status:", res.status);
       if (!res.ok) {
         const body = await res.text().catch(() => "(no body)");
-        console.log("[SMS DEBUG] Resend error body:", body);
+        logApiEvent({
+          level: "WARN",
+          route: "lib/email",
+          event: "SMS_NOTIFICATION_RESEND_FAILED",
+          status: res.status,
+          details: { to: env.adminSmsEmail, body },
+        });
       } else {
-        console.log("[SMS DEBUG] SMS sent successfully via Resend!");
+        logApiEvent({
+          level: "INFO",
+          route: "lib/email",
+          event: "SMS_NOTIFICATION_SENT_RESEND",
+          status: res.status,
+          details: { to: env.adminSmsEmail },
+        });
       }
     } else {
-      console.log("[SMS DEBUG] No SMTP or Resend configured - SMS would be sent to:", env.adminSmsEmail);
+      logApiEvent({
+        level: "WARN",
+        route: "lib/email",
+        event: "SMS_NOTIFICATION_SKIPPED_NO_PROVIDER",
+        details: { to: env.adminSmsEmail },
+      });
     }
   } catch (error) {
-    console.log("[SMS DEBUG] Error sending SMS:", error);
+    logApiEvent({
+      level: "WARN",
+      route: "lib/email",
+      event: "SMS_NOTIFICATION_FAILED",
+      details: { to: env.adminSmsEmail, error },
+    });
   }
 }
 
@@ -75,16 +114,33 @@ export async function sendSmsNotification(message: string): Promise<void> {
  * Sends an email via SMTP using raw socket connection.
  * Simple implementation without external dependencies.
  */
+function stripHtml(html: string): string {
+  return html
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n\n")
+    .replace(/<\/div>/gi, "\n")
+    .replace(/<\/li>/gi, "\n")
+    .replace(/<li>/gi, "- ")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 async function sendSmtpEmail(input: { to: string; subject: string; text: string }): Promise<void> {
   return new Promise((resolve, reject) => {
-    const net = require("net");
-    const tls = require("tls");
-    
     const host = env.smtpHost;
     const port = env.smtpPort || (env.smtpSecure ? 465 : 587);
     const secure = env.smtpSecure;
     
-    console.log("[SMTP DEBUG] Connecting to:", host, "port:", port, "secure:", secure);
+    logEmailDebug("SMTP_CONNECTING", { host, port, secure, to: input.to });
     
     const socket = secure 
       ? tls.connect({ host, port, rejectUnauthorized: false })
@@ -98,7 +154,7 @@ async function sendSmtpEmail(input: { to: string; subject: string; text: string 
     
     socket.on("data", (data: Buffer) => {
       response += data.toString();
-      console.log("[SMTP DEBUG] Received:", response.trim());
+      logEmailDebug("SMTP_RESPONSE_RECEIVED", { chunk: response.trim() });
       
       // Wait for server ready
       if (response.includes("220")) {
@@ -159,7 +215,12 @@ async function sendSmtpEmail(input: { to: string; subject: string; text: string 
       }
       // After email sent (250 response)
       else if (response.includes("250") && response.includes("OK")) {
-        console.log("[SMTP DEBUG] Email sent successfully!");
+        logApiEvent({
+          level: "INFO",
+          route: "lib/email",
+          event: "SMTP_EMAIL_SENT",
+          details: { to: input.to },
+        });
         sendCommand("QUIT");
         socket.end();
         resolve();
@@ -172,12 +233,17 @@ async function sendSmtpEmail(input: { to: string; subject: string; text: string 
     });
     
     socket.on("error", (err: Error) => {
-      console.log("[SMTP DEBUG] Error:", err.message);
+      logApiEvent({
+        level: "WARN",
+        route: "lib/email",
+        event: "SMTP_ERROR",
+        details: { to: input.to, error: err },
+      });
       reject(err);
     });
     
     socket.on("end", () => {
-      console.log("[SMTP DEBUG] Connection closed");
+      logEmailDebug("SMTP_CONNECTION_CLOSED", { to: input.to });
     });
   });
 }
@@ -188,46 +254,62 @@ async function sendSmtpEmail(input: { to: string; subject: string; text: string 
  * so local dev works without an email provider.
  */
 export async function sendEmail(input: SendEmailInput): Promise<void> {
-  if (!env.resendApiKey) {
+  if (env.resendApiKey) {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${env.resendApiKey}`,
+      },
+      body: JSON.stringify({
+        from: env.resendFromEmail,
+        to: [input.to],
+        subject: input.subject,
+        html: input.html,
+      }),
+    });
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => "(no body)");
+      logApiEvent({
+        level: "ERROR",
+        route: "lib/email",
+        event: "EMAIL_SEND_FAILED",
+        status: res.status,
+        details: { to: input.to, subject: input.subject, body },
+      });
+      throw new Error(`EMAIL_SEND_FAILED:${res.status}`);
+    }
+
     logApiEvent({
-      level: "WARN",
+      level: "INFO",
       route: "lib/email",
-      event: "EMAIL_SKIPPED_NO_API_KEY",
-      details: { to: input.to, subject: input.subject },
+      event: "EMAIL_SENT",
+      details: { to: input.to, subject: input.subject, provider: "resend" },
     });
     return;
   }
 
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${env.resendApiKey}`,
-    },
-    body: JSON.stringify({
-      from: env.resendFromEmail,
-      to: [input.to],
+  if (env.smtpHost && env.smtpUser && env.smtpPass) {
+    await sendSmtpEmail({
+      to: input.to,
       subject: input.subject,
-      html: input.html,
-    }),
-  });
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => "(no body)");
-    logApiEvent({
-      level: "ERROR",
-      route: "lib/email",
-      event: "EMAIL_SEND_FAILED",
-      status: res.status,
-      details: { to: input.to, subject: input.subject, body },
+      text: input.text ?? stripHtml(input.html),
     });
-    throw new Error(`EMAIL_SEND_FAILED:${res.status}`);
+
+    logApiEvent({
+      level: "INFO",
+      route: "lib/email",
+      event: "EMAIL_SENT",
+      details: { to: input.to, subject: input.subject, provider: "smtp" },
+    });
+    return;
   }
 
   logApiEvent({
-    level: "INFO",
+    level: "WARN",
     route: "lib/email",
-    event: "EMAIL_SENT",
+    event: "EMAIL_SKIPPED_NO_PROVIDER",
     details: { to: input.to, subject: input.subject },
   });
 }
@@ -240,7 +322,7 @@ const emailWrapper = (content: string) => `
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Maison Olive</title>
+  <title>Chez Olive</title>
   <style>
     body { margin: 0; padding: 0; background: #FAF8F4; font-family: 'Helvetica Neue', Arial, sans-serif; color: #2C1E0F; }
     .wrapper { max-width: 560px; margin: 40px auto; background: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #E8DDD0; }
@@ -259,23 +341,23 @@ const emailWrapper = (content: string) => `
 <body>
   <div class="wrapper">
     <div class="header">
-      <p class="header-title">🐾 Maison Olive</p>
+      <p class="header-title">🐾 Chez Olive</p>
       <p class="header-sub">Boutique animalière bilingue</p>
     </div>
     <div class="body">
       ${content}
     </div>
-    <div class="footer">© Maison Olive — Rimouski, QC</div>
+    <div class="footer">© Chez Olive — Rimouski, QC</div>
   </div>
 </body>
 </html>`;
 
 export function buildPasswordResetEmailFr(resetUrl: string): { subject: string; html: string } {
   return {
-    subject: "Réinitialisation de ton mot de passe — Maison Olive",
+    subject: "Réinitialisation de ton mot de passe — Chez Olive",
     html: emailWrapper(`
       <p>Bonjour,</p>
-      <p>Nous avons reçu une demande de réinitialisation du mot de passe associé à ton compte Maison Olive.</p>
+      <p>Nous avons reçu une demande de réinitialisation du mot de passe associé à ton compte Chez Olive.</p>
       <div class="btn-wrap">
         <a class="btn" href="${resetUrl}">Réinitialiser mon mot de passe</a>
       </div>
@@ -287,10 +369,10 @@ export function buildPasswordResetEmailFr(resetUrl: string): { subject: string; 
 
 export function buildPasswordResetEmailEn(resetUrl: string): { subject: string; html: string } {
   return {
-    subject: "Reset your password — Maison Olive",
+    subject: "Reset your password — Chez Olive",
     html: emailWrapper(`
       <p>Hello,</p>
-      <p>We received a request to reset the password for your Maison Olive account.</p>
+      <p>We received a request to reset the password for your Chez Olive account.</p>
       <div class="btn-wrap">
         <a class="btn" href="${resetUrl}">Reset my password</a>
       </div>
@@ -299,3 +381,4 @@ export function buildPasswordResetEmailEn(resetUrl: string): { subject: string; 
     `),
   };
 }
+

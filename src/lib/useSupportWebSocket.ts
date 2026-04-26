@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useCallback, useState } from "react";
 import { io, Socket } from "socket.io-client";
+import { resolvePublicSiteUrl } from "@/lib/site-url";
 
 interface UseSupportWebSocketOptions {
   userId?: string;
@@ -35,16 +36,41 @@ export function useSupportWebSocket(options: UseSupportWebSocketOptions) {
   } = options;
 
   const socketRef = useRef<Socket | null>(null);
+  const onNewMessageRef = useRef(onNewMessage);
+  const onTypingStartRef = useRef(onTypingStart);
+  const onTypingStopRef = useRef(onTypingStop);
+  const onConversationStatusRef = useRef(onConversationStatus);
+  const onConversationClosedRef = useRef(onConversationClosed);
+  const onAdminOnlineRef = useRef(onAdminOnline);
+  const onAdminOfflineRef = useRef(onAdminOffline);
   const [connected, setConnected] = useState(false);
   const [onlineAdmins, setOnlineAdmins] = useState<Array<{ id: string; name: string }>>([]);
   const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    onNewMessageRef.current = onNewMessage;
+    onTypingStartRef.current = onTypingStart;
+    onTypingStopRef.current = onTypingStop;
+    onConversationStatusRef.current = onConversationStatus;
+    onConversationClosedRef.current = onConversationClosed;
+    onAdminOnlineRef.current = onAdminOnline;
+    onAdminOfflineRef.current = onAdminOffline;
+  }, [
+    onNewMessage,
+    onTypingStart,
+    onTypingStop,
+    onConversationStatus,
+    onConversationClosed,
+    onAdminOnline,
+    onAdminOffline,
+  ]);
 
   // Initialize socket connection
   useEffect(() => {
     if (!userId || !userRole) return;
 
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3101";
-    
+    const siteUrl = resolvePublicSiteUrl();
+
     const socket = io(siteUrl, {
       auth: {
         token: "websocket-auth", // Token will be validated server-side
@@ -76,13 +102,13 @@ export function useSupportWebSocket(options: UseSupportWebSocketOptions) {
     // Handle new messages
     socket.on("conversation:message", (data: { conversationId: string; message: unknown; senderType: string }) => {
       console.log("[WebSocket] New message:", data);
-      onNewMessage?.(data);
+      onNewMessageRef.current?.(data);
     });
 
     // Handle typing indicators
     socket.on("typing:start", (data: { conversationId: string; userId: string; userName: string }) => {
       setTypingUsers(prev => new Set([...prev, data.userId]));
-      onTypingStart?.(data);
+      onTypingStartRef.current?.(data);
     });
 
     socket.on("typing:stop", (data: { conversationId: string; userId: string }) => {
@@ -91,19 +117,19 @@ export function useSupportWebSocket(options: UseSupportWebSocketOptions) {
         next.delete(data.userId);
         return next;
       });
-      onTypingStop?.(data);
+      onTypingStopRef.current?.(data);
     });
 
     // Handle conversation status changes
     socket.on("conversation:status", (data: { conversationId: string; status: string; assignedAdminId?: string }) => {
       console.log("[WebSocket] Conversation status changed:", data);
-      onConversationStatus?.(data);
+      onConversationStatusRef.current?.(data);
     });
 
     // Handle conversation closed
     socket.on("conversation:closed", (data: { conversationId: string }) => {
       console.log("[WebSocket] Conversation closed:", data);
-      onConversationClosed?.(data);
+      onConversationClosedRef.current?.(data);
     });
 
     // Handle admin presence
@@ -113,13 +139,13 @@ export function useSupportWebSocket(options: UseSupportWebSocketOptions) {
         if (prev.find(a => a.id === data.adminId)) return prev;
         return [...prev, { id: data.adminId, name: data.adminName }];
       });
-      onAdminOnline?.(data);
+      onAdminOnlineRef.current?.(data);
     });
 
     socket.on("presence:admin-offline", (data: { adminId: string }) => {
       console.log("[WebSocket] Admin offline:", data);
       setOnlineAdmins(prev => prev.filter(a => a.id !== data.adminId));
-      onAdminOffline?.(data);
+      onAdminOfflineRef.current?.(data);
     });
 
     socket.on("presence:update", (data: { onlineAdmins: Array<{ id: string; name: string }> }) => {
