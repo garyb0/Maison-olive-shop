@@ -37,6 +37,35 @@ enum PaymentMethod {
   STRIPE
 }
 
+enum DeliveryStatus {
+  UNSCHEDULED
+  SCHEDULED
+  OUT_FOR_DELIVERY
+  DELIVERED
+  FAILED
+  RESCHEDULED
+}
+
+enum DeliveryRunStatus {
+  DRAFT
+  PUBLISHED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum DeliveryStopStatus {
+  PENDING
+  DELIVERED
+  FAILED
+}
+
+enum ActualKmSource {
+  GPS
+  ODOMETER
+  MANUAL_ADMIN
+}
+
 enum SupportConversationStatus {
   WAITING
   OPEN
@@ -51,15 +80,19 @@ enum SupportSenderType {
 }
 
 model User {
-  id           String    @id @default(cuid())
-  email        String    @unique
-  passwordHash String
-  firstName    String
-  lastName     String
-  role         UserRole  @default(CUSTOMER)
-  language     String    @default("fr")
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id                        String    @id @default(cuid())
+  email                     String    @unique
+  passwordHash              String
+  firstName                 String
+  lastName                  String
+  role                      UserRole  @default(CUSTOMER)
+  language                  String    @default("fr")
+  twoFactorEnabled          Boolean   @default(false)
+  twoFactorSecretCiphertext String?
+  twoFactorBackupCodesJson  String?
+  twoFactorEnabledAt        DateTime?
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
 
   sessions                     Session[]
   orders                       Order[]
@@ -68,6 +101,55 @@ model User {
   assignedSupportConversations SupportConversation[] @relation("AssignedSupportConversations")
   supportMessages              SupportMessage[]      @relation("SupportMessages")
   passwordResets               PasswordReset[]
+  subscriptions                Subscription[]
+  deliveryAddresses            UserDeliveryAddress[]
+  dogProfiles                  DogProfile[]
+}
+
+model DogProfile {
+  id             String   @id @default(cuid())
+  userId         String?
+  publicToken    String   @unique
+  name           String?
+  photoUrl       String?
+  ageLabel       String?
+  ownerPhone     String?
+  importantNotes String?
+  publicProfileEnabled Boolean @default(true)
+  showPhotoPublic      Boolean @default(false)
+  showAgePublic        Boolean @default(false)
+  showPhonePublic      Boolean @default(false)
+  showNotesPublic      Boolean @default(false)
+  isActive       Boolean  @default(true)
+  claimedAt      DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([publicToken, isActive])
+}
+
+model UserDeliveryAddress {
+  id                   String   @id @default(cuid())
+  userId               String
+  label                String
+  shippingLine1        String
+  shippingCity         String
+  shippingRegion       String
+  shippingPostal       String
+  shippingCountry      String
+  deliveryPhone        String?
+  deliveryInstructions String?
+  lastUsedAt           DateTime?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, lastUsedAt])
 }
 
 model Session {
@@ -83,6 +165,21 @@ model Session {
   @@index([expiresAt])
 }
 
+enum SubscriptionInterval {
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+  QUARTERLY
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  PAUSED
+  EXPIRED
+}
+
 model Product {
   id            String   @id @default(cuid())
   slug          String   @unique
@@ -92,9 +189,25 @@ model Product {
   descriptionEn String
   imageUrl      String?
   priceCents    Int
+  costCents     Int      @default(0)
   currency      String   @default("CAD")
   stock         Int      @default(0)
   isActive      Boolean  @default(true)
+  
+  // Subscription fields
+  isSubscription Boolean              @default(false)
+  
+  // Multi frequency prices
+  priceWeekly    Int?
+  priceBiweekly  Int?
+  priceMonthly   Int?
+  priceQuarterly Int?
+  
+  stripePriceWeekly    String? @unique
+  stripePriceBiweekly  String? @unique
+  stripePriceMonthly   String? @unique
+  stripePriceQuarterly String? @unique
+  
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -102,6 +215,7 @@ model Product {
   inventoryMovements  InventoryMovement[]
   categoryId          String?
   category            Category? @relation(fields: [categoryId], references: [id])
+  subscriptions       Subscription[]
 
   @@index([isActive])
   @@index([slug])
@@ -111,9 +225,10 @@ model Product {
 model Order {
   id              String        @id @default(cuid())
   orderNumber     String        @unique
-  userId          String
+  userId          String?
   customerEmail   String
   customerName    String
+  promoCode       String?
   status          OrderStatus   @default(PENDING)
   paymentStatus   PaymentStatus @default(PENDING)
   paymentMethod   PaymentMethod @default(MANUAL)
@@ -131,16 +246,208 @@ model Order {
   shippingRegion  String?
   shippingPostal  String?
   shippingCountry String?
+  deliverySlotId  String?
+  deliveryWindowStartAt DateTime?
+  deliveryWindowEndAt DateTime?
+  deliveryStatus  DeliveryStatus @default(UNSCHEDULED)
+  deliveryInstructions String?
+  deliveryPhone   String?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
-  user               User                @relation(fields: [userId], references: [id], onDelete: Restrict)
+  user               User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
   items              OrderItem[]
   inventoryMovements InventoryMovement[]
+  deliverySlot       DeliverySlot?       @relation(fields: [deliverySlotId], references: [id], onDelete: SetNull)
+  deliveryStops      DeliveryStop[]
 
   @@index([userId, createdAt])
   @@index([status])
   @@index([paymentStatus])
+  @@index([deliverySlotId])
+  @@index([deliveryStatus])
+  @@index([promoCode])
+}
+
+model PromoCode {
+  id              String   @id @default(cuid())
+  code            String   @unique
+  description     String?
+  discountPercent Int
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([isActive, code])
+}
+
+model DeliverySlot {
+  id        String   @id @default(cuid())
+  startAt   DateTime
+  endAt     DateTime
+  capacity  Int      @default(8)
+  isOpen    Boolean  @default(true)
+  note      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orders    Order[]
+  runs      DeliveryRun[]
+
+  @@index([startAt])
+  @@index([endAt])
+  @@index([isOpen, startAt])
+}
+
+model DeliveryException {
+  id               String   @id @default(cuid())
+  dateKey          String   @unique
+  isClosed         Boolean  @default(true)
+  capacityOverride Int?
+  reason           String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([dateKey])
+}
+
+model DeliveryScheduleSettings {
+  id                     String   @id @default("default")
+  averageDeliveryMinutes Int      @default(30)
+  blockMinutes           Int      @default(60)
+  amEnabled              Boolean  @default(true)
+  amStartMinute          Int      @default(540)
+  amEndMinute            Int      @default(720)
+  pmEnabled              Boolean  @default(true)
+  pmStartMinute          Int      @default(780)
+  pmEndMinute            Int      @default(1020)
+  capacityMode           String   @default("ACTIVE_DRIVERS")
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+}
+
+model Driver {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  runs DeliveryRun[]
+
+  @@index([isActive, name])
+}
+
+model DeliveryRun {
+  id                   String            @id @default(cuid())
+  deliverySlotId       String
+  driverId             String
+  status               DeliveryRunStatus @default(DRAFT)
+  dateKey              String
+  includeReturnToDepot Boolean           @default(true)
+  plannedKm            Float?
+  plannedDurationSec   Int?
+  actualKmGps          Float?
+  actualKmOdometer     Float?
+  actualKmFinal        Float?
+  actualKmSource       ActualKmSource?
+  odometerStartKm      Float?
+  odometerEndKm        Float?
+  note                 String?
+  startedAt            DateTime?
+  completedAt          DateTime?
+  publishedAt          DateTime?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  deliverySlot DeliverySlot             @relation(fields: [deliverySlotId], references: [id], onDelete: Restrict)
+  driver       Driver                   @relation(fields: [driverId], references: [id], onDelete: Restrict)
+  stops        DeliveryStop[]
+  accessTokens DeliveryRunAccessToken[]
+  gpsSamples   DeliveryGpsSample[]
+
+  @@unique([deliverySlotId])
+  @@index([driverId, dateKey])
+  @@index([status, dateKey])
+}
+
+model DeliveryStop {
+  id                       String             @id @default(cuid())
+  runId                    String
+  orderId                  String
+  plannedSequence          Int
+  manualSequence           Int?
+  finalSequence            Int
+  status                   DeliveryStopStatus @default(PENDING)
+  plannedLegKm             Float?
+  plannedCumulativeKm      Float?
+  plannedLegDurationSec    Int?
+  plannedEta               DateTime?
+  actualCumulativeKmAtStop Float?
+  arrivedAt                DateTime?
+  completedAt              DateTime?
+  note                     String?
+  createdAt                DateTime           @default(now())
+  updatedAt                DateTime           @updatedAt
+
+  run   DeliveryRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  order Order       @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@unique([runId, orderId])
+  @@index([runId, finalSequence])
+  @@index([orderId])
+}
+
+model DeliveryRunAccessToken {
+  id           String   @id @default(cuid())
+  runId        String
+  tokenHash    String   @unique
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  lastAccessAt DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  run DeliveryRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId, expiresAt])
+}
+
+model DeliveryGpsSample {
+  id             String   @id @default(cuid())
+  runId          String
+  recordedAt     DateTime
+  lat            Float
+  lng            Float
+  accuracyMeters Float
+  speedMps       Float?
+  heading        Float?
+  createdAt      DateTime @default(now())
+
+  run DeliveryRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId, recordedAt])
+}
+
+model GeocodedAddressCache {
+  id               String   @id @default(cuid())
+  addressKey       String   @unique
+  shippingLine1    String
+  shippingCity     String
+  shippingRegion   String
+  shippingPostal   String
+  shippingCountry  String
+  formattedAddress String
+  placeId          String?
+  lat              Float
+  lng              Float
+  lastUsedAt       DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([shippingPostal])
+  @@index([updatedAt])
 }
 
 model OrderItem {
@@ -189,6 +496,18 @@ model AuditLog {
 
   @@index([entity, createdAt])
   @@index([actorUserId, createdAt])
+}
+
+model StripeWebhookEvent {
+  id             String   @id @default(cuid())
+  stripeEventId  String   @unique
+  stripeEventType String
+  status         String   @default("received")
+  lastError      String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([status])
 }
 
 model SupportConversation {
@@ -249,3 +568,68 @@ model PasswordReset {
   @@index([userId])
   @@index([expiresAt])
 }
+
+model RateLimitBucket {
+  id        String   @id
+  count     Int
+  resetAt   DateTime
+  updatedAt DateTime @updatedAt
+
+  @@index([resetAt])
+}
+
+// promo banner bilingual content
+model PromoBanner {
+  id        String   @id @default(cuid())
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  badgeFr   String   @map("badge") @default("🔥 Offre limitée")
+  badgeEn   String   @default("")
+  titleFr   String   @map("title")
+  titleEn   String   @default("")
+  price1Fr  String   @map("price1") @default("1 pour 64,99 $")
+  price1En  String   @default("")
+  price2Fr  String   @map("price2") @default("🔥 2 pour seulement 100 $")
+  price2En  String   @default("")
+  point1Fr  String   @map("point1") @default("Ultra doux")
+  point1En  String   @default("")
+  point2Fr  String   @map("point2") @default("Lavable")
+  point2En  String   @default("")
+  point3Fr  String   @map("point3") @default("Approuvé par Olive")
+  point3En  String   @default("")
+  ctaTextFr String   @map("ctaText") @default("Magasiner →")
+  ctaTextEn String   @default("")
+  ctaLink   String   @default("/")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, sortOrder])
+}
+
+model Subscription {
+  id                String             @id @default(cuid())
+  stripeSubscriptionId String          @unique
+  userId            String
+  productId         String
+  status            SubscriptionStatus @default(ACTIVE)
+  quantity          Int                @default(1)
+  currentPeriodStart DateTime
+  currentPeriodEnd  DateTime
+  cancelAtPeriodEnd Boolean            @default(false)
+  canceledAt        DateTime?
+  lastPaymentDate   DateTime?
+  nextPaymentDate   DateTime?
+  
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product           Product            @relation(fields: [productId], references: [id], onDelete: Restrict)
+  
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  
+  @@index([userId])
+  @@index([status])
+  @@index([nextPaymentDate])
+}
+
+
+

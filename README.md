@@ -1,4 +1,4 @@
-# Maison Olive Shop 🐾
+﻿# Chez Olive Shop 🐾
 
 Site e-commerce complet pour vendre des produits pour animaux, construit pour **Olive** (notre bulldog français adoré).
 
@@ -21,6 +21,8 @@ Puis ouvre `http://localhost:3101`.
 > 🛟 Pour une migration sans perte (local -> infra publique), consulte: **`MIGRATION_GUIDE.md`**
 >
 > 🖥️ Pour héberger sur ton PC (Windows) de façon stable: **`LOCAL_HOSTING_RUNBOOK.md`**
+>
+> ☁️ Pour une page de maintenance Cloudflare externe (secours): **`CLOUDFLARE_MAINTENANCE_WORKER.md`**
 
 ### Parcours de test rapide
 1. Crée un compte client
@@ -100,6 +102,7 @@ npm run validate:env:dev   # Validation env en mode développement
 npm run validate:env:prod  # Validation env en mode production
 npm run validate      # validate:env:dev + lint + build
 npm run smoke         # Smoke checks API (health + protections admin)
+npm run mail:check    # Vérification DNS Namecheap Private Email (MX/SPF/DMARC/CNAME)
 npm run db:backup -- <label>      # Backup SQLite local dans /backups
 npm run db:restore -- [file.db]   # Restore SQLite (backup sécurité auto avant restore)
 npm run prisma:migrate:safe -- <name> # Backup auto + migration Prisma
@@ -160,12 +163,12 @@ STRIPE_WEBHOOK_SECRET=
 NODE_ENV=development
 
 # Business / support
-BUSINESS_SUPPORT_EMAIL="gary_b0@hotmail.fr"
+BUSINESS_SUPPORT_EMAIL="support@chezolive.ca"
 
 # Email transactionnel (Resend)
 # Laisse vide pour fallback console log en local
 RESEND_API_KEY=""
-RESEND_FROM_EMAIL="Maison Olive <onboarding@resend.dev>"
+RESEND_FROM_EMAIL="Chez Olive <noreply@chezolive.ca>"
 ```
 
 ### Email transactionnel réel (Resend)
@@ -180,6 +183,23 @@ Pour passer en production:
 2. Configure `RESEND_API_KEY`
 3. Configure `RESEND_FROM_EMAIL` avec un domaine vérifié Resend
 4. Passe une commande test et vérifie la réception email
+
+### Boite support `support@chezolive.ca`
+
+La procédure Namecheap Private Email + Cloudflare est documentée dans
+`NAMECHEAP_PRIVATE_EMAIL_SETUP.md`.
+
+Pour vérifier les DNS mail publiés:
+
+```bash
+npm run mail:check
+```
+
+Pour inclure une vérification DKIM après ajout du record Namecheap:
+
+```bash
+npm run mail:check -- --dkim-host <selector._domainkey.chezolive.ca>
+```
 
 ## 🔒 Checklist sécurité (avant prod)
 
@@ -225,6 +245,14 @@ NEXT_PUBLIC_SITE_URL="http://localhost:3101"
 STRIPE_SECRET_KEY="sk_test_..."
 STRIPE_WEBHOOK_SECRET="whsec_..."
 ```
+
+Pour un environnement **pré-production** (avec `NODE_ENV=production` mais clés Stripe test), ajoute:
+
+```env
+ALLOW_STRIPE_TEST_KEYS_IN_PRODUCTION="true"
+```
+
+> Cela permet de conserver des clés test volontairement en pré-prod tout en gardant une validation explicite.
 
 > `STRIPE_WEBHOOK_SECRET` est fourni par Stripe CLI quand tu fais le forwarding local.
 
@@ -284,7 +312,7 @@ Copie le secret `whsec_...` affiché et mets-le dans `STRIPE_WEBHOOK_SECRET`.
 ## 📊 Structure du Projet
 
 ```
-maison-olive-shop/
+Chez-olive-shop/
 ├── prisma/
 │   ├── schema.prisma       # Schéma de la base de données
 │   └── migrations/         # Historique des migrations
@@ -377,3 +405,5 @@ Ce projet est privé et destiné à un usage personnel.
    - Verify Stripe webhook and confirmation email
 
 > Note: Turbopack root warning is handled in `next.config.ts` with `turbopack.root`.
+
+

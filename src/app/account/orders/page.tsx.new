@@ -1,0 +1,113 @@
+import Link from "next/link";
+import { getCurrentUser } from "@/lib/auth";
+import { formatCurrency, formatDate } from "@/lib/format";
+import { getCurrentLanguage } from "@/lib/language";
+import { prisma } from "@/lib/prisma";
+
+const DELIVERY_STATUS_FR: Record<string, string> = {
+  UNSCHEDULED: "En attente",
+  SCHEDULED: "Planifiee",
+  OUT_FOR_DELIVERY: "En livraison",
+  DELIVERED: "Livree",
+  FAILED: "Echouee",
+  RESCHEDULED: "Replanifiee",
+};
+
+const DELIVERY_STATUS_EN: Record<string, string> = {
+  UNSCHEDULED: "Pending",
+  SCHEDULED: "Scheduled",
+  OUT_FOR_DELIVERY: "Out for delivery",
+  DELIVERED: "Delivered",
+  FAILED: "Failed",
+  RESCHEDULED: "Rescheduled",
+};
+
+export default async function AccountOrdersPage() {
+  const user = await getCurrentUser();
+  const language = await getCurrentLanguage();
+  const locale = language === "fr" ? "fr-CA" : "en-CA";
+
+  const orders = await prisma.order.findMany({
+    where: { userId: user!.id },
+    orderBy: { createdAt: "desc" },
+    take: 50,
+    include: {
+      items: {
+        include: {
+          product: true,
+        },
+      },
+    },
+  });
+
+  return (
+    <section className="section">
+      <h1>{language === "fr" ? "Mes commandes" : "My orders"}</h1>
+      <p className="small" style={{ marginBottom: 24 }}>
+        {language === "fr" ? "Historique de toutes tes commandes passees." : "History of all your past orders."}
+      </p>
+
+      {orders.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "4rem 1rem" }}>
+          <h3>{language === "fr" ? "Aucune commande" : "No orders yet"}</h3>
+          <p className="small">
+            {language === "fr" ? "Tu n'as pas encore passe de commande." : "You haven't placed any orders yet."}
+          </p>
+          <Link className="btn" href="/" style={{ marginTop: 16 }}>
+            {language === "fr" ? "Aller faire des achats" : "Go shopping"}
+          </Link>
+        </div>
+      ) : (
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>{language === "fr" ? "Numero" : "Number"}</th>
+                <th>{language === "fr" ? "Date" : "Date"}</th>
+                <th>{language === "fr" ? "Statut" : "Status"}</th>
+                <th>{language === "fr" ? "Livraison" : "Delivery"}</th>
+                <th>{language === "fr" ? "Total" : "Total"}</th>
+                <th>{language === "fr" ? "Actions" : "Actions"}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {orders.map((order) => (
+                <tr key={order.id}>
+                  <td>
+                    <strong>#{order.orderNumber}</strong>
+                  </td>
+                  <td>{formatDate(order.createdAt, locale)}</td>
+                  <td>
+                    <span className="badge">{order.status}</span>
+                  </td>
+                  <td>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                      <span className="small">
+                        {(language === "fr" ? DELIVERY_STATUS_FR : DELIVERY_STATUS_EN)[order.deliveryStatus] ?? order.deliveryStatus}
+                      </span>
+                      {order.deliveryWindowStartAt && order.deliveryWindowEndAt ? (
+                        <span className="small">
+                          {formatDate(order.deliveryWindowStartAt, locale)} -> {formatDate(order.deliveryWindowEndAt, locale)}
+                        </span>
+                      ) : (
+                        <span className="small">
+                          {language === "fr" ? "A confirmer" : "To be scheduled"}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td>{formatCurrency(order.totalCents, order.currency, locale)}</td>
+                  <td>
+                    <Link className="btn btn-secondary" href={`/account/orders/${order.id}`}>
+                      {language === "fr" ? "Voir details" : "View details"}
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}

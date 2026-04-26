@@ -101,24 +101,31 @@ async function main() {
       throw new Error(`Category ${product.categoryName} not found`);
     }
 
-    const { categoryName, ...productData } = product;
-
     await prisma.product.upsert({
       where: { slug: product.slug },
       update: {
-        nameFr: productData.nameFr,
-        nameEn: productData.nameEn,
-        descriptionFr: productData.descriptionFr,
-        descriptionEn: productData.descriptionEn,
-        imageUrl: productData.imageUrl,
-        priceCents: productData.priceCents,
-        currency: productData.currency,
-        stock: productData.stock,
-        isActive: productData.isActive,
+        nameFr: product.nameFr,
+        nameEn: product.nameEn,
+        descriptionFr: product.descriptionFr,
+        descriptionEn: product.descriptionEn,
+        imageUrl: product.imageUrl,
+        priceCents: product.priceCents,
+        currency: product.currency,
+        stock: product.stock,
+        isActive: product.isActive,
         category: { connect: { id: category.id } },
       },
       create: {
-        ...productData,
+        slug: product.slug,
+        nameFr: product.nameFr,
+        nameEn: product.nameEn,
+        descriptionFr: product.descriptionFr,
+        descriptionEn: product.descriptionEn,
+        imageUrl: product.imageUrl,
+        priceCents: product.priceCents,
+        currency: product.currency,
+        stock: product.stock,
+        isActive: product.isActive,
         category: { connect: { id: category.id } },
       },
     });

@@ -1,19 +1,16 @@
 import path from "node:path";
 import {
   createSqliteBackup,
-  loadEnvFilesInOrder,
+  getPositionalScriptArgs,
+  loadDatabaseEnvForTarget,
+  resolveEnvTargetFromArgs,
   resolveDatabaseFromEnv,
 } from "./db-utils";
 
-loadEnvFilesInOrder([
-  ".env.production.local",
-  ".env.production",
-  ".env.local",
-  ".env",
-]);
+const envTarget = resolveEnvTargetFromArgs();
+loadDatabaseEnvForTarget(envTarget);
 
-const label = process.argv[2] ?? "manual";
-const backupDir = process.argv[3] ?? path.resolve(process.cwd(), "backups");
+const [label = "manual", backupDir = path.resolve(process.cwd(), "backups")] = getPositionalScriptArgs();
 
 const db = resolveDatabaseFromEnv();
 
@@ -31,6 +28,7 @@ if (db.kind === "non-sqlite") {
 const result = createSqliteBackup(db.dbPath, backupDir, label);
 
 console.log("SQLite backup created.");
+console.log(`- Environment: ${envTarget}`);
 console.log(`- Source: ${db.dbPath}`);
 console.log(`- Backup DB: ${result.dbBackupPath}`);
 if (result.sidecarBackupPaths.length > 0) {

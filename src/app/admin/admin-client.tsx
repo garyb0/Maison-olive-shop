@@ -1,9 +1,11 @@
 "use client";
 
+import Image from "next/image";
 import { useMemo, useState } from "react";
 import type { Dictionary, Language } from "@/lib/i18n";
 import { Navigation } from "@/components/Navigation";
 import { AdminSupportPanel } from "@/components/AdminSupportPanel";
+import { ImageSelector } from "@/components/ImageSelector";
 
 type ProductRow = {
   id: string;
@@ -127,6 +129,7 @@ export function AdminClient({ language, t, oliveMode, products, inventoryMovemen
   const [stockLoadingId, setStockLoadingId] = useState<string | null>(null);
   const [stockMessage, setStockMessage] = useState("");
   const [stockError, setStockError] = useState("");
+  const [imageSelectorOpen, setImageSelectorOpen] = useState(false);
 
   const locale = language === "fr" ? "fr-CA" : "en-CA";
 
@@ -592,11 +595,42 @@ export function AdminClient({ language, t, oliveMode, products, inventoryMovemen
             </div>
             <div className="field">
               <label>{language === "fr" ? "URL image (optionnel)" : "Image URL (optional)"}</label>
-              <input
-                className="input"
-                value={productForm.imageUrl}
-                onChange={(e) => setProductForm((current) => ({ ...current, imageUrl: e.target.value }))}
-              />
+              <div className="row" style={{ gap: 8, alignItems: "flex-end" }}>
+                <input
+                  className="input"
+                  value={productForm.imageUrl}
+                  onChange={(e) => setProductForm((current) => ({ ...current, imageUrl: e.target.value }))}
+                  style={{ flex: 1 }}
+                />
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => setImageSelectorOpen(true)}
+                  type="button"
+                  style={{ whiteSpace: "nowrap" }}
+                >
+                  {language === "fr" ? "📁 Choisir" : "📁 Browse"}
+                </button>
+              </div>
+              {productForm.imageUrl && (
+                <div style={{ marginTop: 8 }}>
+                  <Image
+                    src={productForm.imageUrl}
+                    alt="Apercu"
+                    width={120}
+                    height={80}
+                    style={{
+                      maxWidth: "120px",
+                      maxHeight: "80px",
+                      objectFit: "contain",
+                      borderRadius: "4px",
+                      border: "1px solid #e5e7eb",
+                    }}
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
+                    }}
+                  />
+                </div>
+              )}
             </div>
             <div className="field">
               <label>{language === "fr" ? "Nom FR" : "French name"}</label>
@@ -716,6 +750,13 @@ export function AdminClient({ language, t, oliveMode, products, inventoryMovemen
             </button>
           </div>
         </form>
+
+        <ImageSelector
+          isOpen={imageSelectorOpen}
+          onClose={() => setImageSelectorOpen(false)}
+          onSelect={(url) => setProductForm((current) => ({ ...current, imageUrl: url }))}
+          language={language}
+        />
 
         <div className="table-wrap" style={{ marginTop: 16 }}>
           <table>
@@ -1080,3 +1121,5 @@ export function AdminClient({ language, t, oliveMode, products, inventoryMovemen
     </div>
   );
 }
+
+

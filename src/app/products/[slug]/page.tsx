@@ -1,19 +1,30 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { notFound } from "next/navigation";
+import { getCurrentUser } from "@/lib/auth";
 import { getActiveProductBySlug, getRelatedActiveProducts } from "@/lib/catalog";
 import { formatCurrency } from "@/lib/format";
 import { getDictionary } from "@/lib/i18n";
 import { getCurrentLanguage } from "@/lib/language";
+import { Navigation } from "@/components/Navigation";
 import { PromoBanner } from "@/components/PromoBanner";
+import { ProductSubscriptionInlineClient } from "./product-subscription-inline-panel";
+import { getCheckoutSession, stripeEnabled } from "@/lib/stripe";
 
 type ProductPageProps = {
   params: Promise<{ slug: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
-export default async function ProductDetailsPage({ params }: ProductPageProps) {
+function getSearchParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+export default async function ProductDetailsPage({ params, searchParams }: ProductPageProps) {
   const { slug } = await params;
+  const query = searchParams ? await searchParams : {};
   const language = await getCurrentLanguage();
   const t = getDictionary(language);
+  const user = await getCurrentUser();
 
   const product = await getActiveProductBySlug(slug);
   if (!product) {
@@ -26,25 +37,44 @@ export default async function ProductDetailsPage({ params }: ProductPageProps) {
   const locale = language === "fr" ? "fr-CA" : "en-CA";
   const productName = language === "fr" ? product.nameFr : product.nameEn;
   const productDescription = language === "fr" ? product.descriptionFr : product.descriptionEn;
+  const subscriptionReturnSessionId = getSearchParam(query.session_id)?.trim() ?? "";
+  let initialSubscriptionStatus: "idle" | "success" | "pending" | "cancelled" =
+    getSearchParam(query.canceled) === "true" ? "cancelled" : "idle";
+
+  if (subscriptionReturnSessionId && stripeEnabled) {
+    try {
+      const session = await getCheckoutSession(subscriptionReturnSessionId);
+      if (session?.mode === "subscription" && session.metadata?.productId === product.id) {
+        initialSubscriptionStatus = session.status === "complete" ? "success" : "pending";
+      }
+    } catch {
+      initialSubscriptionStatus = "pending";
+    }
+  } else if (getSearchParam(query.subscription) === "1") {
+    initialSubscriptionStatus = "pending";
+  }
+
+  const subscriptionProduct = {
+    id: product.id,
+    slug: product.slug,
+    isSubscription: product.isSubscription,
+    priceWeekly: product.priceWeekly,
+    priceBiweekly: product.priceBiweekly,
+    priceMonthly: product.priceMonthly,
+    priceQuarterly: product.priceQuarterly,
+    currency: product.currency,
+    nameFr: product.nameFr,
+    nameEn: product.nameEn,
+  };
 
   return (
     <div className="app-shell">
-      <nav className="topbar">
+      <header className="topbar">
         <div className="brand">{t.brandName}</div>
-        <div className="nav-links">
-          <Link className="pill-link" href="/">
-            {t.navHome}
-          </Link>
-          <Link className="pill-link" href="/checkout">
-            {t.navCheckout}
-          </Link>
-          <Link className="pill-link" href="/account">
-            {t.navAccount}
-          </Link>
-        </div>
-      </nav>
+        <Navigation language={language} t={t} user={user} />
+      </header>
 
-      <PromoBanner />
+      <PromoBanner language={language} />
 
       <section className="section olive-product-page">
         <div className="olive-product-summary">
@@ -63,9 +93,14 @@ export default async function ProductDetailsPage({ params }: ProductPageProps) {
           </div>
 
           <div className="olive-product-content">
-            <span className="badge olive-category-badge">{product.category?.name}</span>
+            <div className="olive-product-kicker-row">
+              <span className="badge olive-category-badge">{product.category?.name}</span>
+              <span className="olive-product-kicker">
+                {language === "fr" ? "Sélection locale Chez Olive" : "Chez Olive local pick"}
+              </span>
+            </div>
             <h1>{productName}</h1>
-            <p className="small">{productDescription}</p>
+            <p className="small olive-product-lead">{productDescription}</p>
 
             <div className="olive-product-meta">
               <div>
@@ -96,6 +131,12 @@ export default async function ProductDetailsPage({ params }: ProductPageProps) {
               <div className="badge">{language === "fr" ? "Sélection animale spécialisée" : "Specialized pet selection"}</div>
             </div>
 
+            <ProductSubscriptionInlineClient
+              product={subscriptionProduct}
+              language={language}
+              initialStatus={initialSubscriptionStatus}
+            />
+
             <div className="row" style={{ marginTop: 16 }}>
               <Link className="btn" href="/">
                 {language === "fr" ? "Retour au catalogue" : "Back to catalog"}
@@ -111,11 +152,11 @@ export default async function ProductDetailsPage({ params }: ProductPageProps) {
       <section className="section">
         <h2>{language === "fr" ? "Pourquoi ce produit ?" : "Why this product?"}</h2>
         <div className="olive-product-benefits">
-          <article className="card">
+          <article className="card olive-product-benefit-card">
             <h3>{language === "fr" ? "Description détaillée" : "Detailed description"}</h3>
             <p className="small">{productDescription}</p>
           </article>
-          <article className="card">
+          <article className="card olive-product-benefit-card">
             <h3>{language === "fr" ? "Pour quel besoin" : "Best for"}</h3>
             <p className="small">
               {language === "fr"
@@ -123,8 +164,8 @@ export default async function ProductDetailsPage({ params }: ProductPageProps) {
                 : `A ${product.category?.name} item selected for a reliable, easy-to-use local pet shop.`}
             </p>
           </article>
-          <article className="card">
-            <h3>{language === "fr" ? "Conseil Maison Olive" : "Maison Olive tip"}</h3>
+          <article className="card olive-product-benefit-card">
+            <h3>{language === "fr" ? "Conseil Chez Olive" : "Chez Olive tip"}</h3>
             <p className="small">
               {language === "fr"
                 ? "Combine ce produit avec d'autres essentiels de la même catégorie pour un panier plus complet."
@@ -143,7 +184,7 @@ export default async function ProductDetailsPage({ params }: ProductPageProps) {
               const relatedDescription = language === "fr" ? relatedProduct.descriptionFr : relatedProduct.descriptionEn;
 
               return (
-                <article className="card" key={relatedProduct.id}>
+                <article className="card olive-product-benefit-card" key={relatedProduct.id}>
                   <span className="badge olive-category-badge">{relatedProduct.category?.name}</span>
                   <h3>{relatedName}</h3>
                   <p className="small">{relatedDescription}</p>

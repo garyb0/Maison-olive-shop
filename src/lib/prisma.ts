@@ -2,10 +2,34 @@ import { PrismaClient } from "@prisma/client";
 import { PrismaLibSql } from "@prisma/adapter-libsql";
 
 declare global {
-  var prisma: PrismaClient | undefined;
+  var __prisma: PrismaClient | undefined;
 }
 
-let prismaClient: PrismaClient | undefined = global.prisma;
+const REQUIRED_MODEL_DELEGATES = [
+  "order",
+  "deliverySlot",
+  "deliveryException",
+  "deliveryScheduleSettings",
+  "driver",
+  "deliveryRun",
+  "deliveryStop",
+  "deliveryRunAccessToken",
+  "deliveryGpsSample",
+  "geocodedAddressCache",
+  "dogProfile",
+  "rateLimitBucket",
+] as const;
+
+function hasRequiredModelDelegates(client: PrismaClient) {
+  return REQUIRED_MODEL_DELEGATES.every((delegateName) => {
+    const delegate = (client as unknown as Record<string, unknown>)[delegateName];
+    return (
+      typeof delegate === "object" &&
+      delegate !== null &&
+      typeof (delegate as { findMany?: unknown }).findMany === "function"
+    );
+  });
+}
 
 const createPrismaClient = () => {
   const adapter = new PrismaLibSql({
@@ -18,25 +42,20 @@ const createPrismaClient = () => {
   });
 };
 
-const getPrismaClient = () => {
-  if (!prismaClient) {
-    prismaClient = createPrismaClient();
-
-    if (process.env.NODE_ENV !== "production") {
-      global.prisma = prismaClient;
-    }
-  }
-
-  return prismaClient;
+const globalForPrisma = globalThis as typeof globalThis & {
+  __prisma?: PrismaClient;
 };
 
-export const prisma = new Proxy({} as PrismaClient, {
-  get(_target, property, receiver) {
-    const client = getPrismaClient() as unknown as Record<PropertyKey, unknown>;
-    const value = Reflect.get(client, property, receiver);
+const cachedClient = globalForPrisma.__prisma;
+const prismaClient = cachedClient && hasRequiredModelDelegates(cachedClient)
+  ? cachedClient
+  : createPrismaClient();
 
-    return typeof value === "function" ? value.bind(client) : value;
-  },
-}) as PrismaClient;
+if (process.env.NODE_ENV !== "production") {
+  globalForPrisma.__prisma = prismaClient;
+}
+
+export const prisma = prismaClient;
+
 
 

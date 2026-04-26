@@ -1,3 +1,5 @@
-@echo off
-cd /d C:\Cline\maison-olive-shop
+﻿@echo off
+cd /d "%~dp0..\.."
 call npx pm2 resurrect
+
+

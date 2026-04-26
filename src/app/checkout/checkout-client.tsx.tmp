@@ -1,0 +1,1447 @@
+﻿"use client";
+
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import type { Dictionary, Language } from "@/lib/i18n";
+import type { CurrentUser, DeliveryAddress } from "@/lib/types";
+import { isRimouskiPostalCode } from "@/lib/delivery-zone";
+import { Navigation } from "@/components/Navigation";
+import { PromoBanner } from "@/components/PromoBanner";
+
+type ProductIndex = Record<
+  string,
+  {
+    id: string;
+    name: string;
+    priceCents: number;
+    currency: string;
+    priceLabel: string;
+  }
+>;
+
+type Props = {
+  language: Language;
+  t: Dictionary;
+  user: CurrentUser | null;
+  productIndex: ProductIndex;
+  initialDeliveryAddresses: DeliveryAddress[];
+  shippingFlatCents: number;
+  shippingFreeThresholdCents: number;
+};
+
+type CartLine = {
+  productId: string;
+  name: string;
+  quantity: number;
+};
+
+type CheckoutQuote = {
+  subtotalCents: number;
+  discountCents: number;
+  shippingCents: number;
+  gstCents: number;
+  qstCents: number;
+  taxCents: number;
+  totalCents: number;
+};
+
+type DeliverySlotOption = {
+  id: string;
+  startAt: string;
+  endAt: string;
+  capacity: number;
+  reservedCount: number;
+  remainingCapacity: number;
+  isOpen: boolean;
+  note: string | null;
+  dateKey: string;
+};
+
+type DeliveryPeriodKey = "AM" | "PM" | "SOIREE";
+type DeliveryPeriodSummary = {
+  period: DeliveryPeriodKey;
+  label: string;
+  statusText: string;
+  tone: "good" | "warn" | "full";
+  slot: DeliverySlotOption | null;
+  available: boolean;
+};
+
+const DELIVERY_PERIODS: DeliveryPeriodKey[] = ["AM", "PM", "SOIREE"];
+
+const CART_STORAGE_KEY = "chezolive_cart_v1";
+
+const formatCad = (cents: number, language: Language) =>
+  new Intl.NumberFormat(language === "fr" ? "fr-CA" : "en-CA", {
+    style: "currency",
+    currency: "CAD",
+  }).format(cents / 100);
+
+const formatDeliveryDayLabel = (dateKey: string, language: Language) =>
+  new Intl.DateTimeFormat(language === "fr" ? "fr-CA" : "en-CA", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  }).format(new Date(dateKey));
+
+const formatDeliveryTimeLabel = (value: string, language: Language) =>
+  new Intl.DateTimeFormat(language === "fr" ? "fr-CA" : "en-CA", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+
+const getDeliveryPeriod = (slot: DeliverySlotOption): DeliveryPeriodKey => {
+  const hour = new Date(slot.startAt).getHours();
+  if (hour < 12) return "AM";
+  if (hour < 17) return "PM";
+  return "SOIREE";
+};
+
+const formatDeliveryPeriodLabel = (period: DeliveryPeriodKey, language: Language) => {
+  if (period === "AM") return "AM";
+  if (period === "PM") return "PM";
+  return language === "fr" ? "Soirée" : "Evening";
+};
+
+const getCalendarDays = (deliveryDays: Array<{ dateKey: string; label: string; statusText: string; tone: "good" | "warn" | "full"; periodCount: number }>) => {
+  if (deliveryDays.length === 0) return [];
+
+  const availableMap = new Map(deliveryDays.map((day) => [day.dateKey, day] as const));
+  const startDate = new Date(deliveryDays[0].dateKey);
+  const offset = (startDate.getDay() + 6) % 7;
+  startDate.setDate(startDate.getDate() - offset);
+
+  return Array.from({ length: 14 }, (_, index) => {
+    const current = new Date(startDate);
+    current.setDate(startDate.getDate() + index);
+    const dateKey = current.toISOString().slice(0, 10);
+    const availableDay = availableMap.get(dateKey);
+    return {
+      dateKey,
+      date: current,
+      availableDay,
+      isAvailable: Boolean(availableDay),
+    };
+  });
+};
+
+const formatSavedAddressLabel = (address: DeliveryAddress) =>
+  `${address.label} - ${address.shippingLine1}, ${address.shippingCity}`;
+
+export function CheckoutClient({
+  language,
+  t,
+  user,
+  productIndex,
+  initialDeliveryAddresses,
+  shippingFlatCents: _shippingFlatCents,
+  shippingFreeThresholdCents: _shippingFreeThresholdCents,
+}: Props) {
+  const searchParams = useSearchParams();
+  const [deliveryAddresses] = useState<DeliveryAddress[]>(initialDeliveryAddresses);
+  const [selectedSavedAddressId, setSelectedSavedAddressId] = useState("");
+  const [saveDeliveryAddress, setSaveDeliveryAddress] = useState(Boolean(user) && initialDeliveryAddresses.length === 0);
+  const [deliveryAddressLabel, setDeliveryAddressLabel] = useState("");
+  const [shippingLine1, setShippingLine1] = useState("");
+  const [shippingCity, setShippingCity] = useState("");
+  const [shippingRegion, setShippingRegion] = useState("");
+  const [shippingPostal, setShippingPostal] = useState("");
+  const [shippingCountry, setShippingCountry] = useState("CA");
+  const [deliveryPhone, setDeliveryPhone] = useState("");
+  const [deliveryInstructions, setDeliveryInstructions] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<"MANUAL" | "STRIPE">("MANUAL");
+  const [promoCode, setPromoCode] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [addressError, setAddressError] = useState("");
+  const [deliveryPhoneTouched, setDeliveryPhoneTouched] = useState(false);
+  const [deliverySlots, setDeliverySlots] = useState<DeliverySlotOption[]>([]);
+  const [deliverySlotsLoading, setDeliverySlotsLoading] = useState(false);
+  const [deliverySlotsError, setDeliverySlotsError] = useState("");
+  const [selectedDeliverySlotId, setSelectedDeliverySlotId] = useState("");
+  const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
+  const [selectedDeliveryPeriod, setSelectedDeliveryPeriod] = useState<DeliveryPeriodKey | null>(null);
+  const [cart, setCart] = useState<CartLine[]>([]);
+  const [quote, setQuote] = useState<CheckoutQuote | null>(null);
+
+  const saveCart = (updated: CartLine[]) => {
+    setCart(updated);
+    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(updated));
+  };
+
+  const updateQty = (productId: string, qty: number) => {
+    if (qty <= 0) {
+      saveCart(cart.filter((line) => line.productId !== productId));
+      return;
+    }
+
+    saveCart(
+      cart.map((line) => (
+        line.productId === productId
+          ? { ...line, quantity: qty }
+          : line
+      )),
+    );
+  };
+
+  const remove = (productId: string) => {
+    saveCart(cart.filter((line) => line.productId !== productId));
+  };
+
+  // Validation code postal en temps réel
+  const postalTouched = shippingPostal.length >= 3;
+  const postalValid = postalTouched ? isRimouskiPostalCode(shippingPostal) : true;
+  const isDeliveryPhoneRequired = !selectedDeliverySlotId;
+  const deliveryPhoneErrorMessage =
+    language === "fr"
+      ? "Le num\u00e9ro de t\u00e9l\u00e9phone est requis pour planifier la livraison."
+      : "A phone number is required to schedule delivery.";
+  const showDeliveryPhoneError =
+    isDeliveryPhoneRequired && !deliveryPhone.trim();
+
+  useEffect(() => {
+    const raw = localStorage.getItem(CART_STORAGE_KEY);
+    if (!raw) {
+      setCart([]);
+      return;
+    }
+    try {
+      setCart(JSON.parse(raw) as CartLine[]);
+    } catch {
+      setCart([]);
+    }
+  }, []);
+
+  const cartRows = useMemo(() => cart.map((line) => {
+    const product = productIndex[line.productId];
+    const lineSubtotalCents = (product?.priceCents ?? 0) * line.quantity;
+    return {
+      ...line,
+      priceLabel: product?.priceLabel ?? "-",
+      lineSubtotalCents,
+      lineSubtotalLabel: new Intl.NumberFormat(language === "fr" ? "fr-CA" : "en-CA", {
+        style: "currency",
+        currency: product?.currency ?? "CAD",
+      }).format(lineSubtotalCents / 100),
+    };
+  }), [cart, language, productIndex]);
+
+  const subtotalCents = cartRows.reduce((acc, row) => acc + row.lineSubtotalCents, 0);
+  const beforeTaxCents = Math.max(0, subtotalCents - (quote?.discountCents ?? 0)) + (quote?.shippingCents ?? 0);
+  const subtotalLabel = formatCad(subtotalCents, language);
+  const trimmedPromoCode = promoCode.trim().toUpperCase();
+  const promoApplied = Boolean(quote && quote.discountCents > 0);
+  const deliveryDays = useMemo(() => Array.from(new Set(deliverySlots.map((slot) => slot.dateKey))).map((dateKey) => {
+    const daySlots = deliverySlots.filter((slot) => slot.dateKey === dateKey);
+    const totalRemaining = daySlots.reduce((sum, slot) => sum + slot.remainingCapacity, 0);
+    const totalCapacity = daySlots.reduce((sum, slot) => sum + slot.capacity, 0);
+    const fillRate = totalCapacity > 0 ? totalRemaining / totalCapacity : 0;
+
+    let tone: "good" | "warn" | "full" = "good";
+    let statusText =
+      language === "fr"
+        ? `${totalRemaining} place(s) disponibles`
+        : `${totalRemaining} spot(s) available`;
+
+    if (fillRate <= 0) {
+      tone = "full";
+      statusText = language === "fr" ? "Complet" : "Full";
+    } else if (fillRate <= 0.35) {
+      tone = "warn";
+      statusText = language === "fr" ? "Presque complet" : "Almost full";
+    }
+
+    return {
+      dateKey,
+      label: formatDeliveryDayLabel(dateKey, language),
+      statusText,
+      tone,
+      periodCount: Array.from(new Set(daySlots.map((slot) => getDeliveryPeriod(slot)))).length,
+    };
+  }), [deliverySlots, language]);
+  const selectedSlot = useMemo(
+    () => deliverySlots.find((slot) => slot.id === selectedDeliverySlotId) ?? null,
+    [deliverySlots, selectedDeliverySlotId],
+  );
+  const selectedDaySlots = useMemo(
+    () => deliverySlots.filter((slot) => slot.dateKey === selectedDateKey),
+    [deliverySlots, selectedDateKey],
+  );
+  const selectedDayPeriods = useMemo(() => {
+    return DELIVERY_PERIODS
+      .map((period): DeliveryPeriodSummary => {
+        const periodSlots = selectedDaySlots.filter((slot) => getDeliveryPeriod(slot) === period);
+        if (!periodSlots.length) {
+          return {
+            period,
+            label: formatDeliveryPeriodLabel(period, language),
+            statusText: language === "fr" ? "Indisponible" : "Unavailable",
+            tone: "full",
+            slot: null,
+            available: false,
+          };
+        }
+
+        const totalRemaining = periodSlots.reduce((sum, slot) => sum + slot.remainingCapacity, 0);
+        let tone: "good" | "warn" | "full" = "good";
+        let statusText =
+          language === "fr"
+            ? `${totalRemaining} place(s) disponibles`
+            : `${totalRemaining} spot(s) available`;
+
+        if (totalRemaining <= 0) {
+          tone = "full";
+          statusText = language === "fr" ? "Complet" : "Full";
+        } else if (totalRemaining <= 2) {
+          tone = "warn";
+          statusText = language === "fr" ? "Disponibilite limitee" : "Limited availability";
+        }
+
+        return {
+          period,
+          label: formatDeliveryPeriodLabel(period, language),
+          statusText,
+          tone,
+          slot: periodSlots[0],
+          available: totalRemaining > 0,
+        };
+      });
+  }, [language, selectedDaySlots]);
+  const calendarDays = useMemo(() => getCalendarDays(deliveryDays), [deliveryDays]);
+  const deliveryStepLabel = !shippingPostal.trim()
+    ? (language === "fr" ? "Entre ton code postal pour afficher les options." : "Enter your postal code to load delivery options.")
+      : !postalValid
+      ? (language === "fr" ? "Nous n'affichons pas de créneaux hors zone de livraison." : "We only show slots inside the delivery area.")
+      : !selectedDateKey
+        ? (language === "fr" ? "Choisis une journée de livraison." : "Choose a delivery day.")
+        : !selectedDeliveryPeriod
+          ? (language === "fr" ? "Choisis maintenant AM, PM ou Soirée." : "Now choose AM, PM, or Evening.")
+          : (language === "fr" ? "Ton créneau est prêt. Tu peux finaliser la commande." : "Your slot is ready. You can finish checkout.");
+
+  const applyDeliveryAddress = (address: DeliveryAddress) => {
+    setSelectedSavedAddressId(address.id);
+    setDeliveryAddressLabel(address.label);
+    setShippingLine1(address.shippingLine1);
+    setShippingCity(address.shippingCity);
+    setShippingRegion(address.shippingRegion);
+    setShippingPostal(address.shippingPostal);
+    setShippingCountry(address.shippingCountry);
+    setDeliveryPhone(address.deliveryPhone ?? "");
+    setDeliveryInstructions(address.deliveryInstructions ?? "");
+    setSaveDeliveryAddress(false);
+  };
+
+  const startNewDeliveryAddress = () => {
+    setSelectedSavedAddressId("");
+    setDeliveryAddressLabel("");
+    setSaveDeliveryAddress(deliveryAddresses.length === 0);
+    setShippingLine1("");
+    setShippingCity("");
+    setShippingRegion("");
+    setShippingPostal("");
+    setShippingCountry("CA");
+    setDeliveryPhone("");
+    setDeliveryInstructions("");
+  };
+
+  useEffect(() => {
+    if (!user || deliveryAddresses.length === 0 || selectedSavedAddressId) {
+      return;
+    }
+
+    const hasTypedAddress = [shippingLine1, shippingCity, shippingRegion, shippingPostal, deliveryPhone, deliveryInstructions]
+      .some((value) => value.trim().length > 0);
+
+    if (hasTypedAddress) {
+      return;
+    }
+
+    applyDeliveryAddress(deliveryAddresses[0]);
+  }, [
+    deliveryAddresses,
+    deliveryInstructions,
+    deliveryPhone,
+    selectedSavedAddressId,
+    shippingCity,
+    shippingLine1,
+    shippingPostal,
+    shippingRegion,
+    user,
+  ]);
+
+  useEffect(() => {
+    const queryPromo = searchParams.get("promoCode")?.trim().toUpperCase();
+    if (queryPromo) {
+      setPromoCode((current) => current || queryPromo);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!cart.length) {
+      setQuote(null);
+      return;
+    }
+
+    const controller = new AbortController();
+
+    const loadQuote = async () => {
+      try {
+        const response = await fetch("/api/orders/quote", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            items: cart.map((row) => ({ productId: row.productId, quantity: row.quantity })),
+            shippingPostal,
+            shippingCountry,
+            promoCode: trimmedPromoCode || undefined,
+          }),
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          setQuote(null);
+          return;
+        }
+
+        const data = (await response.json()) as { quote?: CheckoutQuote };
+        setQuote(data.quote ?? null);
+      } catch {
+        if (!controller.signal.aborted) {
+          setQuote(null);
+        }
+      }
+    };
+
+    void loadQuote();
+
+    return () => controller.abort();
+  }, [cart, shippingCountry, shippingPostal, trimmedPromoCode]);
+
+  useEffect(() => {
+    const postal = shippingPostal.trim();
+    const country = shippingCountry.trim().toUpperCase() || "CA";
+
+    if (!postal || !isRimouskiPostalCode(postal) || country !== "CA") {
+      setDeliverySlots([]);
+      setSelectedDeliverySlotId("");
+      setSelectedDeliveryPeriod(null);
+      setDeliverySlotsError("");
+      setDeliverySlotsLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+
+    const loadSlots = async () => {
+      setDeliverySlotsLoading(true);
+      setDeliverySlotsError("");
+
+      try {
+        const params = new URLSearchParams({
+          postalCode: postal,
+          country,
+        });
+        const response = await fetch(`/api/delivery/slots?${params.toString()}`, {
+          signal: controller.signal,
+        });
+
+        const data = (await response.json().catch(() => ({}))) as {
+          slots?: DeliverySlotOption[];
+          error?: string;
+        };
+
+        if (!response.ok) {
+          setDeliverySlots([]);
+          setSelectedDeliverySlotId("");
+          setSelectedDeliveryPeriod(null);
+          setDeliverySlotsError(
+            data.error ??
+              (language === "fr"
+                ? "Impossible de charger les créneaux de livraison pour le moment."
+                : "Unable to load delivery slots right now."),
+          );
+          return;
+        }
+
+        const slots = data.slots ?? [];
+        setDeliverySlots(slots);
+        
+        // Auto sélectionner le premier jour disponible par défaut
+        if (slots.length > 0) {
+          setSelectedDateKey(slots[0].dateKey);
+          setSelectedDeliverySlotId(slots[0].id);
+          setSelectedDeliveryPeriod(getDeliveryPeriod(slots[0]));
+        } else {
+          setSelectedDateKey(null);
+          setSelectedDeliverySlotId("");
+          setSelectedDeliveryPeriod(null);
+        }
+      } catch {
+        if (!controller.signal.aborted) {
+          setDeliverySlots([]);
+          setSelectedDeliverySlotId("");
+          setSelectedDeliveryPeriod(null);
+          setDeliverySlotsError(
+            language === "fr"
+              ? "Impossible de charger les créneaux de livraison pour le moment."
+              : "Unable to load delivery slots right now.",
+          );
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setDeliverySlotsLoading(false);
+        }
+      }
+    };
+
+    void loadSlots();
+
+    return () => controller.abort();
+  }, [language, shippingCountry, shippingPostal]);
+
+  useEffect(() => {
+    if (!selectedDateKey) {
+      setSelectedDeliverySlotId("");
+      setSelectedDeliveryPeriod(null);
+      return;
+    }
+
+    if (selectedDayPeriods.length === 0) {
+      setSelectedDeliverySlotId("");
+      setSelectedDeliveryPeriod(null);
+      return;
+    }
+
+    const activePeriod = selectedDayPeriods.find(
+      (period) => period.period === selectedDeliveryPeriod && period.available && period.slot,
+    );
+    const nextPeriod = activePeriod ?? selectedDayPeriods.find((period) => period.available && period.slot);
+
+    if (!nextPeriod || !nextPeriod.slot) {
+      setSelectedDeliveryPeriod(null);
+      setSelectedDeliverySlotId("");
+      return;
+    }
+
+    if (selectedDeliveryPeriod !== nextPeriod.period) {
+      setSelectedDeliveryPeriod(nextPeriod.period);
+    }
+
+    if (selectedDeliverySlotId !== nextPeriod.slot.id) {
+      setSelectedDeliverySlotId(nextPeriod.slot.id);
+    }
+  }, [selectedDateKey, selectedDayPeriods, selectedDeliveryPeriod, selectedDeliverySlotId]);
+
+  const formatDeliverySlotLabel = (slot: DeliverySlotOption) => {
+    const startAt = new Date(slot.startAt);
+    const endAt = new Date(slot.endAt);
+    const locale = language === "fr" ? "fr-CA" : "en-CA";
+
+    const dateLabel = new Intl.DateTimeFormat(locale, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+    }).format(startAt);
+
+    const startLabel = new Intl.DateTimeFormat(locale, {
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(startAt);
+
+    const endLabel = new Intl.DateTimeFormat(locale, {
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(endAt);
+
+    return `${dateLabel} · ${startLabel} - ${endLabel}`;
+  };
+
+  const submitOrder = async () => {
+    if (!user) {
+      setError(language === "fr" ? "Connecte-toi avant de commander." : "Please login before ordering.");
+      return;
+    }
+    if (!cartRows.length) {
+      setError(language === "fr" ? "Panier vide." : "Cart is empty.");
+      return;
+    }
+
+    // Validation zone de livraison
+    if (shippingPostal && !isRimouskiPostalCode(shippingPostal)) {
+      setAddressError(
+        language === "fr"
+          ? "Désolé, nous livrons uniquement dans la région de Rimouski (ex: G5L, G5M, G5N, G0L, G0J). Vérifie ton code postal."
+          : "Sorry, we only deliver in the Rimouski area (e.g. G5L, G5M, G5N, G0L, G0J). Please check your postal code.",
+      );
+      return;
+    }
+
+    if (isDeliveryPhoneRequired && !deliveryPhone.trim()) {
+      setDeliveryPhoneTouched(true);
+      setAddressError(deliveryPhoneErrorMessage);
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    setAddressError("");
+    setMessage("");
+
+    try {
+      // Extraire les vraies dates de la fenêtre sélectionnée
+      const selectedSlot = deliverySlots.find((s) => s.id === selectedDeliverySlotId);
+
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: cartRows.map((row) => ({ productId: row.productId, quantity: row.quantity })),
+          paymentMethod,
+          promoCode: trimmedPromoCode || undefined,
+          deliveryAddressId: selectedSavedAddressId || undefined,
+          deliveryAddressLabel: saveDeliveryAddress ? deliveryAddressLabel.trim() || shippingLine1.trim() : undefined,
+          saveDeliveryAddress: user ? saveDeliveryAddress : undefined,
+          shippingLine1,
+          shippingCity,
+          shippingRegion,
+          shippingPostal,
+          shippingCountry,
+          deliverySlotId: selectedSlot?.id || undefined,
+          deliveryInstructions: deliveryInstructions.trim() || undefined,
+          deliveryPhone: deliveryPhone.trim() || undefined,
+        }),
+      });
+
+      const json = (await res.json()) as {
+        order?: { orderNumber: string };
+        stripeCheckoutUrl?: string | null;
+        error?: string;
+      };
+
+      if (!res.ok) {
+        if (!res.ok) {
+        if (json.error === "Adresse hors zone de livraison") {
+          setAddressError(json.error);
+          return;
+        }
+
+        if (
+          json.error === "Numero de telephone requis pour planifier la livraison" ||
+          json.error === "Num\u00e9ro de t\u00e9l\u00e9phone requis pour planifier la livraison"
+        ) {
+          setDeliveryPhoneTouched(true);
+          setAddressError(deliveryPhoneErrorMessage);
+          return;
+        }
+
+        if (
+          json.error === "Numero de telephone requis pour planifier la livraison" ||
+          json.error === "Num\u00e9ro de t\u00e9l\u00e9phone requis pour planifier la livraison"
+        ) {
+          setDeliveryPhoneTouched(true);
+          setAddressError(deliveryPhoneErrorMessage);
+          return;
+        }
+        if (
+          json.error === "Numero de telephone requis pour planifier la livraison" ||
+          json.error === "Num\u00e9ro de t\u00e9l\u00e9phone requis pour planifier la livraison"
+        ) {
+          setDeliveryPhoneTouched(true);
+          setAddressError(deliveryPhoneErrorMessage);
+          return;
+        }
+        }
+
+        if (
+          json.error === "Créneau de livraison introuvable" ||
+          json.error === "Le créneau sélectionné est fermé" ||
+          json.error === "Le créneau sélectionné est complet" ||
+          json.error === "Le créneau est hors fenêtre de réservation"
+        ) {
+          setError(json.error);
+          return;
+        }
+
+        setError(json.error ?? (language === "fr" ? "Commande impossible." : "Could not place order."));
+        return;
+      }
+
+      localStorage.removeItem(CART_STORAGE_KEY);
+      setCart([]);
+
+      if (json.stripeCheckoutUrl) {
+        window.location.href = json.stripeCheckoutUrl;
+        return;
+      }
+
+      if (paymentMethod === "STRIPE") {
+        setError(
+          language === "fr"
+            ? "Stripe est indisponible pour le moment. Essaie le paiement comptant ou vérifie la configuration."
+            : "Stripe is currently unavailable. Try cash on delivery or verify configuration.",
+        );
+        return;
+      }
+
+    setMessage(
+      language === "fr"
+        ? `Commande ${json.order?.orderNumber ?? ""} créée avec succès, paiement comptant à la livraison.`
+        : `Order ${json.order?.orderNumber ?? ""} created successfully with cash on delivery.`,
+    );
+
+      const orderNumber = json.order?.orderNumber;
+      if (orderNumber) {
+        window.location.href = `/account?ordered=${encodeURIComponent(orderNumber)}`;
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="app-shell">
+      <header className="topbar">
+        <div className="brand">{t.brandName}</div>
+        <Navigation language={language} t={t} user={user} />
+      </header>
+
+      <PromoBanner />
+
+      {/* Page header */}
+      <section className="section checkout-page-header">
+        <div className="checkout-page-title-row">
+          <span className="checkout-page-icon">{"\u{1F6D2}"}</span>
+          <div>
+            <h1 className="checkout-page-title">{t.checkoutTitle}</h1>
+            <p className="checkout-page-subtitle">{t.checkoutSubtitle}</p>
+          </div>
+        </div>
+      </section>
+
+      {cartRows.length === 0 ? (
+        <section className="section cart-empty-state">
+          <span className="cart-empty-icon">{"\u{1F43E}"}</span>
+          <p className="cart-empty-text">
+            {language === "fr" ? "Ton panier est vide. Rien à commander." : "Your cart is empty. Nothing to order."}
+          </p>
+          <Link className="btn" href="/">
+            {language === "fr" ? "← Retour à la boutique" : "← Back to shop"}
+          </Link>
+        </section>
+      ) : (
+        <div className="checkout-grid">
+          {/* Colonne principale */}
+          <div className="checkout-main">
+
+            {/* Récapitulatif du panier */}
+            <section className="section checkout-section-card">
+              <div className="checkout-section-header">
+                <span className="checkout-section-icon">{"\u{1F4CB}"}</span>
+                <h2 className="checkout-section-title">
+                  {language === "fr" ? "Récapitulatif" : "Order summary"}
+                </h2>
+              </div>
+
+              <div className="cart-table-wrap">
+                <table className="cart-table">
+                  <thead>
+                    <tr>
+                      <th>{language === "fr" ? "Produit" : "Product"}</th>
+                      <th className="cart-th-price">{language === "fr" ? "Prix unit." : "Unit price"}</th>
+                      <th className="cart-th-qty">{language === "fr" ? "Qté" : "Qty"}</th>
+                      <th className="cart-th-subtotal">{language === "fr" ? "Sous-total" : "Subtotal"}</th>
+                      <th className="cart-th-action"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {cartRows.map((row) => (
+                      <tr key={row.productId} className="cart-row">
+                        <td className="cart-td-name">
+                          <span className="cart-product-name">{row.name}</span>
+                        </td>
+                        <td className="cart-td-price">
+                          <span className="cart-price-badge">{row.priceLabel}</span>
+                        </td>
+                        <td className="cart-td-qty">
+                          <div className="cart-qty-control">
+                            <button
+                              className="cart-qty-btn"
+                              type="button"
+                              onClick={() => updateQty(row.productId, row.quantity - 1)}
+                              aria-label={language === "fr" ? "Diminuer" : "Decrease"}
+                            >
+                              -
+                            </button>
+                            <input
+                              className="cart-qty-input"
+                              type="number"
+                              min={1}
+                              value={row.quantity}
+                              onChange={(e) => updateQty(row.productId, Math.max(1, Number(e.target.value) || 1))}
+                            />
+                            <button
+                              className="cart-qty-btn"
+                              type="button"
+                              onClick={() => updateQty(row.productId, row.quantity + 1)}
+                              aria-label={language === "fr" ? "Augmenter" : "Increase"}
+                            >
+                              +
+                            </button>
+                          </div>
+                        </td>
+                        <td className="cart-td-subtotal">
+                          <strong className="cart-subtotal-value">{row.lineSubtotalLabel}</strong>
+                        </td>
+                        <td className="cart-td-action">
+                          <button
+                            className="cart-remove-btn"
+                            type="button"
+                            onClick={() => remove(row.productId)}
+                            aria-label={language === "fr" ? "Retirer" : "Remove"}
+                            title={language === "fr" ? "Retirer" : "Remove"}
+                          >
+                            X
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            {/* Adresse de livraison */}
+            <section className="section checkout-section-card">
+              <div className="checkout-section-header">
+                <span className="checkout-section-icon">{"\u{1F4CD}"}</span>
+                <div>
+                  <h2 className="checkout-section-title">
+                    {language === "fr" ? "Adresse de livraison" : "Shipping address"}
+                  </h2>
+                  <p className="checkout-section-subtitle">
+                    {language === "fr"
+                      ? "Livraison locale à Rimouski seulement 📍"
+                      : "Local delivery in Rimouski area only 📍"}
+                  </p>
+                </div>
+              </div>
+
+              {user ? (
+                <div style={{ display: "grid", gap: 14, marginBottom: 18 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
+                    <div>
+                      <strong>{language === "fr" ? "Carnet d'adresses" : "Address book"}</strong>
+                      <p className="small" style={{ margin: "6px 0 0" }}>
+                        {language === "fr"
+                          ? "Choisis une adresse déjà enregistrée ou ajoute-en une nouvelle."
+                          : "Choose a saved address or add a new one."}
+                      </p>
+                    </div>
+                    <button type="button" className="btn btn-secondary" onClick={() => startNewDeliveryAddress()}>
+                      {language === "fr" ? "Nouvelle adresse" : "New address"}
+                    </button>
+                  </div>
+
+                  {deliveryAddresses.length > 0 ? (
+                    <div style={{ display: "grid", gap: 10 }}>
+                      {deliveryAddresses.map((address) => {
+                        const active = selectedSavedAddressId === address.id;
+                        return (
+                          <button
+                            key={address.id}
+                            type="button"
+                            className="btn btn-secondary"
+                            style={{
+                              textAlign: "left",
+                              justifyContent: "flex-start",
+                              borderColor: active ? "#7b8b5a" : undefined,
+                              background: active ? "rgba(123, 139, 90, 0.12)" : undefined,
+                            }}
+                            onClick={() => applyDeliveryAddress(address)}
+                          >
+                            {formatSavedAddressLabel(address)}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="small" style={{ margin: 0 }}>
+                      {language === "fr"
+                        ? "Aucune adresse enregistrée pour le moment."
+                        : "You do not have a saved address yet."}
+                    </p>
+                  )}
+                  {user ? (
+                    <div style={{ marginTop: 12 }}>
+                      <label style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                        <input
+                          type="checkbox"
+                          checked={saveDeliveryAddress}
+                          onChange={(event) => setSaveDeliveryAddress(event.target.checked)}
+                        />
+                        <span>
+                          {language === "fr"
+                            ? "Enregistrer cette adresse pour mes prochaines commandes"
+                            : "Save this address for my next orders"}
+                        </span>
+                      </label>
+                      {deliveryAddresses.length === 0 ? (
+                        <p className="small" style={{ marginTop: 8, marginBottom: 0 }}>
+                          {language === "fr"
+                          ? "Première adresse: l'enregistrement est coché par défaut."
+                          : "First address: saving is checked by default."}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
+              <div className="checkout-address-grid">
+                <div className="field checkout-field-full">
+                  <label>{language === "fr" ? "Adresse" : "Street address"}</label>
+                  <div className="input-icon-wrap">
+                    <span className="input-icon">{"\u{1F3E0}"}</span>
+                    <input
+                      className="input input--icon"
+                      placeholder={language === "fr" ? "123 rue des Oliviers" : "123 Olive Street"}
+                      value={shippingLine1}
+                      onChange={(e) => setShippingLine1(e.target.value)}
+                      suppressHydrationWarning
+                    />
+                  </div>
+                </div>
+                <div className="field">
+                  <label>{language === "fr" ? "Ville" : "City"}</label>
+                  <div className="input-icon-wrap">
+                    <span className="input-icon">{"\u{1F3D8}"}</span>
+                    <input
+                      className="input input--icon"
+                      placeholder="Rimouski"
+                      value={shippingCity}
+                      onChange={(e) => setShippingCity(e.target.value)}
+                      suppressHydrationWarning
+                    />
+                  </div>
+                </div>
+
+                <div className="field">
+                  <label>{language === "fr" ? "Province" : "Province"}</label>
+                  <div className="input-icon-wrap">
+                    <span className="input-icon">{"\u{1F3D9}"}</span>
+                    <input
+                      className="input input--icon"
+                      placeholder="QC"
+                      value={shippingRegion}
+                      onChange={(e) => setShippingRegion(e.target.value)}
+                      suppressHydrationWarning
+                    />
+                  </div>
+                </div>
+
+                <div className="field">
+                  <label>
+                    {language === "fr" ? "Code postal" : "Postal code"}
+                    {postalTouched && (
+                      <span className={`checkout-postal-badge${postalValid ? " checkout-postal-badge--ok" : " checkout-postal-badge--err"}`}>
+                        {postalValid
+                          ? (language === "fr" ? "✅ Zone couverte" : "✅ Zone covered")
+                          : (language === "fr" ? "❌ Hors zone" : "❌ Out of zone")}
+                      </span>
+                    )}
+                  </label>
+                  <div className="input-icon-wrap">
+                    <span className="input-icon">{"\u{1F4CD}"}</span>
+                    <input
+                      className={`input input--icon${postalTouched && !postalValid ? " input--error" : ""}`}
+                      placeholder="G5L 1A1"
+                      value={shippingPostal}
+                      onChange={(e) => setShippingPostal(e.target.value)}
+                      suppressHydrationWarning
+                    />
+                  </div>
+                  {postalTouched && !postalValid && (
+                    <p className="checkout-postal-hint">
+                      {language === "fr"
+                        ? "Codes acceptés : G5L, G5M, G5N, G5J, G5K, G5H, G0L, G5X, G0J et alentours."
+                        : "Accepted codes: G5L, G5M, G5N, G5J, G5K, G5H, G0L, G5X, G0J and surroundings."}
+                    </p>
+                  )}
+                  {addressError && (
+                    <p className="checkout-postal-hint" style={{ color: "#dc2626" }}>
+                    ⚠️ {addressError}
+                    </p>
+                  )}
+                </div>
+
+                <div className="field">
+                  <label>{language === "fr" ? "Pays" : "Country"}</label>
+                  <div className="input-icon-wrap">
+                    <span className="input-icon">{"\u{1F310}"}</span>
+                    <input
+                      className="input input--icon"
+                      placeholder="CA"
+                      value={shippingCountry}
+                      onChange={(e) => setShippingCountry(e.target.value)}
+                      suppressHydrationWarning
+                    />
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* Créneau et consignes de livraison */}
+            <section className="section checkout-section-card">
+              <div className="checkout-section-header">
+                <span className="checkout-section-icon">{"\u{23F0}"}</span>
+                <div>
+                  <h2 className="checkout-section-title">
+                    {language === "fr" ? "Créneau de livraison" : "Delivery window"}
+                  </h2>
+                  <p className="checkout-section-subtitle">
+                    {language === "fr"
+                      ? "Choisis l'heure qui te convient le mieux."
+                      : "Choose the time window that works best for you."}
+                  </p>
+                </div>
+              </div>
+
+              <div className="checkout-delivery-intro">
+                <div className="checkout-delivery-stepper">
+                  <div className={`checkout-delivery-step${shippingPostal.trim() ? " checkout-delivery-step--done" : ""}`}>
+                    <span className="checkout-delivery-step-index">1</span>
+                    <span>{language === "fr" ? "Zone de livraison" : "Delivery area"}</span>
+                  </div>
+                  <div className={`checkout-delivery-step${selectedDateKey ? " checkout-delivery-step--done" : ""}`}>
+                    <span className="checkout-delivery-step-index">2</span>
+                    <span>{language === "fr" ? "Jour" : "Day"}</span>
+                  </div>
+                  <div className={`checkout-delivery-step${selectedDeliveryPeriod ? " checkout-delivery-step--done" : ""}`}>
+                  <span className="checkout-delivery-step-index">3</span>
+                    <span>{language === "fr" ? "Période" : "Period"}</span>
+                  </div>
+                </div>
+                <div className="checkout-delivery-banner">
+                <strong>{language === "fr" ? "Livraison locale à Rimouski et environs" : "Local delivery in Rimouski and nearby"}</strong>
+                  <span>{deliveryStepLabel}</span>
+                </div>
+              </div>
+
+              {!shippingPostal.trim() ? (
+                <p className="small checkout-delivery-feedback" style={{ marginTop: 0 }}>
+                  {language === "fr"
+                    ? "Entre d'abord ton code postal pour voir les créneaux disponibles."
+                    : "Enter your postal code first to view available delivery slots."}
+                </p>
+              ) : !postalValid ? (
+                <p className="checkout-postal-hint checkout-delivery-feedback" style={{ marginTop: 0 }}>
+                  {language === "fr"
+                    ? "Aucun créneau affiché tant que le code postal est hors zone de livraison."
+                    : "No slots are shown while the postal code is outside the delivery area."}
+                </p>
+              ) : deliverySlotsLoading ? (
+                <p className="small checkout-delivery-feedback" style={{ marginTop: 0 }}>
+                  {language === "fr" ? "Chargement des créneaux..." : "Loading delivery slots..."}
+                </p>
+              ) : (
+                <>
+                  {deliverySlotsError ? (
+                    <p className="checkout-postal-hint checkout-delivery-feedback" style={{ marginTop: 0 }}>
+                      ⚠️ {deliverySlotsError}
+                    </p>
+                  ) : null}
+
+                  {deliverySlots.length === 0 ? (
+                    <div className="checkout-delivery-feedback" style={{ marginTop: 0 }}>
+                      <p className="small" style={{ margin: 0, fontWeight: 700 }}>
+                        {language === "fr" ? "Planification manuelle activée" : "Manual scheduling enabled"}
+                      </p>
+                      <p className="small" style={{ margin: "6px 0 0" }}>
+                        {language === "fr"
+                          ? "Aucun créneau n'est disponible pour l'instant. Tu peux finaliser la commande quand même et notre équipe t'appellera pour convenir d'une plage de livraison."
+                          : "No delivery slots are available right now. You can still complete your order and our team will call you to arrange a delivery window."}
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="checkout-delivery-calendar">
+                        <div className="checkout-delivery-calendar-head">
+                          {(language === "fr"
+                            ? ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]
+                            : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]).map((weekday) => (
+                            <span key={weekday}>{weekday}</span>
+                          ))}
+                        </div>
+                        <div className="checkout-delivery-calendar-grid">
+                          {calendarDays.map((day) => {
+                            const isActive = selectedDateKey === day.dateKey;
+                            const label = new Intl.DateTimeFormat(language === "fr" ? "fr-CA" : "en-CA", {
+                              day: "numeric",
+                              month: "short",
+                            }).format(day.date);
+
+                            if (!day.availableDay) {
+                              return (
+                                <div key={day.dateKey} className="checkout-delivery-calendar-cell checkout-delivery-calendar-cell--empty">
+                                  <span>{label}</span>
+                                </div>
+                              );
+                            }
+
+                            const availableDay = day.availableDay;
+                            const tone = availableDay.tone;
+
+                            return (
+                              <button
+                                key={day.dateKey}
+                                type="button"
+                                onClick={() => setSelectedDateKey(isActive ? null : day.dateKey)}
+                                className={`checkout-delivery-calendar-cell checkout-delivery-calendar-cell--${tone}${isActive ? " checkout-delivery-calendar-cell--active" : ""}`}
+                              >
+                                <strong>{day.date.getDate()}</strong>
+                                <span>{label}</span>
+                                <small>{availableDay.periodCount} {language === "fr" ? "periode(s)" : "period(s)"}</small>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {selectedDateKey ? (
+                        <>
+                          <div className="checkout-delivery-slot-heading">
+                            <strong>
+                              {language === "fr" ? "Choisis ta periode" : "Choose your period"}
+                            </strong>
+                            <span>
+                              {language === "fr"
+                                ? `Jour choisi: ${formatDeliveryDayLabel(selectedDateKey, language)}`
+                                : `Chosen day: ${formatDeliveryDayLabel(selectedDateKey, language)}`}
+                            </span>
+                          </div>
+                          <div className="checkout-delivery-periods">
+                                {selectedDayPeriods.map((periodOption) => {
+                                  const active = selectedDeliveryPeriod === periodOption.period;
+                              return (
+                                <label
+                                  key={periodOption.period}
+                                  className={`checkout-delivery-period-card checkout-delivery-period-card--${periodOption.tone}${active ? " checkout-delivery-period-card--active" : ""}${!periodOption.available ? " checkout-delivery-period-card--disabled" : ""}`}
+                                >
+                                  <input
+                                    type="radio"
+                                    name="deliveryPeriod"
+                                    value={periodOption.period}
+                                    checked={active}
+                                    disabled={!periodOption.available || !periodOption.slot}
+                                    onChange={() => {
+                                      if (!periodOption.slot) return;
+                                      setSelectedDeliveryPeriod(periodOption.period);
+                                      setSelectedDeliverySlotId(periodOption.slot.id);
+                                    }}
+                                    className="checkout-payment-radio"
+                                  />
+                                  <div className="checkout-delivery-period-title">{periodOption.label}</div>
+                                  <div className="checkout-delivery-period-status">{periodOption.statusText}</div>
+                                  <div className="checkout-delivery-period-note">
+                                    {periodOption.slot
+                                      ? language === "fr"
+                                        ? `Plage actuelle: ${formatDeliveryTimeLabel(periodOption.slot.startAt, language)} - ${formatDeliveryTimeLabel(periodOption.slot.endAt, language)}`
+                                        : `Current window: ${formatDeliveryTimeLabel(periodOption.slot.startAt, language)} - ${formatDeliveryTimeLabel(periodOption.slot.endAt, language)}`
+                              : language === "fr"
+                                ? "Aucune place dans cette période."
+                                : "No space in this period."}
+                                  </div>
+                                  {active ? <span className="checkout-payment-check">✓</span> : null}
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </>
+                      ) : null}
+
+                      <div className="checkout-delivery-summary">
+                        <div className="checkout-delivery-summary-card">
+                          <span className="checkout-delivery-summary-label">
+                            {language === "fr" ? "Période retenue" : "Selected period"}
+                          </span>
+                          {selectedSlot ? (
+                            <>
+                              <strong>
+                                {formatDeliveryDayLabel(selectedSlot.dateKey, language)} · {formatDeliveryPeriodLabel(getDeliveryPeriod(selectedSlot), language)}
+                              </strong>
+                              <span>
+                                {language === "fr"
+                                  ? `Plage actuelle: ${formatDeliveryTimeLabel(selectedSlot.startAt, language)} - ${formatDeliveryTimeLabel(selectedSlot.endAt, language)}`
+                                  : `Current window: ${formatDeliveryTimeLabel(selectedSlot.startAt, language)} - ${formatDeliveryTimeLabel(selectedSlot.endAt, language)}`}
+                              </span>
+                            </>
+                          ) : (
+                            <span>
+                              {language === "fr"
+                                ? "Aucune période choisie pour le moment."
+                                : "No delivery period selected yet."}
+                            </span>
+                          )}
+                        </div>
+                        <div className="checkout-delivery-summary-card">
+                          <span className="checkout-delivery-summary-label">
+                            {language === "fr" ? "Bon à savoir" : "Good to know"}
+                          </span>
+                          <ul className="checkout-delivery-benefits">
+                            <li>{language === "fr" ? "Livraison locale uniquement, selon le code postal." : "Local delivery only, based on your postal code."}</li>
+                            <li>{language === "fr" ? "Le téléphone aide le livreur si besoin." : "A phone number helps the driver if needed."}</li>
+                            <li>{language === "fr" ? "S'il n'y a plus de place, nous te contacterons." : "If no slots remain, we will contact you directly."}</li>
+                          </ul>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+
+              <div className="checkout-address-grid" style={{ marginTop: 14 }}>
+                <div className="field">
+                  <label>{language === "fr" ? "Téléphone (livraison)" : "Phone (delivery)"}</label>
+                  <div className="input-icon-wrap">
+                    <span className="input-icon">{"\u{1F4F1}"}</span>
+                    <input
+                      className={`input input--icon${showDeliveryPhoneError && deliveryPhoneTouched ? " input--error" : ""}`}
+                      placeholder={language === "fr" ? "418 555-1234" : "418 555-1234"}
+                      value={deliveryPhone}
+                      onChange={(e) => setDeliveryPhone(e.target.value)}
+                      onChange={(e) => setDeliveryPhone(e.target.value)}
+                      onBlur={() => setDeliveryPhoneTouched(true)}
+                      suppressHydrationWarning
+                    />
+                    />
+                  </div>
+                  {showDeliveryPhoneError && deliveryPhoneTouched && (
+                    <p className="checkout-postal-hint" style={{ color: "#dc2626" }}>
+                      ⚠️ {deliveryPhoneErrorMessage}
+                    </p>
+                  )}
+                  </div>
+                </div>
+
+                <div className="field checkout-field-full">
+                  <label>{language === "fr" ? "Instructions de livraison" : "Delivery instructions"}</label>
+                  <textarea
+                    className="textarea"
+                    rows={3}
+                    maxLength={500}
+                    placeholder={language === "fr"
+                      ? "Ex.: laisser \u00E0 la porte, sonner \u00E0 l'arriv\u00E9e, code d'acc\u00E8s..."
+                      : "E.g. leave at the door, ring on arrival, access code..."}
+                    value={deliveryInstructions}
+                    onChange={(e) => setDeliveryInstructions(e.target.value)}
+                  />
+                </div>
+
+                {user && saveDeliveryAddress ? (
+                  <div className="field checkout-field-full">
+                    <label>{language === "fr" ? "Nom de l'adresse" : "Address label"}</label>
+                    <input
+                      className="input"
+                      placeholder={language === "fr" ? "Maison, Travail, Chez maman..." : "Home, Work, Mom's place..."}
+                      value={deliveryAddressLabel}
+                      onChange={(e) => setDeliveryAddressLabel(e.target.value)}
+                    />
+                  </div>
+                ) : null}
+              </div>
+            </section>
+
+              {/* Méthode de paiement */}
+            <section className="section checkout-section-card">
+              <div className="checkout-section-header">
+                <span className="checkout-section-icon">{"\u{1F4B3}"}</span>
+                <div>
+                  <h2 className="checkout-section-title">
+                    {language === "fr" ? "Méthode de paiement" : "Payment method"}
+                  </h2>
+                  <p className="checkout-section-subtitle">
+                    {language === "fr" ? "Choisissez comment vous souhaitez payer." : "Choose how you'd like to pay."}
+                  </p>
+                </div>
+              </div>
+
+              <div className="checkout-payment-methods">
+                <label className={`checkout-payment-option${paymentMethod === "MANUAL" ? " checkout-payment-option--active" : ""}`}>
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value="MANUAL"
+                    checked={paymentMethod === "MANUAL"}
+                    onChange={() => setPaymentMethod("MANUAL")}
+                    className="checkout-payment-radio"
+                  />
+                  <span className="checkout-payment-option-icon">{"\u{1F4B3}"}</span>
+                  <div className="checkout-payment-option-text">
+                    <span className="checkout-payment-option-label">{t.manualPayment}</span>
+                    <span className="checkout-payment-option-desc">
+                      {language === "fr"
+                        ? "Paiement comptant au moment de la livraison. Livraison locale uniquement (région de Rimouski)."
+                        : "Cash payment at the time of delivery. Local delivery only (Rimouski area)."}
+                    </span>
+                  </div>
+                  {paymentMethod === "MANUAL" && <span className="checkout-payment-check">✓</span>}
+                </label>
+
+                <label className={`checkout-payment-option${paymentMethod === "STRIPE" ? " checkout-payment-option--active" : ""}`}>
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value="STRIPE"
+                    checked={paymentMethod === "STRIPE"}
+                    onChange={() => setPaymentMethod("STRIPE")}
+                    className="checkout-payment-radio"
+                  />
+                  <span className="checkout-payment-option-icon">{"\u{26A1}"}</span>
+                  <div className="checkout-payment-option-text">
+                    <span className="checkout-payment-option-label">{t.stripePayment}</span>
+                    <span className="checkout-payment-option-desc">
+                      {language === "fr"
+                        ? "Redirigé vers la page de paiement sécurisée Stripe."
+                        : "Redirected to Stripe's secure checkout page."}
+                    </span>
+                  </div>
+                  {paymentMethod === "STRIPE" && <span className="checkout-payment-check">✓</span>}
+                </label>
+              </div>
+            </section>
+
+          </div>
+
+          {/* Colonne résumé */}
+          <div className="checkout-sidebar">
+            <div className="checkout-summary-card">
+              <div className="checkout-summary-title">
+                {language === "fr" ? "Résumé de la commande" : "Order total"}
+              </div>
+
+              <div className="field" style={{ marginBottom: 0 }}>
+                <label>{language === "fr" ? "Code promo" : "Promo code"}</label>
+                <input
+                  className="input"
+                  placeholder={language === "fr" ? "Ex. OLIVE10" : "e.g. OLIVE10"}
+                  value={promoCode}
+                  onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                />
+                {trimmedPromoCode && (
+                  <p className={promoApplied ? "ok" : "small"}>
+                      {promoApplied
+                      ? (language === "fr" ? "✅ Le rabais de 10% est appliqué." : "✅ Your 10% discount is applied.")
+                      : (language === "fr" ? "Le code sera vérifié automatiquement au calcul." : "The code will be checked automatically during pricing.")}
+                  </p>
+                )}
+              </div>
+
+              <div className="checkout-summary-lines">
+                {cartRows.map((row) => (
+                  <div key={row.productId} className="checkout-summary-line">
+                    <span className="checkout-summary-line-name">
+                      {row.name} <span className="checkout-summary-line-qty">×{row.quantity}</span>
+                    </span>
+                    <span className="checkout-summary-line-price">{row.lineSubtotalLabel}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="checkout-summary-divider" />
+
+              <div className="checkout-summary-row">
+                <span>{language === "fr" ? "Sous-total" : "Subtotal"}</span>
+                <span>{quote ? formatCad(quote.subtotalCents, language) : subtotalLabel}</span>
+              </div>
+              {quote && quote.discountCents > 0 && (
+                <div className="checkout-summary-row">
+                  <span>{language === "fr" ? "Rabais promo" : "Promo discount"}</span>
+                  <span>-{formatCad(quote.discountCents, language)}</span>
+                </div>
+              )}
+              <div className="checkout-summary-row checkout-summary-row--shipping">
+                <span>{language === "fr" ? "Livraison" : "Shipping"}</span>
+                <span className="checkout-summary-free">
+                  {quote
+                    ? formatCad(quote.shippingCents, language)
+                    : language === "fr"
+                      ? "Calcul..."
+                      : "Calculating..."}
+                </span>
+              </div>
+              <div className="checkout-summary-divider" />
+              <div className="checkout-summary-row">
+                <span>{language === "fr" ? "Total avant taxes" : "Total before taxes"}</span>
+                <span>{quote ? formatCad(beforeTaxCents, language) : subtotalLabel}</span>
+              </div>
+                <div className="checkout-summary-row">
+                  <span>{language === "fr" ? "TPS (5%)" : "GST (5%)"}</span>
+                <span>{quote ? formatCad(quote.gstCents, language) : language === "fr" ? "Calcul..." : "Calculating..."}</span>
+                </div>
+                <div className="checkout-summary-row">
+                  <span>{language === "fr" ? "TVQ (9,975%)" : "QST (9.975%)"}</span>
+                <span>{quote ? formatCad(quote.qstCents, language) : language === "fr" ? "Calcul..." : "Calculating..."}</span>
+                </div>
+                <div className="checkout-summary-row">
+                  <span>{language === "fr" ? "Taxes totales" : "Total taxes"}</span>
+                <span>{quote ? formatCad(quote.gstCents + quote.qstCents, language) : language === "fr" ? "Calcul..." : "Calculating..."}</span>
+                </div>
+
+              <div className="checkout-summary-divider" />
+
+              <div className="checkout-summary-total-row">
+                <span>{language === "fr" ? "Total" : "Total"}</span>
+                <span className="checkout-summary-total-amount">
+                  {quote ? formatCad(quote.totalCents, language) : subtotalLabel}
+                </span>
+              </div>
+
+                {/* Info zone livraison */}
+                <div className="checkout-zone-note">
+                  📍 {language === "fr"
+                    ? "Livraison locale à Rimouski et environs seulement."
+                    : "Local delivery in Rimouski area only."}
+                </div>
+
+                {message ? (
+                  <div className="auth-alert auth-alert--ok">
+                  <span>✅</span> {message}
+                  </div>
+                ) : null}
+                {error ? (
+                  <div className="auth-alert auth-alert--err">
+                  <span>⚠️</span> {error}
+                  </div>
+                ) : null}
+
+              <button
+                className="btn btn-full checkout-place-order-btn"
+                disabled={loading}
+                onClick={() => void submitOrder()}
+                type="button"
+                suppressHydrationWarning
+              >
+                {loading ? (
+                  <span className="checkout-spinner">⏳</span>
+                ) : (
+                  <>
+                    {t.placeOrder} → {quote ? formatCad(quote.totalCents, language) : subtotalLabel}
+                  </>
+                )}
+              </button>
+
+              <Link className="checkout-back-link" href="/cart">
+                {language === "fr" ? "← Retour au panier" : "← Back to cart"}
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}
+
+
