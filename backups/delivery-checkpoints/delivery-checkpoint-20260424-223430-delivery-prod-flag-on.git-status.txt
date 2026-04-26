@@ -1,0 +1,303 @@
+ M .env.production.example
+ M .github/workflows/ci.yml
+ M .gitignore
+ M ADMIN_SETUP.md
+ M LOCAL_HOSTING_RUNBOOK.md
+ M MIGRATION_GUIDE.md
+ M NEXT_STEPS.md
+ M OLIVE_MODE_GUIDE.md
+ M PRODUCTION_CHECKLIST.md
+ M README-LANCEMENT.html
+ M README.md
+ M ecosystem.config.cjs
+ M eslint.config.mjs
+ M next.config.ts
+ M package-lock.json
+ M package.json
+ M prisma.config.ts
+ M prisma/schema.prisma
+ M prisma/seed.ts
+ M scripts/db-backup-daily.ts
+ M scripts/db-backup.ts
+ M scripts/db-restore.ts
+ M scripts/db-utils.ts
+ M scripts/prisma-migrate-safe.ts
+ M scripts/smoke-check.ts
+ M scripts/windows/create-onlogon-task-admin.cmd
+ M scripts/windows/db-backup-daily.cmd
+ M scripts/windows/install-startup-pm2.cmd
+ M scripts/windows/open-firewall-3101-admin.cmd
+ M scripts/windows/pm2-resurrect.cmd
+ M src/app/account/account-client.tsx
+ M src/app/account/page.tsx
+ M src/app/account/subscriptions/page.tsx
+ M src/app/admin/admin-client.tsx
+ M src/app/admin/admin-sidebar.tsx
+ M src/app/admin/page.tsx
+ M src/app/admin/support/settings/page.tsx
+ M src/app/api/account/subscriptions/cancel/route.ts
+ M src/app/api/admin/orders/route.ts
+ M src/app/api/admin/products/route.ts
+ M src/app/api/auth/forgot-password/route.ts
+ M src/app/api/auth/login/route.ts
+ M src/app/api/auth/logout/route.ts
+ M src/app/api/auth/me/route.ts
+ M src/app/api/auth/register/route.ts
+ M src/app/api/auth/reset-password/route.ts
+ M src/app/api/checkout/subscription/route.ts
+ M src/app/api/health/route.ts
+ M src/app/api/orders/quote/route.ts
+ M src/app/api/orders/route.ts
+ M src/app/api/stripe/webhook/route.ts
+ M src/app/api/support/conversations/[id]/messages/route.ts
+ M src/app/api/support/conversations/[id]/route.ts
+ M src/app/api/support/conversations/route.ts
+ M src/app/api/support/email-reply/route.ts
+ M src/app/api/support/promo-code/route.ts
+ M src/app/cart/cart-client.tsx
+ M src/app/cart/page.tsx
+ M src/app/checkout/checkout-client.tsx
+ M src/app/checkout/page.tsx
+ M src/app/faq/page.tsx
+ M src/app/forgot-password/page.tsx
+ M src/app/globals.css
+ M src/app/layout.tsx
+ M src/app/page.tsx
+ M src/app/products/[slug]/page.tsx
+ M src/app/reset-password/page.tsx
+ M src/app/returns/page.tsx
+ M src/app/sell/page.tsx
+ M src/app/storefront-client.tsx
+ M src/app/terms/page.tsx
+ M src/components/AdminSupportPanel.tsx
+ M src/components/GlobalSupportChat.tsx
+ M src/components/Navigation.tsx
+ M src/components/PromoBanner.tsx
+ M src/components/SupportChatWidget.tsx
+ M src/lib/admin.ts
+ M src/lib/auth.ts
+ M src/lib/business.ts
+ M src/lib/catalog.ts
+ M src/lib/email.ts
+ M src/lib/env.ts
+ M src/lib/i18n.ts
+ M src/lib/maintenance.ts
+ M src/lib/orders.ts
+ M src/lib/prisma.ts
+ M src/lib/promo.ts
+ M src/lib/rate-limit.ts
+ M src/lib/stripe.ts
+ M src/lib/support-email.ts
+ M src/lib/support.ts
+ M src/lib/taxes.ts
+ M src/lib/types.ts
+ M src/lib/useSupportWebSocket.ts
+ M src/lib/validators.ts
+ M src/lib/websocket.ts
+ M src/tests/README.md
+ M src/tests/format.test.ts
+ M src/tests/promo.test.ts
+ M src/tests/taxes.test.ts
+ M start-dev.bat
+?? --env=development/
+?? CLOUDFLARE_DDNS_SETUP.md
+?? CLOUDFLARE_MAINTENANCE_WORKER.md
+?? CUTOVER_CHECKLIST.md
+?? Caddyfile
+?? Caddyfile.example
+?? DELIVERY_CHANGE_WORKFLOW.md
+?? DELIVERY_STATUS.md
+?? DOMAIN_MIGRATION_PREP.md
+?? Logo/46d0582c-84a5-404d-9357-4f2f8d64631e.png
+?? Logo/7ddd6280-e765-4d4a-9325-78c33c364792.png
+?? Logo/LOGOHQ.png
+?? Logo/f8e96b3a-8d0c-4c26-b405-b04d5b8758cd.png
+?? Logo/image/
+?? NAMECHEAP_PRIVATE_EMAIL_SETUP.md
+?? PREOPENING_REPORT.md
+?? STABILIZATION_AUDIT.md
+?? _inspect3.txt
+?? backups/delivery-checkpoints/
+?? cloudflared-config.example.yml
+?? delivery-dev.db
+?? manual-delivery-e2e.db
+?? output/
+?? prisma/migrations/20260406133000_add_delivery_and_subscription_support/
+?? prisma/migrations/20260410153000_add_user_delivery_addresses/
+?? prisma/migrations/20260412183000_add_dog_profiles/
+?? prisma/migrations/20260413124500_add_product_costs/
+?? prisma/migrations/20260416053000_add_rate_limit_bucket/
+?? prisma/migrations/20260416193000_add_promo_codes/
+?? prisma/migrations/20260417123000_add_bilingual_promo_banners/
+?? prisma/migrations/20260417170000_add_admin_two_factor_authentication/
+?? prisma/migrations/20260418140000_make_order_user_optional_for_guest_checkout/
+?? prisma/migrations/20260419113000_add_dog_public_visibility_controls/
+?? prisma/migrations/20260420173000_add_stripe_webhook_event_table/
+?? prisma/migrations/20260423173000_add_delivery_run_tracking/
+?? prod-clean.db
+?? prod-cleanup-temp.db
+?? prod-cleanup-temp2.db
+?? prod.db.replacement
+?? prod.db.tmpcopy
+?? prod.db.tmpcopy-journal
+?? public/dogs/
+?? public/maintenance-dog.png
+?? public/olive-logo-2.png
+?? reset-password-script.js
+?? scripts/check-private-email-dns.ts
+?? scripts/cloudflare/
+?? scripts/delivery-checkpoint-lib.ts
+?? scripts/delivery-checkpoint.ts
+?? scripts/delivery-preactivate.ts
+?? scripts/delivery-rollback-plan.ts
+?? scripts/delivery-smoke.ts
+?? scripts/fix_mojibake.py
+?? scripts/generate-dog-profile-batch.ts
+?? scripts/preopen-check.ts
+?? scripts/seed-delivery-runs-demo.cjs
+?? scripts/site-maintenance.ts
+?? scripts/verify-prod.ts
+?? scripts/windows/check-pending-reboot.ps1
+?? scripts/windows/cloudflare-ddns.env.example
+?? scripts/windows/cloudflare-ddns.ps1
+?? scripts/windows/configure-no-auto-reboot-admin.ps1
+?? scripts/windows/install-cloudflare-ddns-task-admin.cmd
+?? scripts/windows/install-reboot-warning-task-admin.cmd
+?? scripts/windows/reboot-warning-logon.cmd
+?? src/app/account/account-sidebar.tsx
+?? src/app/account/dogs/
+?? src/app/account/layout.tsx
+?? src/app/account/orders/
+?? src/app/account/page.tsx.new
+?? src/app/account/profile/
+?? src/app/account/subscriptions/user-subscriptions-client.tsx
+?? src/app/account/support/
+?? src/app/admin/admin-dashboard-client.tsx
+?? src/app/admin/customers/
+?? src/app/admin/delivery/
+?? src/app/admin/dogs/
+?? src/app/admin/layout.tsx
+?? src/app/admin/maintenance-cloudflare/
+?? src/app/admin/orders/
+?? src/app/admin/products/
+?? src/app/admin/promo/
+?? src/app/admin/support/page.tsx
+?? src/app/admin/taxes/
+?? src/app/api/account/delivery-addresses/
+?? src/app/api/account/dogs/
+?? src/app/api/account/password/
+?? src/app/api/account/sessions/
+?? src/app/api/account/two-factor/
+?? src/app/api/admin/delivery/
+?? src/app/api/admin/dogs/
+?? src/app/api/admin/images/
+?? src/app/api/admin/promo-codes/
+?? src/app/api/admin/promo/
+?? src/app/api/admin/settings/
+?? src/app/api/auth/login/verify-two-factor/
+?? src/app/api/delivery/
+?? src/app/api/driver/
+?? src/app/api/promo-banners/
+?? src/app/api/reset-test-password/
+?? src/app/checkout/checkout-client.tsx.tmp
+?? src/app/checkout/success/
+?? src/app/dog/
+?? src/app/driver/
+?? src/app/login/
+?? src/app/maintenance/
+?? src/app/products/[slug]/product-subscription-client.tsx
+?? src/app/products/[slug]/product-subscription-inline-client.tsx
+?? src/app/products/[slug]/product-subscription-inline-panel.tsx
+?? src/app/robots.ts
+?? src/app/shipping/
+?? src/app/sitemap.ts
+?? src/components/CheckoutSuccessView.tsx
+?? src/components/ConditionalSupportChat.tsx
+?? src/components/DogPhotoUpload.tsx
+?? src/components/ImageSelector.tsx
+?? src/components/LocalPromoBanner.tsx
+?? src/components/SiteFooter.tsx
+?? src/components/StripeInlineCheckout.tsx
+?? src/components/StripeInlineCheckoutPanel.tsx
+?? src/components/StripeInlineCheckoutSurface.tsx
+?? src/instrumentation.ts
+?? src/lib/address-fields.ts
+?? src/lib/admin-access-cookie.ts
+?? src/lib/checkout-confirmation.ts
+?? src/lib/delivery-addresses-sql.ts
+?? src/lib/delivery-addresses.ts
+?? src/lib/delivery-mode.ts
+?? src/lib/delivery-run-km.ts
+?? src/lib/delivery-runs.ts
+?? src/lib/delivery.ts
+?? src/lib/dogs.ts
+?? src/lib/google-maps.ts
+?? src/lib/help-center.ts
+?? src/lib/inventory-metrics.ts
+?? src/lib/launch-guards.ts
+?? src/lib/product-slug.ts
+?? src/lib/promo-banner-fallback.ts
+?? src/lib/promo-banners.ts
+?? src/lib/promo-links.ts
+?? src/lib/site-url.ts
+?? src/lib/stripe-client.ts
+?? src/lib/stripe-server.ts
+?? src/lib/two-factor.ts
+?? src/proxy.ts
+?? src/tests/account-delivery-addresses-route.test.ts
+?? src/tests/account-dogs-route.test.ts
+?? src/tests/account-pages-auth-guard.test.tsx
+?? src/tests/account-password-route.test.ts
+?? src/tests/account-sessions-route.test.ts
+?? src/tests/account-two-factor-route.test.ts
+?? src/tests/address-fields.test.ts
+?? src/tests/admin-access-cookie.test.ts
+?? src/tests/admin-api-guard.test.ts
+?? src/tests/admin-delivery-drivers-route.test.ts
+?? src/tests/admin-delivery-route.test.ts
+?? src/tests/admin-delivery-run-actions-route.test.ts
+?? src/tests/admin-delivery-runs-route.test.ts
+?? src/tests/admin-dogs-route.test.ts
+?? src/tests/admin-images-route.test.ts
+?? src/tests/admin-maintenance-route.test.ts
+?? src/tests/admin-orders-delivery-status-route.test.ts
+?? src/tests/admin-product-category-auto-create.test.ts
+?? src/tests/admin-product-form.test.tsx
+?? src/tests/admin-products-privacy.test.ts
+?? src/tests/admin-promo-codes-route.test.ts
+?? src/tests/admin-promo-route.test.ts
+?? src/tests/auth-forgot-password-route.test.ts
+?? src/tests/auth-login-route.test.ts
+?? src/tests/auth-login-verify-two-factor-route.test.ts
+?? src/tests/catalog-public-select.test.ts
+?? src/tests/checkout-stripe-status.test.tsx
+?? src/tests/delivery-address-dedup.test.ts
+?? src/tests/delivery-checkpoint-lib.test.ts
+?? src/tests/delivery-mode.test.ts
+?? src/tests/delivery-run-km.test.ts
+?? src/tests/delivery-runs-errors.test.ts
+?? src/tests/delivery-slots-route.test.ts
+?? src/tests/dog-public-page.test.tsx
+?? src/tests/driver-run-actions-route.test.ts
+?? src/tests/driver-run-route.test.ts
+?? src/tests/health-route.test.ts
+?? src/tests/inventory-metrics.test.ts
+?? src/tests/launch-guards.test.ts
+?? src/tests/maintenance.test.ts
+?? src/tests/order-confirmation-email.test.ts
+?? src/tests/orders-delivery-zone.test.ts
+?? src/tests/orders-route.test.ts
+?? src/tests/promo-banners.test.ts
+?? src/tests/promo-link-validation.test.ts
+?? src/tests/promo-resolution.test.ts
+?? src/tests/proxy-maintenance.test.ts
+?? src/tests/route-link-integrity.test.ts
+?? src/tests/site-url.test.ts
+?? src/tests/stripe-order-payment.test.ts
+?? src/tests/stripe-webhook-route.test.ts
+?? src/tests/subscription-cancel-route.test.ts
+?? src/tests/subscription-checkout-route.test.ts
+?? src/tests/support-email-reply-route.test.ts
+?? src/tests/support-guest-token.test.ts
+?? src/tests/tax-breakdown.test.ts
+?? src/tests/websocket-auth.test.ts

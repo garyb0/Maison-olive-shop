@@ -1,0 +1,25 @@
+{
+  "version": 2,
+  "createdAt": "2026-04-26T00:09:25.225Z",
+  "label": "am-pm-capacity",
+  "environment": "development",
+  "git": {
+    "branch": "master",
+    "commitSha": "f5a28c5b4e9edf09f3fe5d40453f1928fadcc5fb",
+    "headCommitSha": "ea4548b523cc7e410a112de8fa0c326ad74a2684",
+    "tag": "delivery-checkpoint-20260425-200923-am-pm-capacity",
+    "dirty": true,
+    "snapshotKind": "worktree",
+    "statusPath": "C:\\Cline\\maison-olive-shop\\backups\\delivery-checkpoints\\delivery-checkpoint-20260425-200923-am-pm-capacity.git-status.txt",
+    "trackedDiffPath": "C:\\Cline\\maison-olive-shop\\backups\\delivery-checkpoints\\delivery-checkpoint-20260425-200923-am-pm-capacity.git-diff.patch",
+    "untrackedFilesPath": "C:\\Cline\\maison-olive-shop\\backups\\delivery-checkpoints\\delivery-checkpoint-20260425-200923-am-pm-capacity.untracked.txt"
+  },
+  "database": {
+    "kind": "sqlite",
+    "databaseUrl": "file:./delivery-dev.db",
+    "sourcePath": "C:\\Cline\\maison-olive-shop\\delivery-dev.db",
+    "backupPath": "C:\\Cline\\maison-olive-shop\\backups\\delivery-checkpoints\\delivery-checkpoint-20260425-200923-am-pm-capacity-20260425-200925.db",
+    "manifestPath": "C:\\Cline\\maison-olive-shop\\backups\\delivery-checkpoints\\delivery-checkpoint-20260425-200923-am-pm-capacity-20260425-200925.db.json",
+    "sidecarBackupPaths": []
+  }
+}

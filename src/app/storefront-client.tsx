@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -33,15 +33,32 @@ type FlyItem = {
   y: number;
 };
 
+type PromoBannerData = {
+  id: string;
+  isActive: boolean;
+  sortOrder: number;
+  badge: string;
+  title: string;
+  price1: string;
+  price2: string;
+  point1: string;
+  point2: string;
+  point3: string;
+  ctaText: string;
+  ctaLink: string;
+};
+
 type Props = {
   language: Language;
   t: Dictionary;
   user: CurrentUser | null;
   products: ProductCard[];
   oliveMode?: "princess" | "gremlin";
+  banners?: PromoBannerData[];
+  initialRegisterEmail?: string;
 };
 
-const CART_STORAGE_KEY = "maisonolive_cart_v1";
+const CART_STORAGE_KEY = "chezolive_cart_v1";
 
 const CATEGORY_EMOJI: Record<string, string> = {
   Food: "🍖",
@@ -60,11 +77,35 @@ function getCategoryEmoji(category: string): string {
   return CATEGORY_EMOJI[category] ?? "🐾";
 }
 
-export function StorefrontClient({ language, t, user, products }: Props) {
+const CATEGORY_LABELS: Record<string, { fr: string; en: string }> = {
+  food: { fr: "Nourriture", en: "Food" },
+  nourriture: { fr: "Nourriture", en: "Food" },
+  accessories: { fr: "Accessoires", en: "Accessories" },
+  accessoires: { fr: "Accessoires", en: "Accessories" },
+  toys: { fr: "Jouets", en: "Toys" },
+  jouets: { fr: "Jouets", en: "Toys" },
+  hygiene: { fr: "Hygiène", en: "Hygiene" },
+  "hygiène": { fr: "Hygiène", en: "Hygiene" },
+  beds: { fr: "Literie", en: "Beds" },
+  literie: { fr: "Literie", en: "Beds" },
+  uncategorized: { fr: "Sans catégorie", en: "Uncategorized" },
+  general: { fr: "Général", en: "General" },
+};
+
+function getLocalizedCategoryLabel(category: string, language: Language): string {
+  const normalized = category.trim().toLowerCase();
+  return CATEGORY_LABELS[normalized]?.[language] ?? category;
+}
+
+export function StorefrontClient({ language, t, user, products, banners = [], initialRegisterEmail = "" }: Props) {
   const [cart, setCart] = useState<CartLine[]>([]);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [loginLoading, setLoginLoading] = useState(false);
   const [registerLoading, setRegisterLoading] = useState(false);
+  const [loginTwoFactorRequired, setLoginTwoFactorRequired] = useState(false);
+  const [loginTwoFactorCode, setLoginTwoFactorCode] = useState("");
+  const [loginTwoFactorRole, setLoginTwoFactorRole] = useState<"CUSTOMER" | "ADMIN" | null>(null);
+  const [registerEmail, setRegisterEmail] = useState(initialRegisterEmail);
   const [message, setMessage] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [addingId, setAddingId] = useState<string | null>(null);
@@ -96,7 +137,6 @@ export function StorefrontClient({ language, t, user, products }: Props) {
     const cats = new Set(products.map((p) => p.category));
     return Array.from(cats).sort();
   }, [products]);
-
   // ── Filtered + sorted products ──
   const filteredProducts = useMemo(() => {
     let result = [...products];
@@ -107,7 +147,8 @@ export function StorefrontClient({ language, t, user, products }: Props) {
         (p) =>
           p.name.toLowerCase().includes(q) ||
           p.description.toLowerCase().includes(q) ||
-          p.category.toLowerCase().includes(q),
+          p.category.toLowerCase().includes(q) ||
+          getLocalizedCategoryLabel(p.category, language).toLowerCase().includes(q),
       );
     }
 
@@ -121,7 +162,7 @@ export function StorefrontClient({ language, t, user, products }: Props) {
     // "newest" keeps original server order (createdAt desc)
 
     return result;
-  }, [products, search, categoryFilter, sortBy]);
+  }, [products, search, categoryFilter, sortBy, language]);
 
   const addToCart = (product: ProductCard, x: number, y: number) => {
     const quantity = Math.max(1, quantities[product.id] ?? 1);
@@ -151,6 +192,27 @@ export function StorefrontClient({ language, t, user, products }: Props) {
     setMessage("");
     setLoginLoading(true);
     try {
+      if (loginTwoFactorRequired) {
+        const response = await fetch("/api/auth/login/verify-two-factor", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code: loginTwoFactorCode }),
+        });
+
+        if (!response.ok) {
+          setError(language === "fr" ? "Code de vérification invalide" : "Invalid verification code");
+          return;
+        }
+
+        if (loginTwoFactorRole === "ADMIN") {
+          location.href = "/admin";
+          return;
+        }
+
+        location.reload();
+        return;
+      }
+
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -162,6 +224,14 @@ export function StorefrontClient({ language, t, user, products }: Props) {
 
       if (!res.ok) {
         setError(language === "fr" ? "Connexion échouée" : "Login failed");
+        return;
+      }
+
+      const payload = (await res.json().catch(() => ({}))) as { requiresTwoFactor?: boolean; role?: "CUSTOMER" | "ADMIN" };
+      if (payload.requiresTwoFactor) {
+        setLoginTwoFactorRequired(true);
+        setLoginTwoFactorRole(payload.role ?? null);
+        setLoginTwoFactorCode("");
         return;
       }
 
@@ -194,6 +264,7 @@ export function StorefrontClient({ language, t, user, products }: Props) {
       }
 
       setMessage(language === "fr" ? "Inscription réussie. Connecte-toi." : "Registered. Please login.");
+      setRegisterEmail("");
     } finally {
       setRegisterLoading(false);
     }
@@ -224,7 +295,7 @@ export function StorefrontClient({ language, t, user, products }: Props) {
           <Navigation language={language} t={t} user={user} />
         </header>
 
-        <PromoBanner />
+        <PromoBanner language={language} banners={banners} />
 
         {!user ? (
           <section className="section auth-section">
@@ -271,34 +342,77 @@ export function StorefrontClient({ language, t, user, products }: Props) {
                     void onLogin(new FormData(e.currentTarget));
                   }}
                 >
-                  <div className="field">
-                    <label>Email</label>
-                    <div className="input-icon-wrap">
-                      <span className="input-icon">✉️</span>
-                      <input className="input input--icon" name="email" type="email" placeholder="ton@email.com" required suppressHydrationWarning />
+                  {loginTwoFactorRequired ? (
+                    <div className="field">
+                      <label>{language === "fr" ? "Code de vérification" : "Verification code"}</label>
+                      <div className="input-icon-wrap">
+                        <span className="input-icon">🔐</span>
+                        <input
+                          className="input input--icon"
+                          value={loginTwoFactorCode}
+                          onChange={(event) => setLoginTwoFactorCode(event.target.value)}
+                          placeholder={language === "fr" ? "123456 ou code de secours" : "123456 or backup code"}
+                          autoComplete="one-time-code"
+                          required
+                          suppressHydrationWarning
+                        />
+                      </div>
+                      <p className="small" style={{ marginTop: 8, marginBottom: 0 }}>
+                        {language === "fr"
+                          ? "Entre le code de ton application d’authentification ou un code de secours."
+                          : "Enter a code from your authenticator app or a backup code."}
+                      </p>
                     </div>
-                  </div>
-                  <div className="field">
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                      <label>{language === "fr" ? "Mot de passe" : "Password"}</label>
-                      <a
-                        href="/forgot-password"
-                        className="small"
-                        style={{ color: "var(--muted)", fontSize: "0.78rem" }}
-                      >
-                        {t.forgotPassword}
-                      </a>
-                    </div>
-                    <div className="input-icon-wrap">
-                      <span className="input-icon">🔒</span>
-                      <input className="input input--icon" name="password" type="password" placeholder="••••••••" required suppressHydrationWarning />
-                    </div>
-                  </div>
+                  ) : (
+                    <>
+                      <div className="field">
+                        <label>Email</label>
+                        <div className="input-icon-wrap">
+                          <span className="input-icon">✉️</span>
+                          <input className="input input--icon" name="email" type="email" placeholder="ton@email.com" required suppressHydrationWarning />
+                        </div>
+                      </div>
+                      <div className="field">
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                          <label>{language === "fr" ? "Mot de passe" : "Password"}</label>
+                          <a
+                            href="/forgot-password"
+                            className="small"
+                            style={{ color: "var(--muted)", fontSize: "0.78rem" }}
+                          >
+                            {t.forgotPassword}
+                          </a>
+                        </div>
+                        <div className="input-icon-wrap">
+                          <span className="input-icon">🔒</span>
+                          <input className="input input--icon" name="password" type="password" placeholder="••••••••" required suppressHydrationWarning />
+                        </div>
+                      </div>
+                    </>
+                  )}
                   <button className="btn btn-full" disabled={loginLoading} type="submit" suppressHydrationWarning>
                     {loginLoading
                       ? (language === "fr" ? "Connexion…" : "Signing in…")
-                      : `→ ${t.login}`}
+                      : loginTwoFactorRequired
+                        ? (language === "fr" ? "Vérifier le code" : "Verify code")
+                        : `→ ${t.login}`}
                   </button>
+                  {loginTwoFactorRequired ? (
+                    <button
+                      className="btn btn-full btn-secondary"
+                      type="button"
+                      onClick={() => {
+                        setLoginTwoFactorRequired(false);
+                        setLoginTwoFactorRole(null);
+                        setLoginTwoFactorCode("");
+                        setError("");
+                      }}
+                      suppressHydrationWarning
+                      style={{ marginTop: 10 }}
+                    >
+                      {language === "fr" ? "Retour" : "Back"}
+                    </button>
+                  ) : null}
                 </form>
               </div>
 
@@ -326,6 +440,14 @@ export function StorefrontClient({ language, t, user, products }: Props) {
                     void onRegister(new FormData(e.currentTarget));
                   }}
                 >
+                  {initialRegisterEmail && registerEmail === initialRegisterEmail ? (
+                    <div className="auth-alert auth-alert--ok" style={{ marginBottom: "1rem" }}>
+                      <span>✨</span>
+                      {language === "fr"
+                        ? "On a prérempli ton courriel pour créer ton compte après la commande."
+                        : "Your email has been prefilled so you can create your account after ordering."}
+                    </div>
+                  ) : null}
                   <div className="auth-name-row">
                     <div className="field">
                       <label>{language === "fr" ? "Prénom" : "First name"}</label>
@@ -346,7 +468,16 @@ export function StorefrontClient({ language, t, user, products }: Props) {
                     <label>Email</label>
                     <div className="input-icon-wrap">
                       <span className="input-icon">✉️</span>
-                      <input className="input input--icon" name="email" type="email" placeholder="ton@email.com" required suppressHydrationWarning />
+                      <input
+                        className="input input--icon"
+                        name="email"
+                        type="email"
+                        placeholder="ton@email.com"
+                        value={registerEmail}
+                        onChange={(event) => setRegisterEmail(event.target.value)}
+                        required
+                        suppressHydrationWarning
+                      />
                     </div>
                   </div>
                   <div className="field">
@@ -442,7 +573,7 @@ export function StorefrontClient({ language, t, user, products }: Props) {
                   className={`catalog-cat-pill${categoryFilter === cat ? " catalog-cat-pill--active" : ""}`}
                   onClick={() => setCategoryFilter(cat)}
                 >
-                  {getCategoryEmoji(cat)} {cat}
+                  {getCategoryEmoji(cat)} {getLocalizedCategoryLabel(cat, language)}
                 </button>
               ))}
             </div>
@@ -457,7 +588,7 @@ export function StorefrontClient({ language, t, user, products }: Props) {
             {categoryFilter !== "all" && (
               <span className="catalog-active-filter">
                 {" — "}
-                {getCategoryEmoji(categoryFilter)} {categoryFilter}
+                {getCategoryEmoji(categoryFilter)} {getLocalizedCategoryLabel(categoryFilter, language)}
               </span>
             )}
           </p>
@@ -467,7 +598,7 @@ export function StorefrontClient({ language, t, user, products }: Props) {
             <div className="grid-products">
               {filteredProducts.map((product) => (
                 <article
-                  className={`card${addingId === product.id ? " card--adding" : ""}`}
+                  className={`card glow-border${addingId === product.id ? " card--adding" : ""}`}
                   key={product.id}
                 >
                   {/* Visuel — image ou emoji de catégorie */}
@@ -482,7 +613,7 @@ export function StorefrontClient({ language, t, user, products }: Props) {
 
                   {/* Badges : catégorie + stock */}
                   <div className="card-badges-row">
-                    <span className="badge">{product.category}</span>
+                    <span className="badge">{getLocalizedCategoryLabel(product.category, language)}</span>
                     {product.stock === 0 ? (
                       <span className="stock-badge stock-badge--out">
                         {language === "fr" ? "Rupture" : "Out of stock"}
@@ -505,11 +636,10 @@ export function StorefrontClient({ language, t, user, products }: Props) {
                   <p className="card-price">
                     <strong>{product.priceLabel}</strong>
                   </p>
-
                   {/* Ajout au panier */}
-                  <div className="row">
+                  <div className="card-add-row">
                     <input
-                      className="input"
+                      className="input card-qty-input"
                       type="number"
                       min={1}
                       max={Math.max(1, product.stock)}
@@ -520,11 +650,10 @@ export function StorefrontClient({ language, t, user, products }: Props) {
                           [product.id]: Math.max(1, Number(e.target.value) || 1),
                         }))
                       }
-                      style={{ width: 80 }}
                       disabled={product.stock === 0}
                     />
                     <button
-                      className="btn"
+                      className="btn card-add-btn"
                       onClick={(e) => {
                         const rect = e.currentTarget.getBoundingClientRect();
                         addToCart(product, rect.left + rect.width / 2, rect.top + rect.height / 2);
@@ -551,11 +680,26 @@ export function StorefrontClient({ language, t, user, products }: Props) {
             /* État vide */
             <div className="catalog-no-results">
               <span className="catalog-no-results-icon">🔍</span>
-              <p>
-                {language === "fr"
-                  ? `Aucun produit trouvé${search.trim() ? ` pour « ${search.trim()} »` : ""}.`
-                  : `No products found${search.trim() ? ` for "${search.trim()}"` : ""}.`}
-              </p>
+              {products.length === 0 && !search.trim() && categoryFilter === "all" ? (
+                <>
+                  <p>
+                    {language === "fr"
+                      ? "La boutique est en preparation. Les produits seront ajoutes tres bientot."
+                      : "The shop is being prepared. Products will be added very soon."}
+                  </p>
+                  <p className="small" style={{ marginTop: 8 }}>
+                    {language === "fr"
+                      ? "Ton compte et le checkout sont deja prets pour le lancement."
+                      : "Your account and checkout are already prepared for launch."}
+                  </p>
+                </>
+              ) : (
+                <p>
+                  {language === "fr"
+                    ? `Aucun produit trouve${search.trim() ? ` pour « ${search.trim()} »` : ""}.`
+                    : `No products found${search.trim() ? ` for "${search.trim()}"` : ""}.`}
+                </p>
+              )}
               {(search.trim() || categoryFilter !== "all") && (
                 <button
                   type="button"
@@ -565,7 +709,7 @@ export function StorefrontClient({ language, t, user, products }: Props) {
                     setCategoryFilter("all");
                   }}
                 >
-                  {language === "fr" ? "Réinitialiser les filtres" : "Reset filters"}
+                  {language === "fr" ? "Reinitialiser les filtres" : "Reset filters"}
                 </button>
               )}
             </div>
@@ -576,3 +720,6 @@ export function StorefrontClient({ language, t, user, products }: Props) {
     </>
   );
 }
+
+
+

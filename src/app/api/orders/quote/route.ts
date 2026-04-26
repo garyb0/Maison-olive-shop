@@ -1,5 +1,6 @@
 import { jsonError, jsonOk } from "@/lib/http";
-import { getPromoDiscountCents } from "@/lib/promo";
+import { getHiddenStorefrontProductSlugs } from "@/lib/launch-guards";
+import { resolvePromoCodeDiscount } from "@/lib/promo";
 import { prisma } from "@/lib/prisma";
 import { computeOrderAmounts } from "@/lib/taxes";
 import { checkoutSchema } from "@/lib/validators";
@@ -33,6 +34,7 @@ export async function POST(request: Request) {
       where: {
         id: { in: input.items.map((item) => item.productId) },
         isActive: true,
+        slug: { notIn: getHiddenStorefrontProductSlugs() },
       },
       select: { id: true, priceCents: true },
     });
@@ -50,9 +52,19 @@ export async function POST(request: Request) {
       return sum + product.priceCents * item.quantity;
     }, 0);
 
-    const discountCents = getPromoDiscountCents(subtotalCents, input.promoCode);
-    const quote = computeOrderAmounts(subtotalCents, discountCents);
-    return jsonOk({ quote });
+    const promo = await resolvePromoCodeDiscount(subtotalCents, input.promoCode);
+    const quote = computeOrderAmounts(subtotalCents, promo.discountCents);
+    return jsonOk({
+      quote,
+      appliedPromo: promo.isValid
+        ? {
+            code: promo.appliedCode,
+            description: promo.description,
+            discountPercent: promo.discountPercent,
+          }
+        : null,
+      promoCodeStatus: promo.normalizedCode ? (promo.isValid ? "valid" : "invalid") : "empty",
+    });
   } catch {
     return jsonError("Failed to compute checkout quote", 500);
   }

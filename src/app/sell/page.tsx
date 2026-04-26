@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
 import { getCurrentLanguage } from "@/lib/language";
 import { getDictionary } from "@/lib/i18n";
@@ -57,7 +57,7 @@ export default async function SellWithUsPage() {
         <Navigation language={language} t={t} user={user} />
       </header>
 
-      <PromoBanner />
+      <PromoBanner language={language} />
 
       {/* ── 1. Hero ── */}
       <section className="section sell-hero">
@@ -70,8 +70,8 @@ export default async function SellWithUsPage() {
           </h1>
           <p className="sell-hero-sub">
             {isFr
-              ? "Rejoignez Maison Olive et donnez à vos créations la vitrine qu'elles méritent. Nous connectons les artisans locaux avec des propriétaires d'animaux qui cherchent le meilleur pour leurs compagnons."
-              : "Join Maison Olive and give your creations the storefront they deserve. We connect local makers with pet owners who want the best for their companions."}
+              ? "Rejoignez Chez Olive et donnez à vos créations la vitrine qu'elles méritent. Nous connectons les artisans locaux avec des propriétaires d'animaux qui cherchent le meilleur pour leurs compagnons."
+              : "Join Chez Olive and give your creations the storefront they deserve. We connect local makers with pet owners who want the best for their companions."}
           </p>
           <a href={`mailto:${business.supportEmail}`} className="btn sell-hero-btn">
             {isFr ? "Postuler maintenant →" : "Apply now →"}
@@ -90,8 +90,8 @@ export default async function SellWithUsPage() {
             </h2>
             <p className="small">
               {isFr
-                ? "Que vous soyez artisan, producteur ou petite entreprise spécialisée dans le bien-être animal, Maison Olive est la plateforme idéale pour vendre vos produits sans vous soucier de la technologie ou du marketing. On s'occupe de la boutique, vous vous concentrez sur ce que vous faites de mieux."
-                : "Whether you are a maker, producer or small business specialised in pet wellness, Maison Olive is the ideal platform to sell your products without worrying about technology or marketing. We run the shop, you focus on what you do best."}
+                ? "Que vous soyez artisan, producteur ou petite entreprise spécialisée dans le bien-être animal, Chez Olive est la plateforme idéale pour vendre vos produits sans vous soucier de la technologie ou du marketing. On s'occupe de la boutique, vous vous concentrez sur ce que vous faites de mieux."
+                : "Whether you are a maker, producer or small business specialised in pet wellness, Chez Olive is the ideal platform to sell your products without worrying about technology or marketing. We run the shop, you focus on what you do best."}
             </p>
           </div>
         </div>

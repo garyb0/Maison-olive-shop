@@ -5,7 +5,7 @@ import { applyRateLimit } from "@/lib/rate-limit";
 import { resetPasswordSchema } from "@/lib/validators";
 
 export async function POST(request: Request) {
-  const rate = applyRateLimit(request, { namespace: "auth:reset-password", windowMs: 10 * 60_000, max: 15 });
+  const rate = await applyRateLimit(request, { namespace: "auth:reset-password", windowMs: 10 * 60_000, max: 15 });
   if (!rate.ok) {
     return jsonError("Too many requests", 429);
   }

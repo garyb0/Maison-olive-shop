@@ -1,43 +1,50 @@
-import { env } from "@/lib/env";
+﻿import { env } from "@/lib/env";
 import { sendEmail } from "@/lib/email";
 import { logApiEvent } from "@/lib/observability";
 import crypto from "crypto";
 
+type EmailReplyTokenPayload = {
+  conversationId: string;
+  adminEmail: string;
+};
+
 // Generate a secure token for email reply validation
-export function generateEmailReplyToken(conversationId: string, adminId: string): string {
-  const data = `${conversationId}:${adminId}:${Date.now()}`;
-  return crypto.createHmac('sha256', env.sessionSecret).update(data).digest('hex');
+export function generateEmailReplyToken(conversationId: string, adminEmail: string): string {
+  return createReplyToken(conversationId, adminEmail);
 }
 
 // Verify email reply token
-export function verifyEmailReplyToken(token: string): { conversationId: string; adminId: string } | null {
+export function verifyEmailReplyToken(token: string): EmailReplyTokenPayload | null {
   try {
-    // Token format: conversationId:adminId:timestamp:hmac
+    // Token format: conversationId:adminEmail:timestamp:hmac
     const parts = Buffer.from(token, 'base64').toString('utf-8').split(':');
     if (parts.length !== 4) return null;
     
-    const [conversationId, adminId, timestamp, hmac] = parts;
-    const expectedData = `${conversationId}:${adminId}:${timestamp}`;
+    const [conversationId, adminEmailRaw, timestamp, hmac] = parts;
+    const adminEmail = adminEmailRaw.trim().toLowerCase();
+    const expectedData = `${conversationId}:${adminEmail}:${timestamp}`;
     const expectedHmac = crypto.createHmac('sha256', env.sessionSecret).update(expectedData).digest('hex');
     
-    if (hmac !== expectedHmac) return null;
+    if (hmac.length !== expectedHmac.length) return null;
+    if (!crypto.timingSafeEqual(Buffer.from(hmac), Buffer.from(expectedHmac))) return null;
     
     // Token valid for 7 days
     const tokenTime = parseInt(timestamp);
     if (Date.now() - tokenTime > 7 * 24 * 60 * 60 * 1000) return null;
     
-    return { conversationId, adminId };
+    return { conversationId, adminEmail };
   } catch {
     return null;
   }
 }
 
 // Create a token that can be decoded
-function createReplyToken(conversationId: string, adminId: string): string {
+function createReplyToken(conversationId: string, adminEmailRaw: string): string {
+  const adminEmail = adminEmailRaw.trim().toLowerCase();
   const timestamp = Date.now().toString();
-  const data = `${conversationId}:${adminId}:${timestamp}`;
+  const data = `${conversationId}:${adminEmail}:${timestamp}`;
   const hmac = crypto.createHmac('sha256', env.sessionSecret).update(data).digest('hex');
-  const tokenData = `${conversationId}:${adminId}:${timestamp}:${hmac}`;
+  const tokenData = `${conversationId}:${adminEmail}:${timestamp}:${hmac}`;
   return Buffer.from(tokenData).toString('base64');
 }
 
@@ -58,8 +65,8 @@ function buildEmailHtml(data: EmailNotificationData, isReply: boolean = false): 
     : '';
 
   const subject = isReply
-    ? `💬 Nouveau message de ${data.customerName} - Maison Olive`
-    : `🔔 Nouvelle conversation de ${data.customerName} - Maison Olive`;
+    ? `💬 Nouveau message de ${data.customerName} - Chez Olive`
+    : `🔔 Nouvelle conversation de ${data.customerName} - Chez Olive`;
 
   const previewText = data.messageContent.length > 100 
     ? data.messageContent.substring(0, 100) + '...' 
@@ -210,7 +217,7 @@ function buildEmailHtml(data: EmailNotificationData, isReply: boolean = false): 
 <body>
   <div class="container">
     <div class="header">
-      <p class="header-title">🐾 Maison Olive</p>
+      <p class="header-title">🐾 Chez Olive</p>
       <p class="header-subtitle">Support Client</p>
     </div>
     
@@ -256,7 +263,7 @@ function buildEmailHtml(data: EmailNotificationData, isReply: boolean = false): 
     </div>
     
     <div class="footer">
-      <p>© 2024 Maison Olive — Rimouski, QC</p>
+      <p>© 2024 Chez Olive — Rimouski, QC</p>
       <p>Cet email a été envoyé à ${data.adminEmail || 'votre adresse'}</p>
       <p style="margin-top: 8px;">
         <a href="${env.siteUrl}/admin/support/settings" style="color: #6b7280;">Gérer les notifications</a>
@@ -293,7 +300,7 @@ export async function sendNewConversationEmail(data: {
     messageContent: data.messageContent,
   }, false);
 
-  const subject = `🔔 Nouvelle conversation de ${data.customerName} - Maison Olive`;
+  const subject = `🔔 Nouvelle conversation de ${data.customerName} - Chez Olive`;
 
   // Send to all admin emails
   const sendPromises = data.adminEmails.map(adminEmail => 
@@ -337,7 +344,7 @@ export async function sendNewMessageEmail(data: {
     isReply: true,
   }, true);
 
-  const subject = `💬 Nouveau message de ${data.customerName} - Maison Olive`;
+  const subject = `💬 Nouveau message de ${data.customerName} - Chez Olive`;
 
   await sendEmail({
     to: data.adminEmail,
@@ -362,7 +369,7 @@ export async function sendConversationClosedEmail(data: {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Conversation terminée - Maison Olive</title>
+  <title>Conversation terminée - Chez Olive</title>
   <style>
     body {
       margin: 0;
@@ -418,7 +425,7 @@ export async function sendConversationClosedEmail(data: {
 <body>
   <div class="container">
     <div class="header">
-      <p class="header-title">🐾 Maison Olive</p>
+      <p class="header-title">🐾 Chez Olive</p>
     </div>
     <div class="body">
       <h2 style="margin: 0 0 16px; font-size: 22px;">Conversation terminée</h2>
@@ -430,7 +437,7 @@ export async function sendConversationClosedEmail(data: {
       </div>
     </div>
     <div class="footer">
-      <p>© 2024 Maison Olive — Rimouski, QC</p>
+      <p>© 2024 Chez Olive — Rimouski, QC</p>
     </div>
   </div>
 </body>
@@ -439,7 +446,7 @@ export async function sendConversationClosedEmail(data: {
 
   await sendEmail({
     to: data.customerEmail,
-    subject: 'Votre conversation a été clôturée - Maison Olive',
+    subject: 'Votre conversation a été clôturée - Chez Olive',
     html,
   });
 }

@@ -1,0 +1,25 @@
+{
+  "version": 2,
+  "createdAt": "2026-04-25T02:34:03.345Z",
+  "label": "delivery-prod-flag-on",
+  "environment": "development",
+  "git": {
+    "branch": "master",
+    "commitSha": "c0e661eb8a9f2a0049c1fe908f8bafd7e403ce3b",
+    "headCommitSha": "ea4548b523cc7e410a112de8fa0c326ad74a2684",
+    "tag": "delivery-checkpoint-20260424-223400-delivery-prod-flag-on",
+    "dirty": true,
+    "snapshotKind": "worktree",
+    "statusPath": "C:\\Cline\\maison-olive-shop\\backups\\delivery-checkpoints\\delivery-checkpoint-20260424-223400-delivery-prod-flag-on.git-status.txt",
+    "trackedDiffPath": "C:\\Cline\\maison-olive-shop\\backups\\delivery-checkpoints\\delivery-checkpoint-20260424-223400-delivery-prod-flag-on.git-diff.patch",
+    "untrackedFilesPath": "C:\\Cline\\maison-olive-shop\\backups\\delivery-checkpoints\\delivery-checkpoint-20260424-223400-delivery-prod-flag-on.untracked.txt"
+  },
+  "database": {
+    "kind": "sqlite",
+    "databaseUrl": "file:./delivery-dev.db",
+    "sourcePath": "C:\\Cline\\maison-olive-shop\\delivery-dev.db",
+    "backupPath": "C:\\Cline\\maison-olive-shop\\backups\\delivery-checkpoints\\delivery-checkpoint-20260424-223400-delivery-prod-flag-on-20260424-223403.db",
+    "manifestPath": "C:\\Cline\\maison-olive-shop\\backups\\delivery-checkpoints\\delivery-checkpoint-20260424-223400-delivery-prod-flag-on-20260424-223403.db.json",
+    "sidecarBackupPaths": []
+  }
+}

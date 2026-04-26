@@ -1,0 +1,9 @@
+tunnel: ecc2436e-be64-47ce-8642-523ded6d1b99
+credentials-file: C:\Users\Gary\.cloudflared\ecc2436e-be64-47ce-8642-523ded6d1b99.json
+
+ingress:
+  - hostname: chezolive.ca
+    service: http://localhost:3101
+  - hostname: www.chezolive.ca
+    service: http://localhost:3101
+  - service: http_status:404

@@ -1,9 +1,10 @@
-@echo off
+﻿@echo off
 setlocal
 
-set "SOURCE=C:\Cline\maison-olive-shop\scripts\windows\pm2-resurrect.cmd"
+set "SCRIPT_DIR=%~dp0"
+set "SOURCE=%SCRIPT_DIR%pm2-resurrect.cmd"
 set "TARGET_DIR=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup"
-set "TARGET=%TARGET_DIR%\maison-olive-pm2-resurrect.cmd"
+set "TARGET=%TARGET_DIR%\chez-olive-pm2-resurrect.cmd"
 
 if not exist "%SOURCE%" (
   echo Source script introuvable: %SOURCE%
@@ -20,3 +21,5 @@ echo Startup script installed:
 echo %TARGET%
 
 exit /b 0
+
+

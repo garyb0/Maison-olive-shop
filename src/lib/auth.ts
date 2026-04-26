@@ -1,9 +1,30 @@
 import { cookies } from "next/headers";
 import { randomBytes, createHash } from "crypto";
 import bcrypt from "bcryptjs";
+import { ADMIN_ACCESS_COOKIE_NAME, createAdminAccessCookieValue } from "@/lib/admin-access-cookie";
 import { DEV_SESSION_SECRET, env } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
-import { logApiEvent } from "@/lib/observability"; // eslint-disable-line @typescript-eslint/no-unused-vars
+import {
+  buildTwoFactorOtpAuthUri,
+  clearTwoFactorLoginChallenge,
+  clearTwoFactorSetupChallenge,
+  consumeBackupCode,
+  createTwoFactorLoginChallenge,
+  createTwoFactorSetupChallenge,
+  decryptTwoFactorSecret,
+  encryptTwoFactorSecret,
+  formatTwoFactorSecret,
+  generateBackupCodes,
+  generateTwoFactorSecret,
+  hashBackupCode,
+  readTwoFactorLoginChallenge,
+  readTwoFactorSetupChallenge,
+  verifyTotpCode,
+} from "@/lib/two-factor";
+import { logApiEvent } from "@/lib/observability";
+
+const isSecureCookie = process.env.NODE_ENV === "production";
+const sessionCookieSameSite = isSecureCookie ? "strict" : "lax";
 
 const ensureSessionSecret = () => {
   if (process.env.NODE_ENV === "production" && env.sessionSecret === DEV_SESSION_SECRET) {
@@ -18,6 +39,127 @@ type RegisterInput = {
   lastName: string;
   language?: "fr" | "en";
 };
+
+type AuthenticatedUser = Awaited<ReturnType<typeof getCurrentUser>>;
+
+type SessionUser = {
+  id: string;
+  email: string;
+  passwordHash: string;
+  firstName: string;
+  lastName: string;
+  role: "CUSTOMER" | "ADMIN";
+  language: string;
+  twoFactorEnabled: boolean;
+  twoFactorSecretCiphertext: string | null;
+  twoFactorBackupCodesJson: string | null;
+  twoFactorEnabledAt: Date | null;
+};
+
+type LoginResult = {
+  requiresTwoFactor: boolean;
+  user: NonNullable<AuthenticatedUser>;
+};
+
+const toCurrentUser = (user: SessionUser) => ({
+  id: user.id,
+  email: user.email,
+  firstName: user.firstName,
+  lastName: user.lastName,
+  role: user.role,
+  language: (user.language === "en" ? "en" : "fr") as "fr" | "en",
+  twoFactorEnabled: Boolean(user.twoFactorEnabled),
+});
+
+async function createSessionForUser(user: Pick<SessionUser, "id" | "role">) {
+  const token = randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + env.sessionDurationDays * 24 * 60 * 60 * 1000);
+
+  await prisma.session.create({
+    data: {
+      token,
+      userId: user.id,
+      expiresAt,
+    },
+  });
+
+  const cookieStore = await cookies();
+  cookieStore.set(env.sessionCookieName, token, {
+    httpOnly: true,
+    sameSite: sessionCookieSameSite,
+    secure: isSecureCookie,
+    path: "/",
+    expires: expiresAt,
+  });
+
+  if (user.role === "ADMIN") {
+    const adminAccessCookie = await createAdminAccessCookieValue({
+      sessionToken: token,
+      expiresAt,
+      secret: env.sessionSecret,
+    });
+
+    cookieStore.set(ADMIN_ACCESS_COOKIE_NAME, adminAccessCookie, {
+      httpOnly: true,
+      sameSite: sessionCookieSameSite,
+      secure: isSecureCookie,
+      path: "/",
+      expires: expiresAt,
+    });
+  }
+}
+
+function logAuthLatency(metric: string, durationMs: number, details?: Record<string, unknown>) {
+  if (durationMs < 120) {
+    return;
+  }
+
+  const level = durationMs > 120 ? "WARN" : "INFO";
+  logApiEvent({
+    level,
+    route: "lib/auth",
+    event: metric,
+    status: 200,
+    details: {
+      durationMs,
+      ...(details ?? {}),
+    },
+  });
+}
+
+async function getCurrentSessionWithUser() {
+  const start = Date.now();
+
+  const cookieStore = await cookies();
+  const token = cookieStore.get(env.sessionCookieName)?.value;
+  if (!token) return null;
+
+  const session = await prisma.session.findUnique({
+    where: { token },
+    include: { user: true },
+  });
+
+  if (!session) {
+    return null;
+  }
+
+  if (session.expiresAt < new Date()) {
+    await prisma.session.delete({ where: { id: session.id } });
+    logAuthLatency("SESSION_LOOKUP_EXPIRED", Date.now() - start, { found: false, tokenProvided: true });
+    return null;
+  }
+
+  logAuthLatency("SESSION_LOOKUP", Date.now() - start, { found: true, userId: session.userId });
+  return session;
+}
+
+async function requireCurrentSessionWithUser() {
+  const session = await getCurrentSessionWithUser();
+  if (!session) {
+    throw new Error("UNAUTHORIZED");
+  }
+  return session;
+}
 
 export async function hashPassword(password: string) {
   return bcrypt.hash(password, 12);
@@ -51,37 +193,156 @@ export async function registerUser(input: RegisterInput) {
 export async function loginUser(email: string, password: string) {
   ensureSessionSecret();
 
+  const start = Date.now();
   const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
+  logAuthLatency("USER_LOOKUP", Date.now() - start, { email: email.toLowerCase() });
   if (!user) {
     throw new Error("INVALID_CREDENTIALS");
   }
 
+  const passwordStart = Date.now();
   const ok = await verifyPassword(password, user.passwordHash);
+  logAuthLatency("PASSWORD_CHECK", Date.now() - passwordStart, { userId: user.id });
   if (!ok) {
     throw new Error("INVALID_CREDENTIALS");
   }
 
-  const token = randomBytes(32).toString("hex");
-  const expiresAt = new Date(Date.now() + env.sessionDurationDays * 24 * 60 * 60 * 1000);
+  if (user.role === "ADMIN" && user.twoFactorEnabled && user.twoFactorSecretCiphertext) {
+    logAuthLatency("LOGIN_WITH_2FA", Date.now() - start, { userId: user.id, role: user.role });
+    await createTwoFactorLoginChallenge(user.id);
+    return {
+      requiresTwoFactor: true,
+      user: toCurrentUser(user as SessionUser),
+    } satisfies LoginResult;
+  }
 
-  await prisma.session.create({
-    data: {
-      token,
-      userId: user.id,
-      expiresAt,
-    },
+  await clearTwoFactorLoginChallenge();
+  await createSessionForUser({ id: user.id, role: user.role });
+  logAuthLatency("LOGIN_SESSION_CREATED", Date.now() - start, { userId: user.id, role: user.role });
+
+  return {
+    requiresTwoFactor: false,
+    user: toCurrentUser(user as SessionUser),
+  } satisfies LoginResult;
+}
+
+export async function verifyTwoFactorLogin(code: string) {
+  ensureSessionSecret();
+
+  const challenge = await readTwoFactorLoginChallenge();
+  if (!challenge) {
+    throw new Error("TWO_FACTOR_CHALLENGE_REQUIRED");
+  }
+
+  const user = await prisma.user.findUnique({ where: { id: challenge.userId } });
+  if (!user || user.role !== "ADMIN" || !user.twoFactorEnabled || !user.twoFactorSecretCiphertext) {
+    await clearTwoFactorLoginChallenge();
+    throw new Error("TWO_FACTOR_CHALLENGE_REQUIRED");
+  }
+
+  const secret = decryptTwoFactorSecret(user.twoFactorSecretCiphertext);
+  let matched = verifyTotpCode(secret, code);
+  let nextBackupCodesJson = user.twoFactorBackupCodesJson ?? "[]";
+  let usedBackupCode = false;
+
+  if (!matched) {
+    const backupResult = consumeBackupCode(user.twoFactorBackupCodesJson, code);
+    if (!backupResult.matched) {
+      throw new Error("INVALID_TWO_FACTOR_CODE");
+    }
+    matched = true;
+    usedBackupCode = true;
+    nextBackupCodesJson = backupResult.nextHashesJson;
+  }
+
+  if (usedBackupCode) {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { twoFactorBackupCodesJson: nextBackupCodesJson },
+    });
+  }
+
+  await clearTwoFactorLoginChallenge();
+  await createSessionForUser({ id: user.id, role: user.role });
+
+  return toCurrentUser({
+    ...(user as SessionUser),
+    twoFactorBackupCodesJson: nextBackupCodesJson,
   });
+}
 
+export async function changePasswordForCurrentUser(currentPassword: string, newPassword: string) {
+  ensureSessionSecret();
+
+  const session = await requireCurrentSessionWithUser();
   const cookieStore = await cookies();
-  cookieStore.set(env.sessionCookieName, token, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    expires: expiresAt,
+  const token = cookieStore.get(env.sessionCookieName)?.value;
+  if (!token) throw new Error("UNAUTHORIZED");
+
+  const currentPasswordOk = await verifyPassword(currentPassword, session.user.passwordHash);
+  if (!currentPasswordOk) {
+    throw new Error("INVALID_CURRENT_PASSWORD");
+  }
+
+  const isSamePassword = await verifyPassword(newPassword, session.user.passwordHash);
+  if (isSamePassword) {
+    throw new Error("PASSWORD_UNCHANGED");
+  }
+
+  const passwordHash = await hashPassword(newPassword);
+
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: session.userId },
+      data: { passwordHash },
+    }),
+    prisma.session.deleteMany({
+      where: {
+        userId: session.userId,
+        token: { not: token },
+      },
+    }),
+    prisma.auditLog.create({
+      data: {
+        actorUserId: session.userId,
+        action: "PASSWORD_CHANGED",
+        entity: "User",
+        entityId: session.userId,
+      },
+    }),
+  ]);
+}
+
+export async function revokeOtherSessionsForCurrentUser() {
+  ensureSessionSecret();
+
+  const session = await requireCurrentSessionWithUser();
+  const cookieStore = await cookies();
+  const token = cookieStore.get(env.sessionCookieName)?.value;
+  if (!token) throw new Error("UNAUTHORIZED");
+
+  const result = await prisma.$transaction(async (tx) => {
+    const deleted = await tx.session.deleteMany({
+      where: {
+        userId: session.userId,
+        token: { not: token },
+      },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        actorUserId: session.userId,
+        action: "OTHER_SESSIONS_REVOKED",
+        entity: "User",
+        entityId: session.userId,
+        metadata: JSON.stringify({ revokedCount: deleted.count }),
+      },
+    });
+
+    return deleted;
   });
 
-  return user;
+  return { revokedCount: result.count };
 }
 
 export async function logoutUser() {
@@ -93,6 +354,9 @@ export async function logoutUser() {
   }
 
   cookieStore.delete(env.sessionCookieName);
+  cookieStore.delete(ADMIN_ACCESS_COOKIE_NAME);
+  await clearTwoFactorLoginChallenge();
+  await clearTwoFactorSetupChallenge();
 }
 
 // ─── Password Reset ─────────────────────────────────────────────────────────
@@ -147,28 +411,129 @@ export async function resetPassword(token: string, newPassword: string): Promise
 }
 
 export async function getCurrentUser() {
-  const cookieStore = await cookies();
-  const token = cookieStore.get(env.sessionCookieName)?.value;
-  if (!token) return null;
-
-  const session = await prisma.session.findUnique({
-    where: { token },
-    include: { user: true },
-  });
-
+  const session = await getCurrentSessionWithUser();
   if (!session) return null;
-  if (session.expiresAt < new Date()) {
-    await prisma.session.delete({ where: { id: session.id } });
-    cookieStore.delete(env.sessionCookieName);
-    return null;
+  return toCurrentUser(session.user as SessionUser);
+}
+
+export async function beginTwoFactorSetupForCurrentUser() {
+  ensureSessionSecret();
+
+  const session = await requireCurrentSessionWithUser();
+  if (session.user.role !== "ADMIN") {
+    throw new Error("FORBIDDEN");
+  }
+  if (session.user.twoFactorEnabled) {
+    throw new Error("TWO_FACTOR_ALREADY_ENABLED");
   }
 
+  const secret = generateTwoFactorSecret();
+  await createTwoFactorSetupChallenge(session.userId, secret);
+
   return {
-    id: session.user.id,
-    email: session.user.email,
-    firstName: session.user.firstName,
-    lastName: session.user.lastName,
-    role: session.user.role,
-    language: (session.user.language === "en" ? "en" : "fr") as "fr" | "en",
+    manualEntryKey: formatTwoFactorSecret(secret),
+    otpauthUri: buildTwoFactorOtpAuthUri(session.user.email, secret),
   };
 }
+
+export async function confirmTwoFactorSetupForCurrentUser(currentPassword: string, code: string) {
+  ensureSessionSecret();
+
+  const session = await requireCurrentSessionWithUser();
+  if (session.user.role !== "ADMIN") {
+    throw new Error("FORBIDDEN");
+  }
+  if (session.user.twoFactorEnabled) {
+    throw new Error("TWO_FACTOR_ALREADY_ENABLED");
+  }
+
+  const passwordOk = await verifyPassword(currentPassword, session.user.passwordHash);
+  if (!passwordOk) {
+    throw new Error("INVALID_CURRENT_PASSWORD");
+  }
+
+  const setup = await readTwoFactorSetupChallenge();
+  if (!setup || setup.userId !== session.userId) {
+    throw new Error("TWO_FACTOR_SETUP_REQUIRED");
+  }
+
+  if (!verifyTotpCode(setup.secret, code)) {
+    throw new Error("INVALID_TWO_FACTOR_CODE");
+  }
+
+  const backupCodes = generateBackupCodes();
+  const backupCodeHashes = JSON.stringify(backupCodes.map((backupCode) => hashBackupCode(backupCode)));
+
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: session.userId },
+      data: {
+        twoFactorEnabled: true,
+        twoFactorSecretCiphertext: encryptTwoFactorSecret(setup.secret),
+        twoFactorBackupCodesJson: backupCodeHashes,
+        twoFactorEnabledAt: new Date(),
+      },
+    }),
+    prisma.auditLog.create({
+      data: {
+        actorUserId: session.userId,
+        action: "TWO_FACTOR_ENABLED",
+        entity: "User",
+        entityId: session.userId,
+      },
+    }),
+  ]);
+
+  await clearTwoFactorSetupChallenge();
+
+  return { backupCodes };
+}
+
+export async function disableTwoFactorForCurrentUser(currentPassword: string, code: string) {
+  ensureSessionSecret();
+
+  const session = await requireCurrentSessionWithUser();
+  if (session.user.role !== "ADMIN") {
+    throw new Error("FORBIDDEN");
+  }
+  if (!session.user.twoFactorEnabled || !session.user.twoFactorSecretCiphertext) {
+    throw new Error("TWO_FACTOR_NOT_ENABLED");
+  }
+
+  const passwordOk = await verifyPassword(currentPassword, session.user.passwordHash);
+  if (!passwordOk) {
+    throw new Error("INVALID_CURRENT_PASSWORD");
+  }
+
+  const secret = decryptTwoFactorSecret(session.user.twoFactorSecretCiphertext);
+  const validTotp = verifyTotpCode(secret, code);
+  const backupResult = validTotp ? null : consumeBackupCode(session.user.twoFactorBackupCodesJson, code);
+
+  if (!validTotp && !backupResult?.matched) {
+    throw new Error("INVALID_TWO_FACTOR_CODE");
+  }
+
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: session.userId },
+      data: {
+        twoFactorEnabled: false,
+        twoFactorSecretCiphertext: null,
+        twoFactorBackupCodesJson: null,
+        twoFactorEnabledAt: null,
+      },
+    }),
+    prisma.auditLog.create({
+      data: {
+        actorUserId: session.userId,
+        action: "TWO_FACTOR_DISABLED",
+        entity: "User",
+        entityId: session.userId,
+        metadata: JSON.stringify({ viaBackupCode: Boolean(backupResult?.matched) }),
+      },
+    }),
+  ]);
+
+  await clearTwoFactorSetupChallenge();
+}
+
