@@ -7662,6 +7662,12 @@ tr:last-child td {
   z-index: 1;
 }
 
+.app-shell--home::before {
+  background-image: url("/images/chez-olive/rimouski-illustrated-map.svg");
+  background-size: max(1600px, 125vw) auto;
+  opacity: 0.24;
+}
+
 .nav-header {
   border-radius: 1.2rem;
   border-color: rgba(234, 220, 201, 0.95);

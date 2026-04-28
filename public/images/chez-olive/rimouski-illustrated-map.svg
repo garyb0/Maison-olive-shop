@@ -1,0 +1,154 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" role="img" aria-label="Carte illustree de Rimouski">
+  <defs>
+    <style>
+      .ink{fill:none;stroke:#1f1f1f;stroke-linecap:round;stroke-linejoin:round}
+      .thin{stroke-width:1.4}
+      .mid{stroke-width:2.6}
+      .heavy{stroke-width:5.2}
+      .soft{opacity:.3}
+      .label{fill:#1f1f1f;font:700 28px Arial,sans-serif;letter-spacing:1.6px}
+      .small{fill:#1f1f1f;font:500 16px Arial,sans-serif}
+      .title{fill:#111;font:800 38px Arial,sans-serif;letter-spacing:5px}
+    </style>
+  </defs>
+
+  <rect width="1600" height="1000" fill="#fbfaf6"/>
+
+  <g class="ink thin soft">
+    <path d="M-20 110c70-18 128-10 188-28 68-20 132-40 212-18"/>
+    <path d="M1160 96c76-20 130-4 194-18 80-18 130-8 210-26"/>
+    <path d="M230 120c26-9 56-9 86 0"/>
+    <path d="M538 96c15-19 34-18 52-2"/>
+    <path d="M1048 118c18-14 42-14 60 0"/>
+    <path d="M1260 80c25-20 58-19 83 1"/>
+    <path d="M1390 126c36-8 70-7 102 4"/>
+    <path d="M-30 170c90-24 160 16 250-10 92-28 174-52 282-14 80 28 150 24 232-8 100-38 182 10 286-12 118-24 184-78 310-42 96 28 168 10 286-18"/>
+    <path d="M-26 192c92-24 166 18 254-8 90-26 174-48 280-10 78 28 148 23 230-8 98-36 180 8 284-12 118-22 186-74 310-38 96 28 166 8 284-20"/>
+    <path d="M-22 214c94-24 170 20 258-6 92-26 176-46 282-8 76 28 146 23 228-8 98-36 178 8 284-10 118-20 190-70 312-34 96 28 162 8 278-18"/>
+  </g>
+
+  <text class="title" x="534" y="76">FLEUVE SAINT-LAURENT</text>
+
+  <g class="ink mid">
+    <path d="M28 54c78 22 128 86 176 136 70 74 156 84 254 60 80-20 126-64 212-54 90 10 132 82 224 68 122-18 190-90 318-54 80 22 146 84 242 82 42-1 88-10 130-28"/>
+    <path d="M22 646c76-44 146-58 216-54 84 4 150 30 238 10 126-28 178-102 314-98 104 4 174 76 292 56 142-24 224-138 396-118"/>
+  </g>
+
+  <g class="ink heavy">
+    <path d="M30 54c-18 152-12 298 30 438 25 84 88 124 176 118 82-6 124-52 144-126 24-86 40-160 86-236"/>
+    <path d="M466 248c-62 100-78 202-62 306 12 78 58 124 132 136"/>
+    <path d="M604 224c-48 110-48 228 0 356 32 84 42 174 26 270"/>
+    <path d="M812 262c-42 128-38 248 10 360"/>
+    <path d="M1000 246c-24 138-18 256 16 354"/>
+    <path d="M1268 292c-32 120-36 232-12 338"/>
+    <path d="M1462 260c-34 100-48 218-36 352"/>
+    <path d="M236 610c110 42 238 36 374-20 120-50 244-60 378-36 164 30 322 28 474-6"/>
+    <path d="M50 458c234-12 462-32 686-62 244-32 492-32 744-20"/>
+  </g>
+
+  <g class="ink thin">
+    <path d="M280 270l96 84-120 84-88-74z"/>
+    <path d="M492 300h108v92H492z"/>
+    <path d="M660 318l132-46 92 68-80 100-144-26z"/>
+    <path d="M844 304h136v118H844z"/>
+    <path d="M1030 310l156-36 96 80-40 126-184-20z"/>
+    <path d="M1320 330l134-66 92 62-24 160-152-14z"/>
+    <path d="M448 496l144-42 128 96-36 116-180 16z"/>
+    <path d="M728 476l244-30 18 152-240 34z"/>
+    <path d="M1016 492l230-42 48 126-174 110-98-42z"/>
+    <path d="M322 672l246 44-38 158-274-64z"/>
+    <path d="M632 690l408-28 68 218-438 44z"/>
+    <path d="M1092 704l280-110 78 250-266 92z"/>
+  </g>
+
+  <g class="ink thin soft">
+    <path d="M540 332h288"/>
+    <path d="M544 360h322"/>
+    <path d="M548 388h300"/>
+    <path d="M570 316v126"/>
+    <path d="M606 304v142"/>
+    <path d="M642 292v148"/>
+    <path d="M678 282v160"/>
+    <path d="M714 276v168"/>
+    <path d="M750 272v164"/>
+    <path d="M786 274v150"/>
+    <path d="M862 328h116"/>
+    <path d="M862 356h118"/>
+    <path d="M862 384h118"/>
+    <path d="M890 304v120"/>
+    <path d="M920 304v120"/>
+    <path d="M950 304v120"/>
+    <path d="M1060 350h184"/>
+    <path d="M1050 382h194"/>
+    <path d="M1050 414h206"/>
+    <path d="M1084 316v150"/>
+    <path d="M1122 304v164"/>
+    <path d="M1160 296v168"/>
+    <path d="M1198 302v158"/>
+  </g>
+
+  <g class="ink mid">
+    <path d="M406 824c92-130 158-254 198-372"/>
+    <path d="M622 916c56-148 94-296 116-444"/>
+    <path d="M1056 920c-28-126-42-270-40-432"/>
+    <path d="M1394 914c-92-134-136-278-132-432"/>
+    <path d="M-12 760c218-170 420-232 606-186"/>
+    <path d="M1480 426c56 72 96 152 120 240"/>
+  </g>
+
+  <g fill="#1f1f1f">
+    <text class="label" x="110" y="324">LE BIC</text>
+    <text class="small" x="90" y="372">Parc national</text>
+    <text class="label" x="388" y="262">SACRE-COEUR</text>
+    <text class="label" x="624" y="214">NAZARETH</text>
+    <text class="label" x="864" y="260">SAINT-GERMAIN</text>
+    <text class="label" x="1110" y="318">RIMOUSKI-EST</text>
+    <text class="label" x="1320" y="338">POINTE-AU-PERE</text>
+    <text class="label" x="442" y="452">SAINTE-ODILE</text>
+    <text class="label" x="718" y="464">SAINT-ROBERT</text>
+    <text class="label" x="1006" y="474">SAINT-PIE-X</text>
+    <text class="label" x="674" y="640">TERRASSE ARTHUR-BUIES</text>
+    <text class="label" x="734" y="820">SAINTE-BLANDINE /</text>
+    <text class="label" x="790" y="862">MONT-LEBEL</text>
+  </g>
+
+  <g class="ink mid">
+    <path d="M438 318h42v70h-42z"/>
+    <path d="M431 318l28-36 28 36"/>
+    <path d="M846 300h54v82h-54z"/>
+    <path d="M836 300l37-48 38 48"/>
+    <path d="M1012 358h18v82h-18M1044 340h18v100h-18M1078 318h18v122h-18"/>
+    <path d="M1388 244h38v150h-38zM1378 244l30-48 30 48M1438 272h22v100h-22"/>
+    <path d="M1220 770c50-20 92-6 128 36"/>
+    <path d="M1110 112c42 38 120 38 164-4"/>
+    <path d="M1092 122c70 34 142 34 216 0"/>
+    <path d="M392 120l34-64 20 80z"/>
+  </g>
+
+  <g class="ink thin">
+    <path d="M126 780h220v106H126z"/>
+    <path d="M126 780l18-28h184l18 28"/>
+    <path d="M160 814h152M160 846h152"/>
+    <path d="M174 886v62M298 886v62"/>
+  </g>
+  <text class="title" x="152" y="826">RIMOUSKI</text>
+  <text class="label" x="174" y="864">NOTRE VILLE</text>
+  <path class="ink mid" d="M242 884c-16-15-38-28-38-50 0-14 11-26 25-26 8 0 15 4 20 11 5-7 12-11 20-11 14 0 25 12 25 26 0 22-22 35-52 50z"/>
+
+  <g class="ink mid" transform="translate(1380 760)">
+    <circle cx="82" cy="82" r="70"/>
+    <path d="M82 8v148M8 82h148"/>
+    <path d="M82 18l22 64-22 64-22-64z"/>
+    <path d="M18 82l64-22 64 22-64 22z"/>
+  </g>
+  <text class="label" x="1448" y="756">N</text>
+  <text class="label" x="1448" y="940">S</text>
+  <text class="label" x="1342" y="850">O</text>
+  <text class="label" x="1542" y="850">E</text>
+
+  <g class="ink thin">
+    <path d="M96 214l20-42 20 42M78 250l22-48 22 48M144 248l22-48 22 48M184 300l20-42 20 42M1362 420l18-38 18 38M1406 460l20-42 20 42M1320 512l18-38 18 38"/>
+    <path d="M334 342l20-42 20 42M292 382l18-38 18 38M1180 540l20-42 20 42M1250 560l18-38 18 38M760 536l20-42 20 42"/>
+    <path d="M520 810l20-42 20 42M560 842l18-38 18 38M930 838l20-42 20 42M984 870l18-38 18 38"/>
+  </g>
+</svg>
