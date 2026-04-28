@@ -170,6 +170,11 @@ export function StorefrontClient({
     return () => window.removeEventListener("chezolive:catalog-search", handleCatalogSearch);
   }, []);
 
+  useEffect(() => {
+    setSearch(initialSearch);
+    setCategoryFilter(initialCategory || "all");
+  }, [initialCategory, initialSearch]);
+
   // ── Unique categories ──
   const categories = useMemo(() => {
     const cats = new Set(products.map((p) => p.category));
@@ -852,6 +857,36 @@ export function StorefrontClient({
             </select>
           </div>
 
+          <div className="catalog-market-layout">
+            {categories.length > 0 && (
+              <aside className="catalog-side-panel" aria-label={language === "fr" ? "Catégories du catalogue" : "Catalog categories"}>
+                <h3>{language === "fr" ? "Toutes les catégories" : "All categories"}</h3>
+                <button
+                  type="button"
+                  className={`catalog-side-link${categoryFilter === "all" ? " catalog-side-link--active" : ""}`}
+                  onClick={() => setCategoryFilter("all")}
+                >
+                  <span>{language === "fr" ? "Tout le catalogue" : "Full catalog"}</span>
+                  <span aria-hidden="true">→</span>
+                </button>
+                {categories.map((cat) => (
+                  <button
+                    type="button"
+                    key={cat}
+                    className={`catalog-side-link${categoryFilter === cat ? " catalog-side-link--active" : ""}`}
+                    onClick={() => setCategoryFilter(cat)}
+                  >
+                    <span>
+                      <span aria-hidden="true">{getCategoryEmoji(cat)}</span>{" "}
+                      {getLocalizedCategoryLabel(cat, language)}
+                    </span>
+                    <span aria-hidden="true">→</span>
+                  </button>
+                ))}
+              </aside>
+            )}
+
+            <div className="catalog-products-panel">
           {/* Filtres par catégorie */}
           {categories.length > 0 && (
             <div className="catalog-categories" role="group" aria-label={language === "fr" ? "Filtrer par catégorie" : "Filter by category"}>
@@ -1025,6 +1060,8 @@ export function StorefrontClient({
               )}
             </div>
           )}
+            </div>
+          </div>
         </section>
         ) : null}
 

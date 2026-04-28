@@ -40,6 +40,10 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
   const t = getDictionary(language);
 
+  if (user) {
+    redirect("/boutique");
+  }
+
   const productCards = products.map((p: CatalogProduct) => ({
     id: p.id,
     slug: p.slug,

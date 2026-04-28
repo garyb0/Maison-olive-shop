@@ -9880,8 +9880,7 @@ a.home-category-chip {
 }
 
 .app-shell--shop .catalog-categories {
-  gap: 0.45rem;
-  margin-bottom: 0.65rem;
+  display: none;
 }
 
 .app-shell--shop .catalog-cat-pill {
@@ -9904,10 +9903,77 @@ a.home-category-chip {
   font-size: 0.86rem;
 }
 
+.catalog-market-layout {
+  display: grid;
+  grid-template-columns: minmax(12.5rem, 16rem) minmax(0, 1fr);
+  gap: clamp(1rem, 2vw, 1.35rem);
+  align-items: start;
+  margin-top: 0.75rem;
+}
+
+.catalog-side-panel {
+  position: sticky;
+  top: 8.5rem;
+  display: grid;
+  gap: 0.25rem;
+  align-self: start;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: rgba(255, 253, 248, 0.86);
+  box-shadow: 0 12px 28px rgba(52, 42, 30, 0.07);
+  padding: 1rem;
+}
+
+.catalog-side-panel h3 {
+  margin: 0 0 0.45rem;
+  color: var(--olive-900);
+  font-family: var(--font-ui);
+  font-size: 1.02rem;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.catalog-side-link {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border: 0;
+  border-radius: 0.8rem;
+  background: transparent;
+  color: #413930;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 900;
+  padding: 0.7rem 0.65rem;
+  text-align: left;
+  transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+}
+
+.catalog-side-link:hover,
+.catalog-side-link--active {
+  background: var(--cream);
+  color: var(--olive-700);
+}
+
+.catalog-side-link:hover {
+  transform: translateX(2px);
+}
+
+.catalog-products-panel {
+  min-width: 0;
+}
+
 .app-shell--shop .grid-products {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: clamp(0.8rem, 1.5vw, 1rem);
+}
+
+.catalog-products-panel .grid-products {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .catalog-product-card {
@@ -10140,6 +10206,10 @@ a.home-category-chip {
   .app-shell--shop .grid-products {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+
+  .catalog-products-panel .grid-products {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 900px) {
@@ -10174,6 +10244,40 @@ a.home-category-chip {
 
   .app-shell--shop .grid-products {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .catalog-market-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .catalog-side-panel {
+    position: static;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    overflow-x: visible;
+    padding: 0.75rem;
+  }
+
+  .catalog-side-panel h3 {
+    flex: 1 0 100%;
+    align-self: center;
+    margin: 0 0 0.35rem;
+    white-space: nowrap;
+  }
+
+  .catalog-side-link {
+    width: auto;
+    flex: 0 0 auto;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: #fffdf8;
+    padding: 0.55rem 0.8rem;
+    white-space: nowrap;
+  }
+
+  .catalog-side-link > span:last-child {
+    display: none;
   }
 }
 
@@ -10275,6 +10379,14 @@ a.home-category-chip {
   }
 
   .app-shell--shop .grid-products {
+    grid-template-columns: 1fr;
+  }
+
+  .catalog-market-layout {
+    margin-top: 0.65rem;
+  }
+
+  .catalog-products-panel .grid-products {
     grid-template-columns: 1fr;
   }
 
