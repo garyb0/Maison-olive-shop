@@ -71,6 +71,7 @@ export function SiteFooter() {
               </p>
               <div className="site-footer__links">
                 <Link href="/">{t.navHome}</Link>
+                <Link href="/boutique">{language === "fr" ? "Boutique" : "Shop"}</Link>
                 <Link href="/faq">{language === "fr" ? "Centre d’aide" : "Help center"}</Link>
                 <Link href="/shipping">{language === "fr" ? "Livraison" : "Shipping"}</Link>
                 <Link href="/sell">{t.navSell}</Link>

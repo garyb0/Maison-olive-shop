@@ -17,7 +17,6 @@ export default async function AccountLayout({
     return (
       <div className="app-shell">
         <header className="topbar">
-          <div className="brand">{t.brandName}</div>
           <Navigation language={language} t={t} user={user} />
         </header>
         <section className="section account-access-card">
@@ -44,7 +43,6 @@ export default async function AccountLayout({
   return (
     <div className="app-shell">
       <header className="topbar">
-        <div className="brand">{t.brandName}</div>
         <Navigation language={language} t={t} user={user} />
       </header>
       <div className="admin-layout account-layout-shell">

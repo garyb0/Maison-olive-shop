@@ -17,7 +17,6 @@ export default async function AdminLayout({
     return (
       <div className="app-shell">
         <header className="topbar">
-          <div className="brand">{t.brandName}</div>
           <Navigation language={language} t={t} user={user} />
         </header>
         <section className="section">
@@ -36,7 +35,6 @@ export default async function AdminLayout({
   return (
     <div className="app-shell">
       <header className="topbar">
-        <div className="brand">{t.brandName}</div>
         <Navigation language={language} t={t} user={user} />
       </header>
       <div className="admin-layout">

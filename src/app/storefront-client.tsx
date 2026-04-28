@@ -49,6 +49,7 @@ type PromoBannerData = {
 };
 
 type Props = {
+  surface?: "home" | "shop";
   language: Language;
   t: Dictionary;
   user: CurrentUser | null;
@@ -57,6 +58,7 @@ type Props = {
   banners?: PromoBannerData[];
   initialRegisterEmail?: string;
   initialSearch?: string;
+  initialCategory?: string;
 };
 
 const CART_STORAGE_KEY = "chezolive_cart_v1";
@@ -108,6 +110,7 @@ function getLocalizedCategoryLabel(category: string, language: Language): string
 }
 
 export function StorefrontClient({
+  surface = "home",
   language,
   t,
   user,
@@ -115,7 +118,9 @@ export function StorefrontClient({
   banners = [],
   initialRegisterEmail = "",
   initialSearch = "",
+  initialCategory = "",
 }: Props) {
+  const isShopSurface = surface === "shop";
   const [cart, setCart] = useState<CartLine[]>([]);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [loginLoading, setLoginLoading] = useState(false);
@@ -131,7 +136,7 @@ export function StorefrontClient({
 
   // ── Catalog filters ──
   const [search, setSearch] = useState(initialSearch);
-  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState(initialCategory || "all");
   const [sortBy, setSortBy] = useState<SortBy>("newest");
 
   useEffect(() => {
@@ -232,8 +237,10 @@ export function StorefrontClient({
     [products],
   );
 
-  const focusCatalog = () => {
-    document.getElementById("catalogue")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const getCategoryHref = (category: { value: string; label: string; isFilterable: boolean }) => {
+    const params = new URLSearchParams();
+    params.set(category.isFilterable ? "category" : "q", category.isFilterable ? category.value : category.label);
+    return `/boutique?${params.toString()}`;
   };
 
   // ── Filtered + sorted products ──
@@ -388,14 +395,38 @@ export function StorefrontClient({
         </div>
       ))}
 
-      <div className="app-shell">
+      <div className={`app-shell ${isShopSurface ? "app-shell--shop" : "app-shell--home"}`}>
         <header className="topbar">
-          <div className="brand">{t.brandName}</div>
           <Navigation language={language} t={t} user={user} />
         </header>
 
         <PromoBanner language={language} banners={banners} />
 
+        {isShopSurface ? (
+          <section className="shop-hero" aria-labelledby="shop-hero-title">
+            <div className="shop-hero-copy">
+              <p className="home-eyebrow">
+                {language === "fr" ? "Boutique locale" : "Local shop"}
+              </p>
+              <h1 id="shop-hero-title">
+                {language === "fr"
+                  ? "Tout pour chiens et chats, sans détour."
+                  : "Everything for dogs and cats, without the detour."}
+              </h1>
+              <p>
+                {language === "fr"
+                  ? "Recherche, catégories et produits sont regroupés ici pour magasiner vite, comparer clairement et passer au panier sans revenir dans l’accueil."
+                  : "Search, categories, and products live here so you can shop quickly, compare clearly, and move to cart without returning home."}
+              </p>
+            </div>
+            <div className="shop-hero-panel" aria-label={language === "fr" ? "Résumé boutique" : "Shop summary"}>
+              <strong>{products.length > 0 ? products.length : language === "fr" ? "Bientôt" : "Soon"}</strong>
+              <span>{language === "fr" ? "produits actifs" : "active products"}</span>
+              <small>{language === "fr" ? "Livraison locale Rimouski" : "Local Rimouski delivery"}</small>
+            </div>
+          </section>
+        ) : (
+          <>
         <section className="home-hero" aria-labelledby="home-hero-title">
           <div className="home-hero-media">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -427,9 +458,9 @@ export function StorefrontClient({
                 : "Carefully selected products for your dogs and cats, local businesses, and a simple, warm, reliable shopping experience."}
             </p>
             <div className="home-hero-actions">
-              <a className="btn home-hero-primary" href="#catalogue">
+              <Link className="btn home-hero-primary" href="/boutique">
                 {language === "fr" ? "Magasiner maintenant" : "Shop now"}
-              </a>
+              </Link>
               <Link className="btn btn-secondary home-hero-secondary" href="/sell">
                 {language === "fr" ? "Découvrir les entreprises locales" : "Discover local businesses"}
               </Link>
@@ -437,24 +468,19 @@ export function StorefrontClient({
             <div className="home-category-strip" aria-label={language === "fr" ? "Catégories en vedette" : "Featured categories"}>
               {heroCategoryItems.map((category) =>
                 category.isFilterable ? (
-                  <button
-                    type="button"
+                  <Link
                     key={category.key}
-                    className={`home-category-chip${categoryFilter === category.value ? " home-category-chip--active" : ""}`}
-                    onClick={() => {
-                      setSearch("");
-                      setCategoryFilter(category.value);
-                      focusCatalog();
-                    }}
+                    className="home-category-chip"
+                    href={getCategoryHref(category)}
                   >
                     <span aria-hidden="true">{category.emoji}</span>
                     {category.label}
-                  </button>
+                  </Link>
                 ) : (
-                  <span className="home-category-chip" key={category.key}>
+                  <Link className="home-category-chip" href={getCategoryHref(category)} key={category.key}>
                     <span aria-hidden="true">{category.emoji}</span>
                     {category.label}
-                  </span>
+                  </Link>
                 ),
               )}
             </div>
@@ -535,9 +561,9 @@ export function StorefrontClient({
                   {language === "fr" ? "Disponibles maintenant" : "Available now"}
                 </h2>
               </div>
-              <a className="home-section-link" href="#catalogue">
+              <Link className="home-section-link" href="/boutique">
                 {language === "fr" ? "Voir toute la boutique" : "View full shop"}
-              </a>
+              </Link>
             </div>
 
             <div className="home-rail-grid">
@@ -795,8 +821,11 @@ export function StorefrontClient({
             </div>
           </section>
         )}
+          </>
+        )}
 
         {/* ── Catalogue ── */}
+        {isShopSurface ? (
         <section className="section catalog-section" id="catalogue">
           {/* Titre + toolbar */}
           <div className="catalog-header">
@@ -1005,6 +1034,7 @@ export function StorefrontClient({
             </div>
           )}
         </section>
+        ) : null}
 
       </div>
     </>

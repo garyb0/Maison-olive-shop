@@ -158,11 +158,11 @@ export function Navigation({ language, t, user, onLogout }: Props) {
 
   const runCatalogSearch = useCallback((value: string) => {
     const query = value.trim();
-    const target = query ? `/?q=${encodeURIComponent(query)}#catalogue` : "/#catalogue";
+    const target = query ? `/boutique?q=${encodeURIComponent(query)}` : "/boutique";
 
     setMenuOpen(false);
 
-    if (pathname === "/") {
+    if (pathname.startsWith("/boutique")) {
       window.dispatchEvent(new CustomEvent("chezolive:catalog-search", { detail: query }));
       document.getElementById("catalogue")?.scrollIntoView({ behavior: "smooth", block: "start" });
       window.history.replaceState(null, "", target);
@@ -194,117 +194,109 @@ export function Navigation({ language, t, user, onLogout }: Props) {
 
       {/* ── Nav-body : toujours rendu, CSS gère mobile/desktop ── */}
       <div className="nav-body">
-          <form
-            className="nav-search"
-            role="search"
-            onSubmit={handleCatalogSearchSubmit}
+        <nav className="nav-primary" aria-label={language === "fr" ? "Navigation principale" : "Main navigation"}>
+          <Link className={`pill-link${isActive("/") ? " pill-link--active" : ""}`} href="/">
+            {t.navHome}
+          </Link>
+          <Link className={`pill-link pill-link--shop${isActive("/boutique") ? " pill-link--active" : ""}`} href="/boutique">
+            {language === "fr" ? "Boutique" : "Shop"}
+          </Link>
+          <Link className={`pill-link pill-link--sell${isActive("/sell") ? " pill-link--active" : ""}`} href="/sell">
+            {language === "fr" ? "Vendre" : "Sell"}
+          </Link>
+        </nav>
+
+        <form
+          className="nav-search"
+          role="search"
+          onSubmit={handleCatalogSearchSubmit}
+        >
+          <span className="nav-search-icon" aria-hidden="true">🔍</span>
+          <input
+            className="nav-search-input"
+            type="search"
+            value={catalogSearch}
+            onChange={(event) => setCatalogSearch(event.target.value)}
+            placeholder={language === "fr" ? "Chercher un produit" : "Search products"}
+            aria-label={language === "fr" ? "Rechercher dans la boutique" : "Search the shop"}
+            suppressHydrationWarning
+          />
+          <button
+            className="nav-search-submit"
+            type="submit"
+            aria-label={language === "fr" ? "Lancer la recherche" : "Run search"}
           >
-            <span className="nav-search-icon" aria-hidden="true">🔍</span>
-            <input
-              className="nav-search-input"
-              type="search"
-              value={catalogSearch}
-              onChange={(event) => setCatalogSearch(event.target.value)}
-              placeholder={language === "fr" ? "Chercher croquettes, jouets..." : "Search food, toys..."}
-              aria-label={language === "fr" ? "Rechercher dans la boutique" : "Search the shop"}
-              suppressHydrationWarning
-            />
-            <button
-              className="nav-search-submit"
-              type="submit"
-              aria-label={language === "fr" ? "Lancer la recherche" : "Run search"}
-            >
-              →
-            </button>
-          </form>
+            →
+          </button>
+        </form>
 
-          {/* Liens principaux */}
-          <nav className="nav-primary" aria-label={language === "fr" ? "Navigation principale" : "Main navigation"}>
-            <Link className={`pill-link pill-link--home${isActive("/") ? " pill-link--active" : ""}`} href="/">
-              🏠 {t.navHome}
-            </Link>
-            <Link className="pill-link pill-link--shop" href="/#catalogue">
-              {language === "fr" ? "Magasiner" : "Shop"}
-            </Link>
-            <Link className={`pill-link${isActive("/account") ? " pill-link--active" : ""}`} href="/account">
-              👤 {t.navAccount}
-            </Link>
-            {user?.role === "ADMIN" && (
-              <Link className={`pill-link pill-link--admin${isActive("/admin") ? " pill-link--active" : ""}`} href="/admin">
-                ⚙️ {t.navAdmin}
-              </Link>
-            )}
-          </nav>
+        <Link className="nav-location-pill" href="/boutique">
+          <span aria-hidden="true">📍</span>
+          <span>Rimouski</span>
+        </Link>
 
-          {/* Séparateur */}
-          <span className="nav-sep" aria-hidden="true" />
-
-          {/* Liens secondaires */}
-          <nav className="nav-secondary" aria-label={language === "fr" ? "Navigation secondaire" : "Secondary navigation"}>
-            <Link className={`pill-link pill-link--sm${isActive("/faq") ? " pill-link--active" : ""}`} href="/faq">
-              {t.navFaq}
-            </Link>
-          </nav>
-
-          <Link className="nav-location-pill" href="/#catalogue">
-            <span aria-hidden="true">📍</span>
-            <span>Rimouski</span>
+        <div className="nav-actions">
+          <Link className={`pill-link pill-link--sm${isActive("/faq") ? " pill-link--active" : ""}`} href="/faq">
+            {t.navFaq}
           </Link>
 
-          <div className="nav-sell-center">
-            <Link className={`pill-link pill-link--sm pill-link--sell${isActive("/sell") ? " pill-link--active" : ""}`} href="/sell">
-              🌿 {t.navSell}
-            </Link>
-          </div>
+          <select
+            className="nav-lang-select"
+            value={language}
+            disabled={langLoading}
+            onChange={(e) => void onLanguageChange(e.target.value as Language)}
+            aria-label={language === "fr" ? "Langue" : "Language"}
+          >
+            <option value="fr">FR</option>
+            <option value="en">EN</option>
+          </select>
 
-          {/* Actions : langue + logout + panier */}
-          <div className="nav-actions">
-            <div className="nav-actions-top">
-              <select
-                className="nav-lang-select"
-                value={language}
-                disabled={langLoading}
-                onChange={(e) => void onLanguageChange(e.target.value as Language)}
-                aria-label={language === "fr" ? "Langue" : "Language"}
-              >
-                <option value="fr">🇫🇷 FR</option>
-                <option value="en">🇬🇧 EN</option>
-              </select>
-
+          <details className={`nav-account-menu${isActive("/account") || isActive("/admin") || isActive("/login") ? " nav-account-menu--active" : ""}`}>
+            <summary className="nav-account-trigger">
+              <span className="nav-account-icon" aria-hidden="true">👤</span>
+              <span className="nav-account-label">{user ? t.navAccount : t.login}</span>
+              {user?.role === "ADMIN" ? (
+                <span className="nav-admin-badge">{t.navAdmin}</span>
+              ) : null}
+            </summary>
+            <div className="nav-account-popover">
+              <Link href={user ? "/account" : "/login"}>
+                {user ? t.navAccount : t.login}
+              </Link>
+              {user?.role === "ADMIN" ? (
+                <Link href="/admin">{t.navAdmin}</Link>
+              ) : null}
               {user ? (
                 <button
-                  className="nav-logout-inline"
+                  className="nav-account-logout"
                   onClick={() => void handleLogout()}
                   disabled={logoutLoading}
                   type="button"
-                  aria-label={language === "fr" ? "Se déconnecter" : "Sign out"}
                 >
-                  <span className="nav-logout-inline-icon" aria-hidden="true" />
-                  <span className="nav-logout-inline-tooltip" aria-hidden="true">
-                    {logoutLoading
-                      ? "…"
-                      : language === "fr"
-                        ? "Déconnexion"
-                        : "Sign out"}
-                  </span>
+                  {logoutLoading
+                    ? "..."
+                    : language === "fr"
+                      ? "Déconnexion"
+                      : "Sign out"}
                 </button>
               ) : null}
             </div>
+          </details>
 
-            <Link
-              href="/cart"
-              className={`nav-cart-btn${cartBump ? " nav-cart-bump" : ""}${isActive("/cart") ? " nav-cart-btn--active" : ""}`}
-              aria-label={
-                language === "fr"
-                  ? `Panier — ${cartCount} article${cartCount !== 1 ? "s" : ""}`
-                  : `Cart — ${cartCount} item${cartCount !== 1 ? "s" : ""}`
-              }
-            >
-              🛒
-              <span className={`nav-cart-count${cartCount === 0 ? " nav-cart-empty" : ""}`}>
-                {cartCount}
-              </span>
-            </Link>
+          <Link
+            href="/cart"
+            className={`nav-cart-btn${cartBump ? " nav-cart-bump" : ""}${isActive("/cart") ? " nav-cart-btn--active" : ""}`}
+            aria-label={
+              language === "fr"
+                ? `Panier — ${cartCount} article${cartCount !== 1 ? "s" : ""}`
+                : `Cart — ${cartCount} item${cartCount !== 1 ? "s" : ""}`
+            }
+          >
+            🛒
+            <span className={`nav-cart-count${cartCount === 0 ? " nav-cart-empty" : ""}`}>
+              {cartCount}
+            </span>
+          </Link>
           </div>
         </div>
 
@@ -401,7 +393,7 @@ export function Navigation({ language, t, user, onLogout }: Props) {
 
             <Link
               className="nav-drawer-local-chip"
-              href="/#catalogue"
+              href="/boutique"
               onClick={() => setMenuOpen(false)}
             >
               <span aria-hidden="true">📍</span>
@@ -419,12 +411,12 @@ export function Navigation({ language, t, user, onLogout }: Props) {
               </Link>
 
               <Link
-                className={`nav-drawer-link${isActive("/account") ? " nav-drawer-link--active" : ""}`}
-                href="/account"
+                className={`nav-drawer-link${isActive("/account") || isActive("/login") ? " nav-drawer-link--active" : ""}`}
+                href={user ? "/account" : "/login"}
                 onClick={() => setMenuOpen(false)}
               >
                 <span className="nav-drawer-link-icon" aria-hidden="true">👤</span>
-                <span>{t.navAccount}</span>
+                <span>{user ? t.navAccount : t.login}</span>
               </Link>
 
               {user?.role === "ADMIN" && (
@@ -439,8 +431,8 @@ export function Navigation({ language, t, user, onLogout }: Props) {
               )}
 
               <Link
-                className="nav-drawer-link nav-drawer-link--shop"
-                href="/#catalogue"
+                className={`nav-drawer-link nav-drawer-link--shop${isActive("/boutique") ? " nav-drawer-link--active" : ""}`}
+                href="/boutique"
                 onClick={() => setMenuOpen(false)}
               >
                 <span className="nav-drawer-link-icon" aria-hidden="true">🛍️</span>

@@ -186,8 +186,8 @@ export default async function ProductDetailsPage({ params, searchParams }: Produ
               <Link className="btn btn-secondary" href="/cart">
                 {language === "fr" ? "Voir le panier" : "View cart"}
               </Link>
-              <Link className="btn btn-secondary" href="/#catalogue">
-                {language === "fr" ? "Retour au catalogue" : "Back to catalog"}
+              <Link className="btn btn-secondary" href="/boutique">
+                {language === "fr" ? "Retour à la boutique" : "Back to shop"}
               </Link>
             </div>
             <div className="olive-product-purchase-note">

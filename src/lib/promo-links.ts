@@ -7,6 +7,7 @@ const PUBLIC_PROMO_ROUTE_PATTERNS = [
   /^\/account\/profile$/,
   /^\/account\/subscriptions$/,
   /^\/account\/support$/,
+  /^\/boutique$/,
   /^\/cart$/,
   /^\/checkout$/,
   /^\/dog\/[^/]+$/,
@@ -23,7 +24,7 @@ const PUBLIC_PROMO_ROUTE_PATTERNS = [
 ];
 
 export const PROMO_CTA_LINK_HELP_TEXT =
-  "Exemples valides: /, /checkout, /faq, /shipping, /products/nom-du-produit";
+  "Exemples valides: /, /boutique, /checkout, /faq, /shipping, /products/nom-du-produit";
 
 function extractPathname(rawValue: string): string | null {
   const trimmed = rawValue.trim();

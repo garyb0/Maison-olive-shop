@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/auth";
 import { getActiveProducts } from "@/lib/catalog";
 import { formatCurrency } from "@/lib/format";
@@ -7,27 +8,27 @@ import { prisma } from "@/lib/prisma";
 import { localizePromoBanner } from "@/lib/promo-banners";
 import { getCatalogPreparationBanner } from "@/lib/promo-banner-fallback";
 import { StorefrontClient } from "@/app/storefront-client";
-import { redirect } from "next/navigation";
 
 type CatalogProduct = Awaited<ReturnType<typeof getActiveProducts>>[number];
 
-type HomePageProps = {
+type BoutiquePageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
+
+export const metadata: Metadata = {
+  title: "Boutique",
+  description: "Magasiner les produits locaux pour chiens et chats chez Chez Olive.",
+  alternates: {
+    canonical: "/boutique",
+  },
 };
 
 function getSearchParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
 
-export default async function HomePage({ searchParams }: HomePageProps) {
+export default async function BoutiquePage({ searchParams }: BoutiquePageProps) {
   const query = searchParams ? await searchParams : {};
-  const initialSearch = (getSearchParam(query.q) ?? getSearchParam(query.search) ?? "").trim();
-
-  if (initialSearch) {
-    const params = new URLSearchParams({ q: initialSearch });
-    redirect(`/boutique?${params.toString()}`);
-  }
-
   const [language, user, products, rawBanners] = await Promise.all([
     getCurrentLanguage(),
     getCurrentUser(),
@@ -58,18 +59,16 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         ...localizePromoBanner(b, language),
       }));
 
-  const oliveMode = (process.env.OLIVE_MODE as "princess" | "gremlin") || "princess";
-  const initialRegisterEmail = getSearchParam(query.registerEmail)?.trim() ?? "";
-
   return (
     <StorefrontClient
+      surface="shop"
       language={language}
       t={t}
       user={user}
       products={productCards}
-      oliveMode={oliveMode}
       banners={banners}
-      initialRegisterEmail={initialRegisterEmail}
+      initialSearch={(getSearchParam(query.q) ?? getSearchParam(query.search) ?? "").trim()}
+      initialCategory={(getSearchParam(query.category) ?? "").trim()}
     />
   );
 }

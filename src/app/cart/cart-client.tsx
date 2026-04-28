@@ -229,7 +229,7 @@ export function CartClient({
                 : "Browse the local selection and add your companion’s essentials."}
             </p>
           </div>
-          <Link className="btn cart-empty-shop-btn" href="/#catalogue">
+          <Link className="btn cart-empty-shop-btn" href="/boutique">
             {language === "fr" ? "Retour à la boutique" : "Back to shop"}
           </Link>
         </section>
@@ -280,7 +280,7 @@ export function CartClient({
                   <p className="home-eyebrow">{language === "fr" ? "Sélection" : "Selection"}</p>
                   <h2>{language === "fr" ? "Articles à commander" : "Items to order"}</h2>
                 </div>
-                <Link className="cart-continue-link cart-continue-link--top" href="/#catalogue">
+                <Link className="cart-continue-link cart-continue-link--top" href="/boutique">
                   {language === "fr" ? "Continuer mes achats" : "Continue shopping"}
                 </Link>
               </div>
