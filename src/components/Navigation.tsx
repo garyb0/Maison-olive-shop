@@ -29,8 +29,8 @@ function BrandWordmark({ language }: { language: Language }) {
       </span>
       <small>
         {language === "fr"
-          ? "Le marché local pour chiens et chats"
-          : "The local market for dogs and cats"}
+          ? "De notre famille à la vôtre"
+          : "From our family to yours"}
       </small>
     </span>
   );
