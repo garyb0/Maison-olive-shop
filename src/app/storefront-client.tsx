@@ -402,30 +402,7 @@ export function StorefrontClient({
 
         {!isShopSurface ? <PromoBanner language={language} banners={banners} /> : null}
 
-        {isShopSurface ? (
-          <section className="shop-hero" aria-labelledby="shop-hero-title">
-            <div className="shop-hero-copy">
-              <p className="home-eyebrow">
-                {language === "fr" ? "Boutique locale" : "Local shop"}
-              </p>
-              <h1 id="shop-hero-title">
-                {language === "fr"
-                  ? "Tout pour chiens et chats, sans détour."
-                  : "Everything for dogs and cats, without the detour."}
-              </h1>
-              <p>
-                {language === "fr"
-                  ? "Recherche, catégories et produits sont regroupés ici pour magasiner vite, comparer clairement et passer au panier sans revenir dans l’accueil."
-                  : "Search, categories, and products live here so you can shop quickly, compare clearly, and move to cart without returning home."}
-              </p>
-            </div>
-            <div className="shop-hero-panel" aria-label={language === "fr" ? "Résumé boutique" : "Shop summary"}>
-              <strong>{products.length > 0 ? products.length : language === "fr" ? "Bientôt" : "Soon"}</strong>
-              <span>{language === "fr" ? "produits actifs" : "active products"}</span>
-              <small>{language === "fr" ? "Livraison locale Rimouski" : "Local Rimouski delivery"}</small>
-            </div>
-          </section>
-        ) : (
+        {isShopSurface ? null : (
           <>
         <section className="home-hero" aria-labelledby="home-hero-title">
           <div className="home-hero-media">
