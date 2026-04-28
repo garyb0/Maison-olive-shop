@@ -894,79 +894,89 @@ export function StorefrontClient({
             <div className="grid-products">
               {filteredProducts.map((product) => (
                 <article
-                  className={`card glow-border${addingId === product.id ? " card--adding" : ""}`}
+                  className={`catalog-product-card${addingId === product.id ? " catalog-product-card--adding" : ""}`}
                   key={product.id}
                 >
                   {/* Visuel — image ou emoji de catégorie */}
-                  <div className="card-visual">
+                  <Link className="catalog-product-media" href={`/products/${product.slug}`}>
                     {product.imageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={product.imageUrl} alt={product.name} className="card-img" />
+                      <img src={product.imageUrl} alt={product.name} className="catalog-product-img" />
                     ) : (
-                      <div className="card-img-emoji">{getCategoryEmoji(product.category)}</div>
+                      <span className="catalog-product-emoji" aria-hidden="true">{getCategoryEmoji(product.category)}</span>
                     )}
-                  </div>
+                  </Link>
 
                   {/* Badges : catégorie + stock */}
-                  <div className="card-badges-row">
-                    <span className="badge">{getLocalizedCategoryLabel(product.category, language)}</span>
+                  <div className="catalog-product-meta">
+                    <span className="catalog-product-category">{getLocalizedCategoryLabel(product.category, language)}</span>
                     {product.stock === 0 ? (
-                      <span className="stock-badge stock-badge--out">
+                      <span className="catalog-stock-pill catalog-stock-pill--out">
                         {language === "fr" ? "Rupture" : "Out of stock"}
                       </span>
                     ) : product.stock <= 3 ? (
-                      <span className="stock-badge stock-badge--low">
-                        ⚡ {language === "fr"
+                      <span className="catalog-stock-pill catalog-stock-pill--low">
+                        {language === "fr"
                           ? `${product.stock} restant${product.stock > 1 ? "s" : ""}`
                           : `${product.stock} left`}
                       </span>
                     ) : (
-                      <span className="stock-badge stock-badge--in">
+                      <span className="catalog-stock-pill catalog-stock-pill--in">
                         {language === "fr" ? "En stock" : "In stock"}
                       </span>
                     )}
                   </div>
 
-                  <h3>{product.name}</h3>
-                  <p className="small">{product.description}</p>
-                  <p className="card-price">
-                    <strong>{product.priceLabel}</strong>
-                  </p>
+                  <div className="catalog-product-copy">
+                    <Link href={`/products/${product.slug}`} className="catalog-product-name">
+                      {product.name}
+                    </Link>
+                    <p>{product.description}</p>
+                  </div>
+
                   {/* Ajout au panier */}
-                  <div className="card-add-row">
-                    <input
-                      className="input card-qty-input"
-                      type="number"
-                      min={1}
-                      max={Math.max(1, product.stock)}
-                      value={quantities[product.id] ?? 1}
-                      onChange={(e) =>
-                        setQuantities((current) => ({
-                          ...current,
-                          [product.id]: Math.max(1, Number(e.target.value) || 1),
-                        }))
-                      }
-                      disabled={product.stock === 0}
-                    />
-                    <button
-                      className="btn card-add-btn"
-                      onClick={(e) => {
-                        const rect = e.currentTarget.getBoundingClientRect();
-                        addToCart(product, rect.left + rect.width / 2, rect.top + rect.height / 2);
-                      }}
-                      type="button"
-                      disabled={product.stock === 0 || addingId === product.id}
-                    >
-                      {addingId === product.id
-                        ? language === "fr"
-                          ? "✓ Ajouté !"
-                          : "✓ Added!"
-                        : t.addToCart}
-                    </button>
+                  <div className="catalog-product-footer">
+                    <strong className="catalog-product-price">{product.priceLabel}</strong>
+                    <div className="catalog-product-actions">
+                      <input
+                        className="catalog-product-qty"
+                        type="number"
+                        min={1}
+                        max={Math.max(1, product.stock)}
+                        value={quantities[product.id] ?? 1}
+                        onChange={(e) =>
+                          setQuantities((current) => ({
+                            ...current,
+                            [product.id]: Math.max(1, Number(e.target.value) || 1),
+                          }))
+                        }
+                        disabled={product.stock === 0}
+                        aria-label={language === "fr" ? `Quantité pour ${product.name}` : `Quantity for ${product.name}`}
+                      />
+                      <button
+                        className="catalog-product-add"
+                        onClick={(e) => {
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          addToCart(product, rect.left + rect.width / 2, rect.top + rect.height / 2);
+                        }}
+                        type="button"
+                        disabled={product.stock === 0 || addingId === product.id}
+                      >
+                        {product.stock === 0
+                          ? language === "fr"
+                            ? "Indisponible"
+                            : "Unavailable"
+                          : addingId === product.id
+                            ? language === "fr"
+                              ? "Ajouté"
+                              : "Added"
+                            : t.addToCart}
+                      </button>
+                    </div>
                   </div>
 
                   {/* Lien vers la fiche détaillée */}
-                  <Link href={`/products/${product.slug}`} className="card-view-link">
+                  <Link href={`/products/${product.slug}`} className="catalog-product-view">
                     {language === "fr" ? "Voir le produit →" : "View product →"}
                   </Link>
                 </article>
