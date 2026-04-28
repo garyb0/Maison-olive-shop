@@ -9923,7 +9923,7 @@ button.home-category-chip:hover,
 }
 
 .nav-marketplace--light .nav-marketplace-main {
-  grid-template-columns: max-content minmax(240px, 1fr) auto;
+  grid-template-columns: max-content max-content minmax(220px, 1fr) auto;
   gap: 0.8rem;
   padding: 0.9rem 1rem;
 }
@@ -9990,7 +9990,7 @@ button.home-category-chip:hover,
 
 .nav-marketplace-main {
   display: grid;
-  grid-template-columns: max-content minmax(260px, 1fr) auto;
+  grid-template-columns: max-content max-content minmax(240px, 1fr) auto;
   align-items: center;
   gap: clamp(0.85rem, 1.6vw, 1.35rem);
   padding: 1.2rem clamp(1rem, 2vw, 1.45rem) 1rem;
@@ -10085,12 +10085,11 @@ button.home-category-chip:hover,
   min-width: 0;
 }
 
-.nav-marketplace-primary-links {
+.nav-marketplace-main-links {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
-  border-top: 1px solid rgba(234, 220, 201, 0.78);
-  padding: 0.55rem clamp(1rem, 2vw, 1.45rem) 0.65rem;
+  gap: 0.35rem;
+  min-width: 0;
 }
 
 .nav-marketplace-link {
@@ -10117,7 +10116,16 @@ button.home-category-chip:hover,
 }
 
 .nav-marketplace-link--shop {
-  color: var(--terracotta);
+  border-color: rgba(84, 93, 46, 0.2);
+  background: rgba(84, 93, 46, 0.1);
+  color: var(--olive-900);
+}
+
+.nav-marketplace-link--shop:hover,
+.nav-marketplace-link--shop.nav-marketplace-link--active {
+  border-color: rgba(84, 93, 46, 0.3);
+  background: var(--olive-700);
+  color: #fff;
 }
 
 .nav-marketplace-action,
@@ -10669,12 +10677,12 @@ a.home-category-chip {
 
 @media (max-width: 1180px) {
   .nav-marketplace-main {
-    grid-template-columns: max-content minmax(200px, 1fr) auto;
+    grid-template-columns: max-content max-content minmax(180px, 1fr) auto;
     gap: 0.9rem;
   }
 
   .nav-marketplace--light .nav-marketplace-main {
-    grid-template-columns: max-content minmax(200px, 1fr) auto;
+    grid-template-columns: max-content max-content minmax(180px, 1fr) auto;
   }
 
   .nav-marketplace-logo {
@@ -10719,6 +10727,10 @@ a.home-category-chip {
     padding-inline: 0.42rem;
   }
 
+  .nav-marketplace-main-links .nav-marketplace-link:not(.nav-marketplace-link--shop) {
+    display: none;
+  }
+
   .nav-marketplace--light .nav-marketplace-action-icon,
   .nav-marketplace--light .nav-marketplace-cart > span {
     display: none;
@@ -10760,7 +10772,7 @@ a.home-category-chip {
     display: none;
   }
 
-  .nav-marketplace-primary-links {
+  .nav-marketplace-main-links {
     display: none;
   }
 

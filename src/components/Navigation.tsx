@@ -215,6 +215,21 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
             <BrandWordmark language={language} />
           </Link>
 
+          <nav className="nav-marketplace-main-links" aria-label={language === "fr" ? "Navigation principale" : "Main navigation"}>
+            <Link className={`nav-marketplace-link${isActive("/") ? " nav-marketplace-link--active" : ""}`} href={HOME_HREF}>
+              {t.navHome}
+            </Link>
+            <Link className={`nav-marketplace-link nav-marketplace-link--shop${isActive("/boutique") || isActive("/shop") ? " nav-marketplace-link--active" : ""}`} href="/boutique">
+              {language === "fr" ? "Boutique" : "Shop"}
+            </Link>
+            <Link className={`nav-marketplace-link${isActive("/sell") ? " nav-marketplace-link--active" : ""}`} href="/sell">
+              {language === "fr" ? "Vendre" : "Sell"}
+            </Link>
+            <Link className={`nav-marketplace-link${isActive("/faq") ? " nav-marketplace-link--active" : ""}`} href="/faq">
+              {t.navFaq}
+            </Link>
+          </nav>
+
           <form
             className="nav-marketplace-search"
             role="search"
@@ -228,7 +243,7 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
               type="search"
               value={catalogSearch}
               onChange={(event) => setCatalogSearch(event.target.value)}
-              placeholder={language === "fr" ? "Rechercher un produit, une marque ou un vendeur..." : "Search a product, brand, or seller..."}
+              placeholder={language === "fr" ? "Rechercher un produit..." : "Search products..."}
               aria-label={language === "fr" ? "Rechercher dans la boutique" : "Search the shop"}
               suppressHydrationWarning
             />
@@ -333,21 +348,6 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
             </button>
           </div>
         </div>
-
-        <nav className="nav-marketplace-primary-links" aria-label={language === "fr" ? "Navigation principale" : "Main navigation"}>
-          <Link className={`nav-marketplace-link${isActive("/") ? " nav-marketplace-link--active" : ""}`} href={HOME_HREF}>
-            {t.navHome}
-          </Link>
-          <Link className={`nav-marketplace-link nav-marketplace-link--shop${isActive("/boutique") || isActive("/shop") ? " nav-marketplace-link--active" : ""}`} href="/boutique">
-            {language === "fr" ? "Boutique" : "Shop"}
-          </Link>
-          <Link className={`nav-marketplace-link${isActive("/sell") ? " nav-marketplace-link--active" : ""}`} href="/sell">
-            {language === "fr" ? "Vendre" : "Sell"}
-          </Link>
-          <Link className={`nav-marketplace-link${isActive("/faq") ? " nav-marketplace-link--active" : ""}`} href="/faq">
-            {t.navFaq}
-          </Link>
-        </nav>
 
         {mounted && isMobile && (
           <>
