@@ -7650,9 +7650,9 @@ tr:last-child td {
   pointer-events: none;
   opacity: 0.26;
   background-image: image-set(url("/images/rikibackground.webp") type("image/webp"), url("/images/rikibackground.png") type("image/png"));
-  background-position: center top;
+  background-position: center center;
   background-repeat: no-repeat;
-  background-size: min(1536px, 100vw) auto;
+  background-size: contain;
   filter: grayscale(1);
   mix-blend-mode: multiply;
 }
@@ -8140,12 +8140,6 @@ button.home-category-chip:hover,
   .site-footer__mascot {
     width: 8.5rem;
     height: 8.5rem;
-  }
-}
-
-@media (max-width: 760px) {
-  .app-shell--home::before {
-    background-size: max(980px, 250vw) auto;
   }
 }
 
