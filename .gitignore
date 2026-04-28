@@ -12,6 +12,10 @@
 
 # testing
 /coverage
+/playwright-report
+/test-results
+/audit-output
+/output
 
 # next.js
 /.next/
@@ -25,21 +29,48 @@
 *.pem
 *.bundle
 
+# maintenance lock file (état dynamique, ne pas versionner)
+.maintenance-lock
+logs/
+
 # debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+.next-dev*.log
 
 # env files (can opt-in for committing if needed)
 .env*
 !.env.production.example
+scripts/windows/cloudflare-ddns.env
+cloudflared-config.yml
+*.cloudflared.json
+tools/cloudflared.exe
 
 # local database files
-dev.db
+/*.db
+*.db
+*.db-*
+*.db.*
+*.sqlite
+*.sqlite3
 *.db-journal
 /backups/*.db
 /backups/*.db.json
+/backups/delivery-checkpoints/
+
+# local scratch/generated files
+/--env=development/
+/Logo/
+/chez_olive_codex_maquette/
+_inspect*.txt
+codex-stuck.patch
+reset-password-script.js
+*.tmp
+*.new
+/public/dogs/
+/public/[0-9a-f][0-9a-f]*-*.png
 
 # vercel
 .vercel
