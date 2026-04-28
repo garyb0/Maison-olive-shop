@@ -520,15 +520,15 @@ export function StorefrontClient({
                 ? "Des produits sélectionnés pour chiens et chats, avec livraison locale à Rimouski et paiement sécurisé."
                 : "Selected products for dogs and cats, with local Rimouski delivery and secure payment."}
             </p>
-          </div>
 
-          <div className="home-market-stats">
-            {marketHighlights.map((item) => (
-              <article key={item.label}>
-                <strong>{item.value}</strong>
-                <span>{item.label}</span>
-              </article>
-            ))}
+            <div className="home-market-stats">
+              {marketHighlights.map((item) => (
+                <article key={item.label}>
+                  <strong>{item.value}</strong>
+                  <span>{item.label}</span>
+                </article>
+              ))}
+            </div>
           </div>
 
           <div className="home-local-promises">
