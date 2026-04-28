@@ -402,7 +402,20 @@ export function StorefrontClient({
 
       <div className={`app-shell ${isShopSurface ? "app-shell--shop" : "app-shell--home"}`}>
         <header className="topbar">
-          <Navigation language={language} t={t} user={user} />
+          <Navigation
+            language={language}
+            t={t}
+            user={user}
+            catalogCategories={
+              isShopSurface
+                ? categories.map((category) => ({
+                    value: category,
+                    label: getLocalizedCategoryLabel(category, language),
+                    emoji: getCategoryEmoji(category),
+                  }))
+                : undefined
+            }
+          />
         </header>
 
         {!isShopSurface ? <PromoBanner language={language} banners={banners} /> : null}

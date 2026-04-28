@@ -11,10 +11,17 @@ const CART_STORAGE_KEY = "chezolive_cart_v1";
 
 type CartLine = { productId: string; quantity: number };
 
+type NavigationCatalogCategory = {
+  value: string;
+  label: string;
+  emoji: string;
+};
+
 type Props = {
   language: Language;
   t: Dictionary;
   user: Pick<CurrentUser, "role"> | null;
+  catalogCategories?: NavigationCatalogCategory[];
   /** Optional custom logout handler */
   onLogout?: () => void;
 };
@@ -36,7 +43,7 @@ function BrandWordmark({ language }: { language: Language }) {
   );
 }
 
-export function Navigation({ language, t, user, onLogout }: Props) {
+export function Navigation({ language, t, user, catalogCategories = [], onLogout }: Props) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [cartCount, setCartCount] = useState(0);
@@ -116,67 +123,14 @@ export function Navigation({ language, t, user, onLogout }: Props) {
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
   const isMarketplaceHeader = pathname.startsWith("/boutique");
-  const currentQuery = (searchParams.get("q") ?? "").trim().toLowerCase();
   const currentCategory = (searchParams.get("category") ?? "").trim().toLowerCase();
-  const marketplaceCategories = [
-    {
-      key: "dogs",
-      icon: "🐾",
-      label: language === "fr" ? "Chiens" : "Dogs",
-      href: "/boutique?q=chien",
-      active: currentQuery === "chien" || currentQuery === "dog",
-    },
-    {
-      key: "cats",
-      icon: "🐱",
-      label: language === "fr" ? "Chats" : "Cats",
-      href: "/boutique?q=chat",
-      active: currentQuery === "chat" || currentQuery === "cat",
-    },
-    {
-      key: "toys",
-      icon: "🪢",
-      label: language === "fr" ? "Jouets" : "Toys",
-      href: "/boutique?category=Toys",
-      active: currentCategory === "toys" || currentCategory === "jouets" || currentQuery === "jouet" || currentQuery === "toy",
-    },
-    {
-      key: "treats",
-      icon: "🦴",
-      label: language === "fr" ? "Friandises" : "Treats",
-      href: "/boutique?q=friandise",
-      active: currentQuery === "friandise" || currentQuery === "treat",
-    },
-    {
-      key: "beds",
-      icon: "🛏️",
-      label: language === "fr" ? "Lits" : "Beds",
-      href: "/boutique?category=Beds",
-      active: currentCategory === "beds" || currentCategory === "literie" || currentQuery === "lit" || currentQuery === "bed",
-    },
-    {
-      key: "care",
-      icon: "🧴",
-      label: language === "fr" ? "Soins" : "Care",
-      href: "/boutique?category=Hygiene",
-      active: currentCategory === "hygiene" || currentCategory === "hygiène" || currentQuery === "soin" || currentQuery === "care",
-    },
-    {
-      key: "local",
-      icon: "🌿",
-      label: language === "fr" ? "Marques locales" : "Local brands",
-      href: "/boutique?q=local",
-      active: currentQuery === "local",
-    },
-    {
-      key: "offers",
-      icon: "🏷️",
-      label: language === "fr" ? "Offres" : "Offers",
-      href: "/boutique?q=offre",
-      active: currentQuery === "offre" || currentQuery === "offer",
-      accent: true,
-    },
-  ];
+  const marketplaceCategories = catalogCategories.map((category) => ({
+    key: category.value,
+    icon: category.emoji,
+    label: category.label,
+    href: `/boutique?category=${encodeURIComponent(category.value)}`,
+    active: currentCategory === category.value.trim().toLowerCase(),
+  }));
 
   // Marquer le composant comme monté (côté client uniquement)
   useEffect(() => {
@@ -380,7 +334,7 @@ export function Navigation({ language, t, user, onLogout }: Props) {
             <Link
               key={item.key}
               href={item.href}
-              className={`nav-marketplace-category${item.active ? " nav-marketplace-category--active" : ""}${item.accent ? " nav-marketplace-category--accent" : ""}`}
+              className={`nav-marketplace-category${item.active ? " nav-marketplace-category--active" : ""}`}
             >
               <span aria-hidden="true">{item.icon}</span>
               {item.label}
