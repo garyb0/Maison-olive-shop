@@ -7652,7 +7652,7 @@ tr:last-child td {
   background-image: image-set(url("/images/rikibackground.webp") type("image/webp"), url("/images/rikibackground.png") type("image/png"));
   background-position: center top;
   background-repeat: no-repeat;
-  background-size: max(1600px, 125vw) auto;
+  background-size: min(1536px, 100vw) auto;
   filter: grayscale(1);
   mix-blend-mode: multiply;
 }
@@ -8140,6 +8140,12 @@ button.home-category-chip:hover,
   .site-footer__mascot {
     width: 8.5rem;
     height: 8.5rem;
+  }
+}
+
+@media (max-width: 760px) {
+  .app-shell--home::before {
+    background-size: max(980px, 250vw) auto;
   }
 }
 
