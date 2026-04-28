@@ -5,7 +5,6 @@ import Link from "next/link";
 import type { Dictionary, Language } from "@/lib/i18n";
 import type { CurrentUser } from "@/lib/types";
 import { Navigation } from "@/components/Navigation";
-import { PromoBanner } from "@/components/PromoBanner";
 
 type ProductCard = {
   id: string;
@@ -115,7 +114,6 @@ export function StorefrontClient({
   t,
   user,
   products,
-  banners = [],
   initialRegisterEmail = "",
   initialSearch = "",
   initialCategory = "",
@@ -417,8 +415,6 @@ export function StorefrontClient({
             }
           />
         </header>
-
-        {!isShopSurface ? <PromoBanner language={language} banners={banners} /> : null}
 
         {isShopSurface ? null : (
           <>
