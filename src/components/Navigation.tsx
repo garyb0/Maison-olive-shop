@@ -8,6 +8,7 @@ import type { CurrentUser } from "@/lib/types";
 import Image from "next/image";
 
 const CART_STORAGE_KEY = "chezolive_cart_v1";
+const HOME_HREF = "/?home=1";
 
 type CartLine = { productId: string; quantity: number };
 
@@ -198,7 +199,7 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
     return (
       <header className="nav-marketplace">
         <div className="nav-marketplace-main">
-          <Link href="/" className="nav-marketplace-brand">
+          <Link href={HOME_HREF} className="nav-marketplace-brand">
             <Image
               src="/images/chez-olive/chezolive-logo-mark-tight.png"
               alt="Chez Olive"
@@ -356,7 +357,7 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
               aria-hidden={!menuOpen}
             >
               <div className="nav-drawer-header">
-                <Link href="/" className="nav-brand" onClick={() => setMenuOpen(false)}>
+                <Link href={HOME_HREF} className="nav-brand" onClick={() => setMenuOpen(false)}>
                   <Image
                     src="/images/chez-olive/chezolive-logo-mark-tight.png"
                     alt="Chez Olive"
@@ -410,7 +411,7 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
               </Link>
 
               <div className="nav-drawer-links">
-                <Link className={`nav-drawer-link${isActive("/") ? " nav-drawer-link--active" : ""}`} href="/" onClick={() => setMenuOpen(false)}>
+                <Link className={`nav-drawer-link${isActive("/") ? " nav-drawer-link--active" : ""}`} href={HOME_HREF} onClick={() => setMenuOpen(false)}>
                   <span className="nav-drawer-link-icon" aria-hidden="true">🏠</span>
                   <span>{t.navHome}</span>
                 </Link>
@@ -495,7 +496,7 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
   return (
     <header className="nav-header glow-border">
       {/* ── Marque / Logo ── */}
-      <Link href="/" className="nav-brand">
+      <Link href={HOME_HREF} className="nav-brand">
         <Image
           src="/images/chez-olive/chezolive-logo-mark-tight.png"
           alt="Chez Olive"
@@ -510,7 +511,7 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
       {/* ── Nav-body : toujours rendu, CSS gère mobile/desktop ── */}
       <div className="nav-body">
         <nav className="nav-primary" aria-label={language === "fr" ? "Navigation principale" : "Main navigation"}>
-          <Link className={`pill-link${isActive("/") ? " pill-link--active" : ""}`} href="/">
+          <Link className={`pill-link${isActive("/") ? " pill-link--active" : ""}`} href={HOME_HREF}>
             {t.navHome}
           </Link>
           <Link className={`pill-link pill-link--shop${isActive("/boutique") ? " pill-link--active" : ""}`} href="/boutique">
@@ -661,7 +662,7 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
           >
             {/* En-tête du drawer */}
             <div className="nav-drawer-header">
-              <Link href="/" className="nav-brand" onClick={() => setMenuOpen(false)}>
+              <Link href={HOME_HREF} className="nav-brand" onClick={() => setMenuOpen(false)}>
                 <Image
                   src="/images/chez-olive/chezolive-logo-mark-tight.png"
                   alt="Chez Olive"
@@ -718,7 +719,7 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
             <div className="nav-drawer-links">
               <Link
                 className={`nav-drawer-link${isActive("/") ? " nav-drawer-link--active" : ""}`}
-                href="/"
+                href={HOME_HREF}
                 onClick={() => setMenuOpen(false)}
               >
                 <span className="nav-drawer-link-icon" aria-hidden="true">🏠</span>

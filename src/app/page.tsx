@@ -22,6 +22,7 @@ function getSearchParam(value: string | string[] | undefined) {
 export default async function HomePage({ searchParams }: HomePageProps) {
   const query = searchParams ? await searchParams : {};
   const initialSearch = (getSearchParam(query.q) ?? getSearchParam(query.search) ?? "").trim();
+  const wantsHome = getSearchParam(query.home) === "1";
 
   if (initialSearch) {
     const params = new URLSearchParams({ q: initialSearch });
@@ -40,7 +41,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
   const t = getDictionary(language);
 
-  if (user) {
+  if (user && !wantsHome) {
     redirect("/boutique");
   }
 

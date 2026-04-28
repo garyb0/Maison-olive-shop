@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getDictionary, normalizeLanguage, type Language } from "@/lib/i18n";
 
+const HOME_HREF = "/?home=1";
+
 function getClientLanguage() {
   if (typeof document === "undefined") return "fr" as const;
   const match = document.cookie.match(/chezolive_lang=([^;]+)/);
@@ -70,7 +72,7 @@ export function SiteFooter() {
                 {language === "fr" ? "Navigation" : "Navigation"}
               </p>
               <div className="site-footer__links">
-                <Link href="/">{t.navHome}</Link>
+                <Link href={HOME_HREF}>{t.navHome}</Link>
                 <Link href="/boutique">{language === "fr" ? "Boutique" : "Shop"}</Link>
                 <Link href="/faq">{language === "fr" ? "Centre d’aide" : "Help center"}</Link>
                 <Link href="/shipping">{language === "fr" ? "Livraison" : "Shipping"}</Link>
