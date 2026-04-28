@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { getCurrentLanguage } from "@/lib/language";
 import { syncOrderPaymentFromStripeSessionForUser } from "@/lib/orders";
 import { prisma } from "@/lib/prisma";
+import { AccountLogoutButton } from "./account-logout-button";
 
 type AccountDashboardPageProps = {
   searchParams?: Promise<{
@@ -52,17 +53,21 @@ export default async function AccountDashboardPage({ searchParams }: AccountDash
   return (
     <>
       <section className="section account-home-hero">
-        <p className="account-home-hero__eyebrow">
-          {language === "fr" ? "Tableau de bord" : "Dashboard"}
-        </p>
-        <h1>
-          {language === "fr" ? "Bonjour" : "Hello"}, {user?.firstName}
-        </h1>
-        <p className="small" style={{ marginBottom: 0, maxWidth: 620 }}>
-          {language === "fr"
-            ? "Retrouve ici l’essentiel pour suivre tes commandes, tes abonnements et les informations utiles de ton compte."
-            : "Find the essentials here to track your orders, subscriptions, and useful account information."}
-        </p>
+        <div className="account-home-hero__content">
+          <p className="account-home-hero__eyebrow">
+            {language === "fr" ? "Tableau de bord" : "Dashboard"}
+          </p>
+          <h1>
+            {language === "fr" ? "Bonjour" : "Hello"}, {user?.firstName}
+          </h1>
+          <p className="small" style={{ marginBottom: 0, maxWidth: 620 }}>
+            {language === "fr"
+              ? "Retrouve ici l’essentiel pour suivre tes commandes, tes abonnements et les informations utiles de ton compte."
+              : "Find the essentials here to track your orders, subscriptions, and useful account information."}
+          </p>
+          <p className="small account-home-hero__email">{user.email}</p>
+        </div>
+        <AccountLogoutButton language={language} className="btn btn-secondary account-home-logout" />
       </section>
 
       {paymentNotice ? (
@@ -142,6 +147,21 @@ export default async function AccountDashboardPage({ searchParams }: AccountDash
             </p>
           </Link>
         </div>
+      </section>
+
+      <section className="section account-logout-section">
+        <div>
+          <p className="account-home-hero__eyebrow">
+            {language === "fr" ? "Session" : "Session"}
+          </p>
+          <h2>{language === "fr" ? "Quitter mon compte" : "Leave my account"}</h2>
+          <p className="small" style={{ marginBottom: 0 }}>
+            {language === "fr"
+              ? "Déconnecte cette session lorsque tu as terminé, surtout sur un appareil partagé."
+              : "Sign out when you are done, especially on a shared device."}
+          </p>
+        </div>
+        <AccountLogoutButton language={language} className="btn btn-secondary account-home-logout" />
       </section>
     </>
   );

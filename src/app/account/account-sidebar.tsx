@@ -97,8 +97,8 @@ export function AccountSidebar({ language }: Props) {
                   ? "Déconnexion..."
                   : "Signing out..."
                 : language === "fr"
-                  ? "Déconnexion"
-                  : "Logout"}
+                  ? "Déconnexion du compte"
+                  : "Sign out of account"}
             </span>
           </button>
         </div>

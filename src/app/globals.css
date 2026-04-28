@@ -6748,8 +6748,16 @@ tr:last-child td {
 }
 
 .account-home-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
   background: linear-gradient(135deg, rgba(255, 252, 246, 1) 0%, rgba(244, 237, 224, 0.9) 100%);
   box-shadow: 0 18px 36px rgba(82, 58, 24, 0.06);
+}
+
+.account-home-hero__content {
+  min-width: 0;
 }
 
 .account-home-hero__eyebrow {
@@ -6759,6 +6767,15 @@ tr:last-child td {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: #8a7a59;
+}
+
+.account-home-hero__email {
+  margin-top: 0.85rem;
+}
+
+.account-home-logout {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .account-home-stats {
@@ -6815,6 +6832,13 @@ tr:last-child td {
 
 .account-home-shortcut__copy {
   margin: 0;
+}
+
+.account-logout-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
 }
 
 .support-lite-grid {
@@ -9719,6 +9743,15 @@ button.home-category-chip:hover,
 
   .account-sidebar__logout {
     grid-column: 1 / -1;
+  }
+
+  .account-home-hero,
+  .account-logout-section {
+    flex-direction: column;
+  }
+
+  .account-home-logout {
+    width: 100%;
   }
 
   .auth-card__brand {

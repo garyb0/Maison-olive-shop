@@ -285,7 +285,7 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
                     {logoutLoading
                       ? "..."
                       : language === "fr"
-                        ? "Déconnexion"
+                        ? "Déconnexion du compte"
                         : "Sign out"}
                   </button>
                 ) : null}
@@ -487,7 +487,7 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
                       {logoutLoading
                         ? "…"
                         : language === "fr"
-                          ? "Déconnexion"
+                          ? "Déconnexion du compte"
                           : "Sign out"}
                     </span>
                   </button>
@@ -599,7 +599,7 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
                   {logoutLoading
                     ? "..."
                     : language === "fr"
-                      ? "Déconnexion"
+                      ? "Déconnexion du compte"
                       : "Sign out"}
                 </button>
               ) : null}
@@ -822,7 +822,7 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
                     {logoutLoading
                       ? "…"
                       : language === "fr"
-                        ? "Déconnexion"
+                        ? "Déconnexion du compte"
                         : "Sign out"}
                   </span>
                 </button>
