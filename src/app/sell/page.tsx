@@ -4,7 +4,6 @@ import { getCurrentLanguage } from "@/lib/language";
 import { getDictionary } from "@/lib/i18n";
 import { getBusinessInfo } from "@/lib/business";
 import { Navigation } from "@/components/Navigation";
-import { PromoBanner } from "@/components/PromoBanner";
 
 export default async function SellWithUsPage() {
   const language = await getCurrentLanguage();
@@ -56,8 +55,6 @@ export default async function SellWithUsPage() {
         <div className="brand">{t.brandName}</div>
         <Navigation language={language} t={t} user={user} />
       </header>
-
-      <PromoBanner language={language} />
 
       {/* ── 1. Hero ── */}
       <section className="section sell-hero">

@@ -1,9 +1,10 @@
 ﻿"use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { normalizeLanguage, getDictionary, type Language } from "@/lib/i18n";
+import { Navigation } from "@/components/Navigation";
 
 function getCookieLanguage(): Language {
   if (typeof document === "undefined") return "fr";
@@ -70,6 +71,12 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="app-shell">
+      <header className="topbar">
+        <Suspense fallback={null}>
+          <Navigation language={lang} t={t} user={null} />
+        </Suspense>
+      </header>
+
       <section className="section auth-shell">
         <div className="auth-card">
           <div className="auth-card__header">

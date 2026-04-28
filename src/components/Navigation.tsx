@@ -123,7 +123,9 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
-  const isMarketplaceHeader = pathname.startsWith("/boutique");
+  const isShopRoute = pathname.startsWith("/boutique") || pathname.startsWith("/shop");
+  const isAdminRoute = pathname.startsWith("/admin");
+  const useMarketplaceHeader = !isAdminRoute;
   const currentCategory = (searchParams.get("category") ?? "").trim().toLowerCase();
   const marketplaceCategories = catalogCategories.map((category) => ({
     key: category.value,
@@ -195,9 +197,11 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
     runCatalogSearch(catalogSearch);
   }, [catalogSearch, runCatalogSearch]);
 
-  if (isMarketplaceHeader) {
+  const drawerCategoryLinks = isShopRoute ? marketplaceCategories : [];
+
+  if (useMarketplaceHeader) {
     return (
-      <header className="nav-marketplace">
+      <header className={`nav-marketplace${isShopRoute ? " nav-marketplace--shop" : " nav-marketplace--light"}`}>
         <div className="nav-marketplace-main">
           <Link href={HOME_HREF} className="nav-marketplace-brand">
             <Image
@@ -330,17 +334,19 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
           </div>
         </div>
 
-        <nav className="nav-marketplace-categories" aria-label={language === "fr" ? "Catégories principales" : "Main categories"}>
-          {marketplaceCategories.map((item) => (
-            <Link
-              key={item.key}
-              href={item.href}
-              className={`nav-marketplace-category${item.active ? " nav-marketplace-category--active" : ""}`}
-            >
-              <span aria-hidden="true">{item.icon}</span>
-              {item.label}
-            </Link>
-          ))}
+        <nav className="nav-marketplace-primary-links" aria-label={language === "fr" ? "Navigation principale" : "Main navigation"}>
+          <Link className={`nav-marketplace-link${isActive("/") ? " nav-marketplace-link--active" : ""}`} href={HOME_HREF}>
+            {t.navHome}
+          </Link>
+          <Link className={`nav-marketplace-link nav-marketplace-link--shop${isActive("/boutique") || isActive("/shop") ? " nav-marketplace-link--active" : ""}`} href="/boutique">
+            {language === "fr" ? "Boutique" : "Shop"}
+          </Link>
+          <Link className={`nav-marketplace-link${isActive("/sell") ? " nav-marketplace-link--active" : ""}`} href="/sell">
+            {language === "fr" ? "Vendre" : "Sell"}
+          </Link>
+          <Link className={`nav-marketplace-link${isActive("/faq") ? " nav-marketplace-link--active" : ""}`} href="/faq">
+            {t.navFaq}
+          </Link>
         </nav>
 
         {mounted && isMobile && (
@@ -429,7 +435,14 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
                     <span>{t.navAdmin}</span>
                   </Link>
                 )}
-                {marketplaceCategories.map((item) => (
+                <Link className={`nav-drawer-link${isActive("/faq") ? " nav-drawer-link--active" : ""}`} href="/faq" onClick={() => setMenuOpen(false)}>
+                  <span className="nav-drawer-link-icon" aria-hidden="true">❓</span>
+                  <span>{t.navFaq}</span>
+                </Link>
+                {drawerCategoryLinks.length > 0 ? (
+                  <div className="nav-drawer-divider" aria-hidden="true" />
+                ) : null}
+                {drawerCategoryLinks.map((item) => (
                   <Link
                     key={item.key}
                     className={`nav-drawer-link${item.active ? " nav-drawer-link--active" : ""}`}

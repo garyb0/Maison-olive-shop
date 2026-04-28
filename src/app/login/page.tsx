@@ -3,8 +3,9 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { getDictionary, normalizeLanguage, type Language } from '@/lib/i18n'
+import { Navigation } from '@/components/Navigation'
 
 function getCookieLanguage(): Language {
   if (typeof document === 'undefined') return 'fr'
@@ -101,6 +102,12 @@ export default function LoginPage() {
 
   return (
     <div className="app-shell">
+      <header className="topbar">
+        <Suspense fallback={null}>
+          <Navigation language={language} t={t} user={null} />
+        </Suspense>
+      </header>
+
       <section className="section auth-shell">
         <div className="auth-card">
           <div className="auth-card__header">

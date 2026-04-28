@@ -1,6 +1,5 @@
 ﻿import type { Metadata } from "next";
 import { Navigation } from "@/components/Navigation";
-import { PromoBanner } from "@/components/PromoBanner";
 import { getCurrentUser } from "@/lib/auth";
 import { getDictionary } from "@/lib/i18n";
 import { getCurrentLanguage } from "@/lib/language";
@@ -39,8 +38,6 @@ export default async function CheckoutSuccessPage({ searchParams }: CheckoutSucc
         <div className="brand">{t.brandName}</div>
         <Navigation language={language} t={t} user={user} />
       </header>
-
-      <PromoBanner language={language} />
 
       <CheckoutSuccessView
         language={language}

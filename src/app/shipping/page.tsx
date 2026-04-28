@@ -5,7 +5,6 @@ import { getDictionary } from "@/lib/i18n";
 import { getBusinessInfo } from "@/lib/business";
 import { getShippingSections } from "@/lib/help-center";
 import { Navigation } from "@/components/Navigation";
-import { PromoBanner } from "@/components/PromoBanner";
 
 export default async function ShippingPage() {
   const language = await getCurrentLanguage();
@@ -20,8 +19,6 @@ export default async function ShippingPage() {
         <div className="brand">{t.brandName}</div>
         <Navigation language={language} t={t} user={user} />
       </header>
-
-      <PromoBanner language={language} />
 
       <section className="section help-hero">
         <h1>{language === "fr" ? "Livraison" : "Shipping"}</h1>

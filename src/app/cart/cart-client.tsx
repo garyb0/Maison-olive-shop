@@ -5,7 +5,6 @@ import { useEffect, useState } from "react";
 import type { Dictionary, Language } from "@/lib/i18n";
 import type { CurrentUser } from "@/lib/types";
 import { Navigation } from "@/components/Navigation";
-import { PromoBanner } from "@/components/PromoBanner";
 
 type ProductInfo = {
   id: string;
@@ -180,17 +179,11 @@ export function CartClient({
         <Navigation language={language} t={t} user={user} />
       </header>
 
-      <PromoBanner language={language} />
-
       <section className="section cart-page-header cart-market-header">
         <div className="cart-page-title-row">
-          <span className="cart-page-icon cart-page-icon--mascot" aria-hidden="true">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/images/chez-olive/olive-head.png" alt="" />
-          </span>
           <div>
             <p className="home-eyebrow">
-              {language === "fr" ? "Panier Chez Olive" : "Chez Olive cart"}
+              {language === "fr" ? "Commande locale" : "Local order"}
             </p>
             <h1 className="cart-page-title">{t.cart}</h1>
             <p className="cart-page-subtitle">{cartSubtitle}</p>
@@ -285,72 +278,80 @@ export function CartClient({
                 </Link>
               </div>
 
-              <div className="cart-table-wrap">
-                <table className="cart-table">
-                  <thead>
-                    <tr>
-                      <th>{language === "fr" ? "Produit" : "Product"}</th>
-                      <th className="cart-th-price">{language === "fr" ? "Prix unit." : "Unit price"}</th>
-                      <th className="cart-th-qty">{language === "fr" ? "Quantité" : "Qty"}</th>
-                      <th className="cart-th-subtotal">{language === "fr" ? "Sous-total" : "Subtotal"}</th>
-                      <th className="cart-th-action"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.map((row) => (
-                      <tr key={row.productId} className="cart-row">
-                        <td className="cart-td-name">
-                          <span className="cart-product-mark" aria-hidden="true">🐾</span>
-                          <span className="cart-product-name">{row.name}</span>
-                        </td>
-                        <td className="cart-td-price" data-label={language === "fr" ? "Prix unit." : "Unit price"}>
-                          <span className="cart-price-badge">{row.priceLabel}</span>
-                        </td>
-                        <td className="cart-td-qty" data-label={language === "fr" ? "Quantité" : "Quantity"}>
-                          <div className="cart-qty-control">
-                            <button
-                              className="cart-qty-btn"
-                              type="button"
-                              onClick={() => updateQty(row.productId, row.quantity - 1)}
-                              aria-label={language === "fr" ? "Diminuer" : "Decrease"}
-                            >
-                              -
-                            </button>
-                            <input
-                              className="cart-qty-input"
-                              type="number"
-                              min={1}
-                              value={row.quantity}
-                              onChange={(e) => updateQty(row.productId, Math.max(1, Number(e.target.value) || 1))}
-                            />
-                            <button
-                              className="cart-qty-btn"
-                              type="button"
-                              onClick={() => updateQty(row.productId, row.quantity + 1)}
-                              aria-label={language === "fr" ? "Augmenter" : "Increase"}
-                            >
-                              +
-                            </button>
+              <div className="cart-items-list">
+                {rows.map((row) => {
+                  const isUnavailable = !productIndex[row.productId];
+
+                  return (
+                    <article key={row.productId} className={`cart-item-card${isUnavailable ? " cart-item-card--unavailable" : ""}`}>
+                      <div className="cart-item-main">
+                        <span className="cart-product-mark" aria-hidden="true">🐾</span>
+                        <div className="cart-item-copy">
+                          <div className="cart-item-name-row">
+                            <h3 className="cart-product-name">{row.name}</h3>
+                            {isUnavailable ? (
+                              <span className="cart-item-status">
+                                {language === "fr" ? "À vérifier" : "To review"}
+                              </span>
+                            ) : null}
                           </div>
-                        </td>
-                        <td className="cart-td-subtotal" data-label={language === "fr" ? "Sous-total" : "Subtotal"}>
-                          <strong className="cart-subtotal-value">{row.subtotalLabel}</strong>
-                        </td>
-                        <td className="cart-td-action" data-label={language === "fr" ? "Action" : "Action"}>
+                          <p className="cart-item-meta">
+                            {language === "fr" ? "Vendu par Chez Olive · Rimouski" : "Sold by Chez Olive · Rimouski"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="cart-item-price">
+                        <span>{language === "fr" ? "Prix" : "Price"}</span>
+                        <strong>{row.priceLabel}</strong>
+                      </div>
+
+                      <div className="cart-item-quantity">
+                        <span>{language === "fr" ? "Quantité" : "Quantity"}</span>
+                        <div className="cart-qty-control">
                           <button
-                            className="cart-remove-btn"
+                            className="cart-qty-btn"
                             type="button"
-                            onClick={() => remove(row.productId)}
-                            aria-label={language === "fr" ? "Retirer" : "Remove"}
-                            title={language === "fr" ? "Retirer" : "Remove"}
+                            onClick={() => updateQty(row.productId, row.quantity - 1)}
+                            aria-label={language === "fr" ? "Diminuer" : "Decrease"}
                           >
-                            X
+                            -
                           </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                          <input
+                            className="cart-qty-input"
+                            type="number"
+                            min={1}
+                            value={row.quantity}
+                            onChange={(e) => updateQty(row.productId, Math.max(1, Number(e.target.value) || 1))}
+                          />
+                          <button
+                            className="cart-qty-btn"
+                            type="button"
+                            onClick={() => updateQty(row.productId, row.quantity + 1)}
+                            aria-label={language === "fr" ? "Augmenter" : "Increase"}
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="cart-item-subtotal">
+                        <span>{language === "fr" ? "Sous-total" : "Subtotal"}</span>
+                        <strong>{row.subtotalLabel}</strong>
+                      </div>
+
+                      <button
+                        className="cart-remove-btn"
+                        type="button"
+                        onClick={() => remove(row.productId)}
+                        aria-label={language === "fr" ? "Retirer" : "Remove"}
+                        title={language === "fr" ? "Retirer" : "Remove"}
+                      >
+                        ×
+                      </button>
+                    </article>
+                  );
+                })}
               </div>
             </div>
 

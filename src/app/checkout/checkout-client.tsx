@@ -21,7 +21,6 @@ import {
 } from "@/lib/address-fields";
 import { isRimouskiPostalCode } from "@/lib/delivery-zone";
 import { Navigation } from "@/components/Navigation";
-import { PromoBanner } from "@/components/PromoBanner";
 import { StripeInlineCheckout } from "@/components/StripeInlineCheckoutSurface";
 import { CheckoutSuccessView } from "@/components/CheckoutSuccessView";
 
@@ -1027,8 +1026,6 @@ export function CheckoutClient({
           <Navigation language={language} t={t} user={user} />
         </header>
 
-        <PromoBanner language={language} />
-
         <CheckoutSuccessView
           language={language}
           user={user}
@@ -1045,8 +1042,6 @@ export function CheckoutClient({
         <div className="brand">{t.brandName}</div>
         <Navigation language={language} t={t} user={user} />
       </header>
-
-      <PromoBanner language={language} />
 
       {/* Page header */}
       <section className="section checkout-page-header">

@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { normalizeLanguage, getDictionary, type Language } from "@/lib/i18n";
+import { Navigation } from "@/components/Navigation";
 
 function getCookieLanguage(): Language {
   if (typeof document === "undefined") return "fr";
@@ -91,6 +92,12 @@ function ResetPasswordForm() {
 
   return (
     <div className="app-shell">
+      <header className="topbar">
+        <Suspense fallback={null}>
+          <Navigation language={lang} t={t} user={null} />
+        </Suspense>
+      </header>
+
       <section className="section auth-shell">
         <div className="auth-card">
           <div className="auth-card__header">

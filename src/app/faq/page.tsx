@@ -5,7 +5,6 @@ import { getDictionary } from "@/lib/i18n";
 import { getBusinessInfo } from "@/lib/business";
 import { getHelpCenterCards, getHelpCenterQuestions } from "@/lib/help-center";
 import { Navigation } from "@/components/Navigation";
-import { PromoBanner } from "@/components/PromoBanner";
 
 export default async function FaqPage() {
   const language = await getCurrentLanguage();
@@ -21,8 +20,6 @@ export default async function FaqPage() {
         <div className="brand">{t.brandName}</div>
         <Navigation language={language} t={t} user={user} />
       </header>
-
-      <PromoBanner language={language} />
 
       <section className="section help-hero">
         <h1>{language === "fr" ? "Centre d\u2019aide" : "Help center"}</h1>
