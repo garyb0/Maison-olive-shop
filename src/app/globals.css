@@ -7328,7 +7328,7 @@ tr:last-child td {
 .site-footer__card {
   border: 1px solid rgba(232, 221, 208, 0.9);
   border-radius: 1.1rem;
-  background: rgba(255, 255, 255, 0.78);
+  background: rgba(255, 255, 255, 0.86);
   padding: 1rem 1.05rem;
   display: grid;
   gap: 0.75rem;
@@ -8016,7 +8016,8 @@ button.home-category-chip:hover,
 
 .site-footer {
   border-color: rgba(234, 220, 201, 0.9);
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.78), rgba(247, 241, 232, 0.78));
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.88), rgba(247, 241, 232, 0.9));
+  backdrop-filter: blur(2px);
 }
 
 .site-footer__brand {
