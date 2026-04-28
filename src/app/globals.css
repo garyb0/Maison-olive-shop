@@ -8859,7 +8859,7 @@ button.home-category-chip:hover,
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background: linear-gradient(90deg, rgba(255, 253, 249, 0.95) 0%, rgba(255, 253, 249, 0.84) 48%, rgba(255, 253, 249, 0.58) 100%);
+  background: linear-gradient(90deg, rgba(255, 253, 249, 0.94) 0%, rgba(255, 253, 249, 0.78) 46%, rgba(255, 253, 249, 0.24) 100%);
 }
 
 .home-rimouski-map-bg {
@@ -8867,12 +8867,12 @@ button.home-category-chip:hover,
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  opacity: 0.54;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 360'%3E%3Crect width='1200' height='360' fill='none'/%3E%3Cpath d='M-60 94 C120 62 218 84 330 58 C495 20 622 52 750 34 C930 10 1065 38 1260 8' fill='none' stroke='%2352483d' stroke-width='12' stroke-linecap='round' opacity='.18'/%3E%3Cpath d='M-40 134 C120 108 230 132 372 102 C520 70 676 104 828 76 C970 50 1094 62 1248 42' fill='none' stroke='%2352483d' stroke-width='3' stroke-linecap='round' stroke-dasharray='14 18' opacity='.26'/%3E%3Cpath d='M68 296 C196 254 324 260 454 218 C604 170 744 184 900 132 C1010 96 1090 94 1182 70' fill='none' stroke='%232b2b2b' stroke-width='5' stroke-linecap='round' opacity='.2'/%3E%3Cpath d='M150 336 C276 284 408 286 524 238 C666 180 786 174 956 122' fill='none' stroke='%232b2b2b' stroke-width='2' stroke-linecap='round' stroke-dasharray='8 14' opacity='.25'/%3E%3Cg fill='none' stroke='%232b2b2b' stroke-width='2' stroke-linecap='round' opacity='.2'%3E%3Cpath d='M180 274 L312 174 L438 236 L548 148 L690 194 L808 102'/%3E%3Cpath d='M330 320 L392 214 L468 124 L604 96 L746 128 L880 76'/%3E%3Cpath d='M238 204 L368 198 L500 178 L632 138 L768 114 L930 92'/%3E%3Cpath d='M510 266 L572 190 L676 154 L792 166 L924 132'/%3E%3Cpath d='M98 246 L198 224 L302 230 L414 198'/%3E%3C/g%3E%3Cg fill='%2352483d' opacity='.5'%3E%3Ccircle cx='425' cy='194' r='6'/%3E%3Ccircle cx='596' cy='132' r='6'/%3E%3Ccircle cx='776' cy='108' r='6'/%3E%3Ccircle cx='298' cy='236' r='5'/%3E%3Ccircle cx='670' cy='204' r='5'/%3E%3Ccircle cx='1040' cy='88' r='5'/%3E%3C/g%3E%3Cg fill='%2352483d' font-family='Georgia, serif' font-size='26' font-weight='700' opacity='.52'%3E%3Ctext x='438' y='184'%3ECentre-ville%3C/text%3E%3Ctext x='610' y='122'%3ERimouski-Est%3C/text%3E%3Ctext x='790' y='100'%3EPointe-au-P%C3%A8re%3C/text%3E%3Ctext x='310' y='258'%3ENazareth%3C/text%3E%3Ctext x='682' y='226'%3ESacr%C3%A9-C%C5%93ur%3C/text%3E%3Ctext x='1052' y='104'%3ELe Bic%3C/text%3E%3C/g%3E%3C/svg%3E");
+  opacity: 0.82;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 360'%3E%3Crect width='1200' height='360' fill='none'/%3E%3Cpath d='M-60 94 C120 62 218 84 330 58 C495 20 622 52 750 34 C930 10 1065 38 1260 8' fill='none' stroke='%2352483d' stroke-width='13' stroke-linecap='round' opacity='.3'/%3E%3Cpath d='M-40 134 C120 108 230 132 372 102 C520 70 676 104 828 76 C970 50 1094 62 1248 42' fill='none' stroke='%2352483d' stroke-width='4' stroke-linecap='round' stroke-dasharray='14 18' opacity='.42'/%3E%3Cpath d='M68 296 C196 254 324 260 454 218 C604 170 744 184 900 132 C1010 96 1090 94 1182 70' fill='none' stroke='%232b2b2b' stroke-width='6' stroke-linecap='round' opacity='.34'/%3E%3Cpath d='M150 336 C276 284 408 286 524 238 C666 180 786 174 956 122' fill='none' stroke='%232b2b2b' stroke-width='3' stroke-linecap='round' stroke-dasharray='8 14' opacity='.38'/%3E%3Cg fill='none' stroke='%232b2b2b' stroke-width='3' stroke-linecap='round' opacity='.34'%3E%3Cpath d='M180 274 L312 174 L438 236 L548 148 L690 194 L808 102'/%3E%3Cpath d='M330 320 L392 214 L468 124 L604 96 L746 128 L880 76'/%3E%3Cpath d='M238 204 L368 198 L500 178 L632 138 L768 114 L930 92'/%3E%3Cpath d='M510 266 L572 190 L676 154 L792 166 L924 132'/%3E%3Cpath d='M98 246 L198 224 L302 230 L414 198'/%3E%3C/g%3E%3Cg fill='%2352483d' opacity='.72'%3E%3Ccircle cx='425' cy='194' r='7'/%3E%3Ccircle cx='596' cy='132' r='7'/%3E%3Ccircle cx='776' cy='108' r='7'/%3E%3Ccircle cx='298' cy='236' r='6'/%3E%3Ccircle cx='670' cy='204' r='6'/%3E%3Ccircle cx='1040' cy='88' r='6'/%3E%3C/g%3E%3Cg fill='%2352483d' font-family='Georgia, serif' font-size='28' font-weight='700' opacity='.76'%3E%3Ctext x='438' y='184'%3ECentre-ville%3C/text%3E%3Ctext x='610' y='122'%3ERimouski-Est%3C/text%3E%3Ctext x='790' y='100'%3EPointe-au-P%C3%A8re%3C/text%3E%3Ctext x='310' y='258'%3ENazareth%3C/text%3E%3Ctext x='682' y='226'%3ESacr%C3%A9-C%C5%93ur%3C/text%3E%3Ctext x='1052' y='104'%3ELe Bic%3C/text%3E%3C/g%3E%3C/svg%3E");
   background-attachment: fixed;
-  background-position: center right;
+  background-position: 76% center;
   background-repeat: no-repeat;
-  background-size: min(980px, 82vw) auto;
+  background-size: min(1180px, 94vw) auto;
   filter: grayscale(1);
   mix-blend-mode: multiply;
 }
@@ -9228,7 +9228,7 @@ button.home-category-chip:hover,
     background-attachment: scroll;
     background-position: center top;
     background-size: 760px auto;
-    opacity: 0.32;
+    opacity: 0.46;
   }
 
   .home-rail-grid {
@@ -9270,13 +9270,13 @@ button.home-category-chip:hover,
   }
 
   .home-market-overview::after {
-    background: linear-gradient(180deg, rgba(255, 253, 249, 0.93) 0%, rgba(255, 253, 249, 0.84) 100%);
+    background: linear-gradient(180deg, rgba(255, 253, 249, 0.9) 0%, rgba(255, 253, 249, 0.68) 100%);
   }
 
   .home-rimouski-map-bg {
     background-position: 42% 8%;
     background-size: 660px auto;
-    opacity: 0.26;
+    opacity: 0.36;
   }
 
   .home-market-stats,
