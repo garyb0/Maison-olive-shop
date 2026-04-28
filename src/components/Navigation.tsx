@@ -19,6 +19,23 @@ type Props = {
   onLogout?: () => void;
 };
 
+function BrandWordmark({ language }: { language: Language }) {
+  return (
+    <span className="nav-brand-copy">
+      <span className="nav-brand-name" aria-label="ChezOlive.ca">
+        <span className="nav-brand-chez">Chez</span>
+        <span className="nav-brand-olive">Olive</span>
+        <span className="nav-brand-ca">.ca</span>
+      </span>
+      <small>
+        {language === "fr"
+          ? "Le marché local pour chiens et chats"
+          : "The local market for dogs and cats"}
+      </small>
+    </span>
+  );
+}
+
 export function Navigation({ language, t, user, onLogout }: Props) {
   const pathname = usePathname();
   const [cartCount, setCartCount] = useState(0);
@@ -172,10 +189,7 @@ export function Navigation({ language, t, user, onLogout }: Props) {
           className="nav-logo-img"
           priority
         />
-        <span className="nav-brand-copy">
-          <span className="nav-brand-name">{t.brandName}</span>
-          <small>{language === "fr" ? "Marché local pour animaux" : "Local pet marketplace"}</small>
-        </span>
+        <BrandWordmark language={language} />
       </Link>
 
       {/* ── Nav-body : toujours rendu, CSS gère mobile/desktop ── */}
@@ -348,10 +362,7 @@ export function Navigation({ language, t, user, onLogout }: Props) {
                   height={56}
                   className="nav-logo-img"
                 />
-                <span className="nav-brand-copy">
-                  <span className="nav-brand-name">{t.brandName}</span>
-                  <small>{language === "fr" ? "Marché local" : "Local market"}</small>
-                </span>
+                <BrandWordmark language={language} />
               </Link>
               <button
                 className="nav-drawer-close"
