@@ -7,6 +7,14 @@ import { adminProductCreateSchema, adminProductDeleteSchema, adminProductUpdateS
 const isPrismaUniqueError = (error: unknown) =>
   typeof error === "object" && error !== null && "code" in error && error.code === "P2002";
 
+const getInvalidProductPayloadMessage = (issues: Array<{ path: PropertyKey[] }>) => {
+  if (issues.some((issue) => issue.path[0] === "slug")) {
+    return "Invalid product slug. Use only letters, numbers, and hyphens.";
+  }
+
+  return "Invalid product payload";
+};
+
 export async function GET() {
   try {
     await requireAdmin();
@@ -27,7 +35,7 @@ export async function POST(request: Request) {
     const parsed = adminProductCreateSchema.safeParse(body);
 
     if (!parsed.success) {
-      return jsonError("Invalid product payload", 400);
+      return jsonError(getInvalidProductPayloadMessage(parsed.error.issues), 400);
     }
 
     const product = await createAdminProduct(parsed.data, admin.id);
@@ -71,7 +79,7 @@ export async function PATCH(request: Request) {
     const parsed = adminProductUpdateSchema.safeParse(body);
 
     if (!parsed.success) {
-      return jsonError("Invalid product payload", 400);
+      return jsonError(getInvalidProductPayloadMessage(parsed.error.issues), 400);
     }
 
     const { id, ...changes } = parsed.data;

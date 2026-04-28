@@ -1,16 +1,13 @@
 import path from "node:path";
 import {
   createSqliteBackup,
-  loadEnvFilesInOrder,
+  loadDatabaseEnvForTarget,
+  resolveEnvTargetFromArgs,
   resolveDatabaseFromEnv,
 } from "./db-utils";
 
-loadEnvFilesInOrder([
-  ".env.production.local",
-  ".env.production",
-  ".env.local",
-  ".env",
-]);
+const envTarget = resolveEnvTargetFromArgs(undefined, "production");
+loadDatabaseEnvForTarget(envTarget);
 
 const backupDir = path.resolve(process.cwd(), "backups");
 
@@ -30,6 +27,7 @@ if (db.kind === "non-sqlite") {
 const result = createSqliteBackup(db.dbPath, backupDir, "daily");
 
 console.log("Daily SQLite backup created.");
+console.log(`- Environment: ${envTarget}`);
 console.log(`- Source: ${db.dbPath}`);
 console.log(`- Backup DB: ${result.dbBackupPath}`);
 console.log(`- Manifest: ${result.manifestPath}`);

@@ -1,0 +1,14 @@
+ALTER TABLE "DogProfile"
+ADD COLUMN "publicProfileEnabled" BOOLEAN NOT NULL DEFAULT true;
+
+ALTER TABLE "DogProfile"
+ADD COLUMN "showPhotoPublic" BOOLEAN NOT NULL DEFAULT false;
+
+ALTER TABLE "DogProfile"
+ADD COLUMN "showAgePublic" BOOLEAN NOT NULL DEFAULT false;
+
+ALTER TABLE "DogProfile"
+ADD COLUMN "showPhonePublic" BOOLEAN NOT NULL DEFAULT false;
+
+ALTER TABLE "DogProfile"
+ADD COLUMN "showNotesPublic" BOOLEAN NOT NULL DEFAULT false;

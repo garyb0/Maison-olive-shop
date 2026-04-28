@@ -5,7 +5,7 @@ import { createSupportMessageAsCustomer, createSupportMessageAsGuest } from "@/l
 import { supportGuestMessageCreateSchema, supportMessageCreateSchema } from "@/lib/validators";
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
-  const rate = applyRateLimit(request, { namespace: "support:message", windowMs: 60_000, max: 30 });
+  const rate = await applyRateLimit(request, { namespace: "support:message", windowMs: 60_000, max: 30 });
   if (!rate.ok) {
     return jsonError("Too many requests", 429);
   }
@@ -26,7 +26,12 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       // Guest — requires guestEmail for verification
       const parsed = supportGuestMessageCreateSchema.safeParse(body);
       if (!parsed.success) return jsonError("Invalid support message payload", 400);
-      const conversation = await createSupportMessageAsGuest(id, parsed.data.guestEmail, parsed.data.content);
+      const conversation = await createSupportMessageAsGuest(
+        id,
+        parsed.data.guestEmail,
+        parsed.data.guestToken,
+        parsed.data.content,
+      );
       return jsonOk({ conversation });
     }
   } catch (error) {

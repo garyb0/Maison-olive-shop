@@ -1,6 +1,6 @@
-@echo off
-echo Starting Maison Olive development server and keep-alive...
-cd /d "C:\Cline\maison-olive-shop"
+﻿@echo off
+echo Starting Chez Olive development server and keep-alive...
+cd /d "%~dp0"
 
 echo 1. Starting Next.js dev server...
 start "Next.js Dev Server" cmd /k "npm run dev"

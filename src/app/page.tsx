@@ -3,15 +3,31 @@ import { getActiveProducts } from "@/lib/catalog";
 import { formatCurrency } from "@/lib/format";
 import { getCurrentLanguage } from "@/lib/language";
 import { getDictionary } from "@/lib/i18n";
+import { prisma } from "@/lib/prisma";
+import { localizePromoBanner } from "@/lib/promo-banners";
+import { getCatalogPreparationBanner } from "@/lib/promo-banner-fallback";
 import { StorefrontClient } from "@/app/storefront-client";
 
 type CatalogProduct = Awaited<ReturnType<typeof getActiveProducts>>[number];
 
-export default async function HomePage() {
-  const [language, user, products] = await Promise.all([
+type HomePageProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
+
+function getSearchParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+export default async function HomePage({ searchParams }: HomePageProps) {
+  const query = searchParams ? await searchParams : {};
+  const [language, user, products, rawBanners] = await Promise.all([
     getCurrentLanguage(),
     getCurrentUser(),
     getActiveProducts(),
+    prisma.promoBanner.findMany({
+      where: { isActive: true },
+      orderBy: { sortOrder: "asc" },
+    }),
   ]);
 
   const t = getDictionary(language);
@@ -28,7 +44,24 @@ export default async function HomePage() {
     imageUrl: p.imageUrl ?? null,
   }));
 
-  const oliveMode = (process.env.OLIVE_MODE as "princess" | "gremlin") || "princess";
+  const banners = productCards.length === 0
+    ? [getCatalogPreparationBanner(language)]
+    : rawBanners.map((b) => ({
+        ...localizePromoBanner(b, language),
+      }));
 
-  return <StorefrontClient language={language} t={t} user={user} products={productCards} oliveMode={oliveMode} />;
+  const oliveMode = (process.env.OLIVE_MODE as "princess" | "gremlin") || "princess";
+  const initialRegisterEmail = getSearchParam(query.registerEmail)?.trim() ?? "";
+
+  return (
+    <StorefrontClient
+      language={language}
+      t={t}
+      user={user}
+      products={productCards}
+      oliveMode={oliveMode}
+      banners={banners}
+      initialRegisterEmail={initialRegisterEmail}
+    />
+  );
 }

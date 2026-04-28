@@ -1,6 +1,6 @@
-# Guide de Changement de Mode Olive 🎭
+﻿# Guide de Changement de Mode Olive 🎭
 
-Ce guide explique comment basculer entre les deux thèmes visuels de la boutique Maison Olive.
+Ce guide explique comment basculer entre les deux thèmes visuels de la boutique Chez Olive.
 
 ## Les Deux Modes
 
@@ -31,7 +31,7 @@ Ce guide explique comment basculer entre les deux thèmes visuels de la boutique
    Ctrl+C puis npm run dev
    
    # Si tu utilises PM2:
-   pm2 restart maison-olive-shop
+   pm2 restart chez-olive-shop
    ```
 
 ### Méthode 2: Via variable d'environnement système (Production)
@@ -39,11 +39,11 @@ Ce guide explique comment basculer entre les deux thèmes visuels de la boutique
 ```bash
 # Windows PowerShell
 $env:OLIVE_MODE="gremlin"
-pm2 restart maison-olive-shop
+pm2 restart chez-olive-shop
 
 # ou retour à princess
 $env:OLIVE_MODE="princess"
-pm2 restart maison-olive-shop
+pm2 restart chez-olive-shop
 ```
 
 ### Méthode 3: Editer directement ecosystem.config.cjs
@@ -57,7 +57,7 @@ env: {
 }
 ```
 
-Puis: `pm2 restart maison-olive-shop`
+Puis: `pm2 restart chez-olive-shop`
 
 ## Notes Importantes
 
@@ -82,3 +82,4 @@ Puis: `pm2 restart maison-olive-shop`
 ---
 
 **Tip**: Tu peux même automatiser le switch avec un script si tu veux randomiser selon l'heure ou autre logique fun! 🎲
+

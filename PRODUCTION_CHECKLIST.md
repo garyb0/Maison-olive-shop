@@ -1,4 +1,4 @@
-# Maison Olive — Checklist Go‑Live (Production)
+﻿# Chez Olive — Checklist Go‑Live (Production)
 
 Checklist opérationnelle pour passer de **"ça marche en local"** à **"prêt en production"**.
 
@@ -22,6 +22,9 @@ Créer des variables **production** (jamais dans Git):
 - [ ] `SESSION_SECRET=<secret_32+_chars>`
 - [ ] `DATABASE_URL=<database_prod>`
 - [ ] `BUSINESS_SUPPORT_EMAIL=<email_support>`
+- [ ] `DATABASE_URL` ne pointe plus vers `dev.db`
+- [ ] `NEXT_PUBLIC_SITE_URL` n'utilise pas `localhost`
+- [ ] `NEXT_PUBLIC_SITE_URL` utilise bien `https`
 
 Stripe (si activé):
 - [ ] `STRIPE_SECRET_KEY` (live)
@@ -86,10 +89,16 @@ npm run start
 - [ ] Checkout complet validé (commande -> paiement -> retour)
 - [ ] Webhook reçu en prod et commande marquée `PAID`
 - [ ] Cas annulation/expiration testé
+- [ ] Si des produits récurrents sont vendus: abonnement Stripe validé end-to-end en live
+
+Note:
+- Les commandes Stripe one-time ont déjà été validées en production.
+- Le flux abonnement Stripe n'est pas encore validé end-to-end en live au moment de cette note.
 
 ### Email
 - [ ] Email confirmation commande reçu
 - [ ] Expéditeur vérifié (pas d’adresse sandbox en prod)
+- [ ] Liens email (reset password / support) pointent vers le vrai domaine
 
 ---
 
@@ -101,6 +110,8 @@ npm run start
 - [ ] Historique commandes
 - [ ] Re-commande depuis historique
 - [ ] Admin: vue commandes / clients / taxes / inventaire
+- [ ] QR chiens: scan -> claim -> fiche publique
+- [ ] Export vendeur QR généré uniquement avec le vrai domaine
 
 ---
 
@@ -110,6 +121,8 @@ npm run start
 - [ ] Alertes minimales (erreurs 5xx, downtime)
 - [ ] Suivi des commandes en erreur
 - [ ] Processus de support documenté
+- [ ] Procédure de maintenance Cloudflare de secours documentée
+- [ ] Worker Cloudflare de maintenance prêt à activer en cas de panne origin
 
 ---
 
@@ -138,10 +151,10 @@ git push origin main --tags
 git push backup main --tags
 
 # 4) Créer un bundle offline complet
-git bundle create maison-olive-backup.bundle --all
+git bundle create Chez-olive-backup.bundle --all
 
 # 5) Tester la restauration depuis le bundle
-git clone maison-olive-backup.bundle maison-olive-restore-test
+git clone Chez-olive-backup.bundle Chez-olive-restore-test
 ```
 
 ---
@@ -175,3 +188,4 @@ npm run prisma:generate
 npm run build
 npm run start
 ```
+

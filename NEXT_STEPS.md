@@ -1,4 +1,4 @@
-# Maison Olive — Next Steps (ordre d'exécution)
+﻿# Chez Olive — Next Steps (ordre d'exécution)
 
 Ce document sert de runbook court pour le prochain sprint de mise en production.
 
@@ -16,6 +16,10 @@ Ce document sert de runbook court pour le prochain sprint de mise en production.
    ```bash
    npm run validate:env:prod
    ```
+
+Docs utiles:
+- `DOMAIN_MIGRATION_PREP.md`
+- `CUTOVER_CHECKLIST.md`
 
 ### Générer un SESSION_SECRET rapidement
 
@@ -105,6 +109,16 @@ En cas d’incident, commence par:
 - Si Stripe activé: confirmer webhook `checkout.session.completed`
 - Si Resend activé: confirmer email réel reçu
 
+## 4.1) Rappel ouvert — abonnements Stripe
+
+- Les commandes Stripe one-time ont été validées end-to-end en production.
+- Les abonnements Stripe ont des tests unitaires et webhook, mais le parcours live complet n'a pas encore été validé end-to-end.
+- Avant d'activer ou pousser fortement les produits récurrents, faire au minimum:
+  - checkout abonnement live,
+  - webhook reçu,
+  - abonnement visible côté compte/admin,
+  - test d'annulation simple.
+
 ## 5) Go / No-Go
 
 **GO** seulement si:
@@ -114,3 +128,4 @@ En cas d’incident, commence par:
 - parcours client/admin vert
 
 Sinon: **NO-GO**, corriger puis retester.
+

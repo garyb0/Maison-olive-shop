@@ -1,14 +1,29 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import Image from "next/image";
 import Link from "next/link";
-import { normalizeLanguage, getDictionary } from "@/lib/i18n";
+import { normalizeLanguage, getDictionary, type Language } from "@/lib/i18n";
+
+function getCookieLanguage(): Language {
+  if (typeof document === "undefined") return "fr";
+  const match = document.cookie.match(/chezolive_lang=([^;]+)/);
+  return normalizeLanguage(match?.[1]);
+}
 
 function useLanguage() {
-  if (typeof document === "undefined") return "fr" as const;
-  const match = document.cookie.match(/maisonolive_lang=([^;]+)/);
-  return normalizeLanguage(match?.[1]);
+  const [language, setLanguage] = useState<Language>("fr");
+
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      setLanguage(getCookieLanguage());
+    }, 0);
+
+    return () => window.clearTimeout(id);
+  }, []);
+
+  return language;
 }
 
 function ResetPasswordForm() {
@@ -76,33 +91,28 @@ function ResetPasswordForm() {
 
   return (
     <div className="app-shell">
-      <div className="section" style={{ maxWidth: 480, margin: "3rem auto" }}>
-        {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1.5rem" }}>
-          <span
-            style={{
-              fontSize: "2rem",
-              background: "var(--accent-light)",
-              width: "3rem",
-              height: "3rem",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              borderRadius: "0.9rem",
-              flexShrink: 0,
-            }}
-          >
-            🔒
-          </span>
-          <div>
-            <h1 style={{ fontSize: "1.4rem", margin: "0 0 0.15rem" }}>{t.resetPasswordTitle}</h1>
-            <p className="small" style={{ margin: 0 }}>{t.resetPasswordSubtitle}</p>
+      <section className="section auth-shell">
+        <div className="auth-card">
+          <div className="auth-card__header">
+            <div className="auth-card__brand">
+              <Image
+                src="/images/chez-olive/chezolive-logo-mark-tight.png"
+                alt="Chez Olive"
+                width={84}
+                height={84}
+                className="auth-card__logo"
+                priority
+              />
+              <div>
+                <p className="account-home-hero__eyebrow">{lang === "fr" ? "Compte" : "Account"}</p>
+                <h1 className="auth-card__title">{t.resetPasswordTitle}</h1>
+                <p className="auth-card__text">{t.resetPasswordSubtitle}</p>
+              </div>
+            </div>
           </div>
-        </div>
 
-        {/* Success state */}
-        {success ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          {success ? (
+          <div className="auth-form">
             <div className="auth-alert auth-alert--ok">
               <span>✅</span> {t.resetPasswordSuccess}
             </div>
@@ -119,7 +129,7 @@ function ResetPasswordForm() {
             )}
 
             {!error || token ? (
-              <form onSubmit={(e) => void onSubmit(e)}>
+              <form onSubmit={(e) => void onSubmit(e)} className="auth-form">
                 <div className="field">
                   <label>{lang === "fr" ? "Nouveau mot de passe" : "New password"}</label>
                   <div className="input-icon-wrap">
@@ -155,11 +165,11 @@ function ResetPasswordForm() {
                   </div>
                 </div>
 
-                <button className="btn btn-full" type="submit" disabled={loading || !token} style={{ marginBottom: "0.75rem" }}>
+                <button className="btn btn-full" type="submit" disabled={loading || !token}>
                   {loading ? t.resetPasswordSaving : t.resetPasswordBtn}
                 </button>
 
-                <div style={{ textAlign: "center" }}>
+                <div className="auth-card__actions">
                   <Link href="/" className="small" style={{ color: "var(--muted)" }}>
                     ← {t.backToHome}
                   </Link>
@@ -172,7 +182,8 @@ function ResetPasswordForm() {
             )}
           </>
         )}
-      </div>
+        </div>
+      </section>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-# Maison Olive — Guide de migration (sans perte)
+﻿# Chez Olive — Guide de migration (sans perte)
 
 Ce guide couvre 2 cas:
 
@@ -74,3 +74,4 @@ npm run prisma:migrate:safe -- <migration-name>
 npm run validate:env:prod
 npm run smoke
 ```
+

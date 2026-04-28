@@ -31,5 +31,8 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Critical tests
+        run: npm run test:critical
+
       - name: Build
         run: npm run build

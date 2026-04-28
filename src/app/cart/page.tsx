@@ -3,6 +3,7 @@ import { getCurrentLanguage } from "@/lib/language";
 import { getDictionary } from "@/lib/i18n";
 import { getActiveProducts } from "@/lib/catalog";
 import { CartClient } from "@/app/cart/cart-client";
+import { env } from "@/lib/env";
 
 export default async function CartPage() {
   const [language, user, products] = await Promise.all([
@@ -44,6 +45,8 @@ export default async function CartPage() {
       t={t}
       user={user}
       productIndex={productIndex}
+      shippingFlatCents={env.shippingFlatCents}
+      shippingFreeThresholdCents={env.shippingFreeThresholdCents}
     />
   );
 }

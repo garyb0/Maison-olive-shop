@@ -1,7 +1,5 @@
-import { describe, it, expect } from 'vitest';
+/// <reference types="vitest/globals" />
 import { 
-  CHAT_PROMO_CODE, 
-  CHAT_PROMO_DISCOUNT_PERCENT, 
   normalizePromoCode, 
   isSupportedPromoCode, 
   getPromoDiscountCents 

@@ -2,7 +2,6 @@
 
 import { useSearchParams } from "next/navigation";
 import type { Dictionary, Language } from "@/lib/i18n";
-import type { CurrentUser } from "@/lib/types";
 import { Navigation } from "@/components/Navigation";
 import { PromoBanner } from "@/components/PromoBanner";
 
@@ -53,7 +52,7 @@ export function AccountClient({ language, t, user, orders }: Props) {
         <Navigation language={language} t={t} user={{ role: user.role }} />
       </header>
 
-      <PromoBanner />
+      <PromoBanner language={language} />
 
       <section className="section">
         <h1>

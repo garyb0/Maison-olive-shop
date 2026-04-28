@@ -36,6 +36,38 @@ export function loadEnvFilesInOrder(fileNames: string[]) {
   }
 }
 
+export type EnvTarget = "development" | "production";
+
+export function resolveEnvTargetFromArgs(
+  args = process.argv,
+  fallback: EnvTarget = process.env.NODE_ENV === "production" ? "production" : "development",
+): EnvTarget {
+  const explicit = args.find((value) => value.startsWith("--env="));
+  if (explicit === "--env=production") {
+    return "production";
+  }
+  if (explicit === "--env=development") {
+    return "development";
+  }
+  return fallback;
+}
+
+export function getEnvFilesForTarget(target: EnvTarget) {
+  if (target === "production") {
+    return [".env.production.local", ".env.production", ".env"];
+  }
+
+  return [".env.local", ".env"];
+}
+
+export function loadDatabaseEnvForTarget(target: EnvTarget) {
+  loadEnvFilesInOrder(getEnvFilesForTarget(target));
+}
+
+export function getPositionalScriptArgs(args = process.argv) {
+  return args.slice(2).filter((value) => !value.startsWith("--"));
+}
+
 const stripQueryAndHash = (value: string) => value.split(/[?#]/)[0];
 
 export function resolveSqliteDbPathFromUrl(databaseUrl: string | undefined): string | null {

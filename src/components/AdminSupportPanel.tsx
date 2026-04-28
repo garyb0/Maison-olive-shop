@@ -1,6 +1,6 @@
-"use client";
+﻿"use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Message = {
   id: string;
@@ -22,35 +22,65 @@ type Props = {
   language: "fr" | "en";
 };
 
-const STATUS_LABEL: Record<string, string> = {
+const STATUS_ICON: Record<string, string> = {
   WAITING: "⏳",
   OPEN: "🟢",
   ASSIGNED: "👤",
   CLOSED: "✓",
 };
 
+function getStatusText(status: Conversation["status"], language: "fr" | "en") {
+  if (language === "fr") {
+    switch (status) {
+      case "WAITING":
+        return "En attente";
+      case "OPEN":
+        return "Ouverte";
+      case "ASSIGNED":
+        return "Prise en charge";
+      case "CLOSED":
+        return "Fermee";
+      default:
+        return status;
+    }
+  }
+
+  switch (status) {
+    case "WAITING":
+      return "Waiting";
+    case "OPEN":
+      return "Open";
+    case "ASSIGNED":
+      return "Assigned";
+    case "CLOSED":
+      return "Closed";
+    default:
+      return status;
+  }
+}
+
 const QUICK_REPLIES_KEY = "admin_quick_replies";
 const ADMIN_NAME_KEY = "admin_display_name";
 
 const DEFAULT_QUICK_REPLIES_FR = (name: string) => [
-  `Bonjour ! Je suis ${name} de l'équipe Maison Olive. Comment puis-je vous aider aujourd'hui ? 🫒`,
+  `Bonjour ! Je suis ${name} de l'équipe Chez Olive. Comment puis-je vous aider aujourd'hui ? 🫒`,
   `Bonjour ! ${name} à votre service. Je suis là pour vous aider !`,
   `Merci pour votre message ! Je vérifie ça pour vous et reviens vers vous dans quelques instants.`,
   `Votre commande est actuellement en cours de traitement. Vous recevrez une confirmation par email sous peu.`,
   `Je comprends votre situation. Laissez-moi vérifier ça avec notre équipe et je vous reviens très rapidement.`,
   `Avez-vous d'autres questions ? Je suis disponible pour vous aider !`,
-  `Merci pour votre patience. Votre satisfaction est notre priorité chez Maison Olive.`,
+  `Merci pour votre patience. Votre satisfaction est notre priorité chez Chez Olive.`,
   `Cette conversation est maintenant terminée. N'hésitez pas à nous recontacter si vous avez d'autres questions. Bonne journée ! 🫒`,
 ];
 
 const DEFAULT_QUICK_REPLIES_EN = (name: string) => [
-  `Hello! I'm ${name} from the Maison Olive team. How can I help you today? 🫒`,
+  `Hello! I'm ${name} from the Chez Olive team. How can I help you today? 🫒`,
   `Hi there! ${name} here at your service. I'm here to help!`,
   `Thank you for your message! Let me check on that for you and I'll be right back.`,
   `Your order is currently being processed. You will receive a confirmation email shortly.`,
   `I understand your situation. Let me check with our team and get back to you very quickly.`,
   `Do you have any other questions? I'm here to help!`,
-  `Thank you for your patience. Your satisfaction is our priority at Maison Olive.`,
+  `Thank you for your patience. Your satisfaction is our priority at Chez Olive.`,
   `This conversation is now closed. Don't hesitate to contact us again if you have other questions. Have a great day! 🫒`,
 ];
 
@@ -182,7 +212,6 @@ export function AdminSupportPanel({ language }: Props) {
   const [error, setError] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
-  const listScrollRestoreRef = useRef<number | null>(null);
 
   // Request notification permission on mount
   useEffect(() => {
@@ -202,8 +231,8 @@ export function AdminSupportPanel({ language }: Props) {
         : `🔔 ${newWaiting} new conversation${newWaiting > 1 ? 's' : ''}`;
       
       const body = language === "fr"
-        ? "Un client attend votre réponse sur Maison Olive"
-        : "A customer is waiting for your response on Maison Olive";
+        ? "Un client attend votre réponse sur Chez Olive"
+        : "A customer is waiting for your response on Chez Olive";
       
       new Notification(title, {
         body,
@@ -357,7 +386,7 @@ export function AdminSupportPanel({ language }: Props) {
       const first = items.find((c) => c.status === "WAITING") ?? items.find((c) => c.status !== "CLOSED");
       if (first) setSelectedId(first.id);
     }
-  }, [items]);
+  }, [items, selectedId]);
 
   // Auto-scroll messages to bottom only when admin sends a message (not on every poll)
   const lastScrolledMsgCount = useRef(0);
@@ -455,13 +484,30 @@ export function AdminSupportPanel({ language }: Props) {
   });
 
   const waitingCount = items.filter((c) => c.status === "WAITING").length;
+  const activeCount = items.filter((c) => c.status !== "CLOSED").length;
+  const closedCount = items.filter((c) => c.status === "CLOSED").length;
 
   return (
     <section className="section" style={{ padding: 0, overflow: "hidden" }}>
       {/* Panel header */}
       <div className="support-admin-header">
-        <div>
-          <h2 style={{ margin: 0 }}>{t.title}</h2>
+        <div className="support-admin-header__intro">
+          <div>
+            <h2 style={{ margin: 0 }}>{t.title}</h2>
+            <p className="support-admin-header__copy">
+              {language === "fr"
+                ? "Un espace plus simple pour répondre vite et garder le bon ton."
+                : "A calmer workspace to reply quickly and keep the right tone."}
+            </p>
+          </div>
+          <div className="support-admin-summary">
+            <span className="support-admin-summary-pill">
+              {activeCount} {language === "fr" ? "actives" : "active"}
+            </span>
+            <span className="support-admin-summary-pill support-admin-summary-pill--soft">
+              {closedCount} {language === "fr" ? "fermées" : "closed"}
+            </span>
+          </div>
           {waitingCount > 0 && (
             <span className="support-admin-waiting-badge">
               {waitingCount} {language === "fr" ? "en attente" : "waiting"}
@@ -614,7 +660,7 @@ export function AdminSupportPanel({ language }: Props) {
             <input
               className="support-admin-search-input"
               type="search"
-              placeholder={language === "fr" ? "🔍 Rechercher..." : "🔍 Search..."}
+              placeholder={language === "fr" ? "Rechercher un client ou un email" : "Search customer or email"}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -645,8 +691,9 @@ export function AdminSupportPanel({ language }: Props) {
                 }}
               >
                 <div className="support-admin-item-top">
-                  <span className="support-admin-item-status" title={conv.status}>
-                    {STATUS_LABEL[conv.status] ?? "?"}
+                  <span className={`support-admin-item-status support-admin-item-status--${conv.status.toLowerCase()}`} title={conv.status}>
+                    <span>{STATUS_ICON[conv.status] ?? "?"}</span>
+                    <span>{getStatusText(conv.status, language)}</span>
                   </span>
                   <strong className="support-admin-item-name">{conv.customerName}</strong>
                   {lastMsgTime && (
@@ -690,10 +737,14 @@ export function AdminSupportPanel({ language }: Props) {
             <>
               {/* Conversation header */}
               <div className="support-admin-detail-header">
-                <div>
-                  <strong>{selected.customerName}</strong>
-                  <span className="small" style={{ marginLeft: 8 }}>{selected.customerEmail}</span>
-                  <span className="support-admin-status-pill">{STATUS_LABEL[selected.status]} {selected.status}</span>
+                <div className="support-admin-detail-header__meta">
+                  <div className="support-admin-detail-header__identity">
+                    <strong>{selected.customerName}</strong>
+                    <span className="small">{selected.customerEmail}</span>
+                  </div>
+                  <span className={`support-admin-status-pill support-admin-status-pill--${selected.status.toLowerCase()}`}>
+                    {STATUS_ICON[selected.status]} {getStatusText(selected.status, language)}
+                  </span>
                 </div>
                 <div className="row" style={{ gap: "0.5rem" }}>
                   {selected.status !== "ASSIGNED" && selected.status !== "CLOSED" && (
@@ -828,3 +879,4 @@ export function AdminSupportPanel({ language }: Props) {
     </section>
   );
 }
+
