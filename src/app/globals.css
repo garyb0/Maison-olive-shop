@@ -6562,7 +6562,6 @@ tr:last-child td {
 }
 
 .local-cart-delivery-banner,
-.cart-free-delivery-card,
 .checkout-local-reassurance,
 .checkout-final-trust {
   display: grid;
@@ -6575,29 +6574,6 @@ tr:last-child td {
 
 .local-cart-delivery-banner {
   margin-top: 1rem;
-}
-
-.cart-free-delivery-card {
-  margin-bottom: 1rem;
-}
-
-.cart-free-delivery-copy {
-  display: grid;
-  gap: 0.18rem;
-}
-
-.cart-free-delivery-progress {
-  height: 0.6rem;
-  border-radius: 999px;
-  overflow: hidden;
-  background: rgba(92, 107, 64, 0.12);
-}
-
-.cart-free-delivery-progress span {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, var(--brand), var(--brand-2));
 }
 
 .local-account-strip-wrap {
@@ -9468,13 +9444,6 @@ button.home-category-chip:hover,
   color: var(--olive-900);
 }
 
-.section.cart-free-delivery-card {
-  grid-template-columns: minmax(0, 1fr) minmax(180px, 280px);
-  align-items: center;
-  margin-bottom: 1rem;
-}
-
-.cart-free-delivery-copy strong,
 .checkout-local-reassurance strong,
 .checkout-final-trust strong {
   color: var(--olive-900);
@@ -9616,8 +9585,7 @@ button.home-category-chip:hover,
   .home-market-stats,
   .home-local-promises,
   .home-rail-grid,
-  .cart-route-strip,
-  .section.cart-free-delivery-card {
+  .cart-route-strip {
     grid-template-columns: 1fr;
   }
 

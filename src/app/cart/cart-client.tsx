@@ -168,9 +168,6 @@ export function CartClient({
   const pricedSubtotalCents = visibleQuote?.subtotalCents ?? totalCents;
   const remainingForFreeShippingCents = Math.max(0, shippingFreeThresholdCents - pricedSubtotalCents);
   const qualifiesForFreeShipping = rows.length > 0 && visibleQuote?.shippingCents === 0;
-  const freeShippingProgress = shippingFreeThresholdCents > 0
-    ? Math.min(100, Math.round((pricedSubtotalCents / shippingFreeThresholdCents) * 100))
-    : 100;
 
   return (
     <div className="app-shell">
@@ -238,32 +235,6 @@ export function CartClient({
             <span className="cart-route-step">
               {language === "fr" ? "3. Paiement" : "3. Payment"}
             </span>
-          </section>
-
-          <section className="section cart-free-delivery-card">
-            <div className="cart-free-delivery-copy">
-              <strong>
-                {qualifiesForFreeShipping
-                  ? language === "fr"
-                    ? "Livraison gratuite débloquée"
-                    : "Free delivery unlocked"
-                  : language === "fr"
-                    ? "Objectif livraison gratuite"
-                    : "Free delivery goal"}
-              </strong>
-              <span>
-                {qualifiesForFreeShipping
-                  ? language === "fr"
-                    ? "Ton panier a atteint le seuil. Le checkout confirmera l'adresse locale."
-                    : "Your cart reached the threshold. Checkout will confirm the local address."
-                  : language === "fr"
-                    ? `Ajoute ${fmt(remainingForFreeShippingCents, "CAD", locale)} pour profiter de la livraison gratuite.`
-                    : `Add ${fmt(remainingForFreeShippingCents, "CAD", locale)} to unlock free delivery.`}
-              </span>
-            </div>
-            <div className="cart-free-delivery-progress" aria-hidden="true">
-              <span style={{ width: `${freeShippingProgress}%` }} />
-            </div>
           </section>
 
           <section className="section cart-content-section">
