@@ -8848,7 +8848,7 @@ button.home-category-chip:hover,
   position: relative;
   isolation: isolate;
   display: grid;
-  overflow: hidden;
+  overflow: visible;
   gap: 1.1rem;
   padding: clamp(1.1rem, 2.4vw, 1.65rem);
 }
@@ -8864,7 +8864,7 @@ button.home-category-chip:hover,
 
 .home-rimouski-map-bg {
   position: absolute;
-  inset: 0;
+  inset: -1.8rem -3.8rem;
   z-index: 0;
   pointer-events: none;
   opacity: 0.82;
@@ -8875,6 +8875,8 @@ button.home-category-chip:hover,
   background-size: min(1180px, 94vw) auto;
   filter: grayscale(1);
   mix-blend-mode: multiply;
+  transform: scaleX(1.08);
+  transform-origin: center;
 }
 
 .home-market-copy {
@@ -9225,10 +9227,12 @@ button.home-category-chip:hover,
   }
 
   .home-rimouski-map-bg {
+    inset: -1rem -1.4rem;
     background-attachment: scroll;
     background-position: center top;
     background-size: 760px auto;
     opacity: 0.46;
+    transform: none;
   }
 
   .home-rail-grid {
@@ -9274,6 +9278,7 @@ button.home-category-chip:hover,
   }
 
   .home-rimouski-map-bg {
+    inset: -0.7rem -0.85rem;
     background-position: 42% 8%;
     background-size: 660px auto;
     opacity: 0.36;
