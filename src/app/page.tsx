@@ -52,6 +52,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
   const oliveMode = (process.env.OLIVE_MODE as "princess" | "gremlin") || "princess";
   const initialRegisterEmail = getSearchParam(query.registerEmail)?.trim() ?? "";
+  const initialSearch = (getSearchParam(query.q) ?? getSearchParam(query.search) ?? "").trim();
 
   return (
     <StorefrontClient
@@ -62,6 +63,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       oliveMode={oliveMode}
       banners={banners}
       initialRegisterEmail={initialRegisterEmail}
+      initialSearch={initialSearch}
     />
   );
 }

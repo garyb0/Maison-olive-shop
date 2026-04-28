@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { usePathname } from "next/navigation";
 import type { Dictionary, Language } from "@/lib/i18n";
 import type { CurrentUser } from "@/lib/types";
@@ -28,6 +28,7 @@ export function Navigation({ language, t, user, onLogout }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [catalogSearch, setCatalogSearch] = useState("");
   const prevCountRef = useRef(0);
 
   useEffect(() => {
@@ -138,6 +139,27 @@ export function Navigation({ language, t, user, onLogout }: Props) {
     setMenuOpen((v) => !v);
   }, []);
 
+  const runCatalogSearch = useCallback((value: string) => {
+    const query = value.trim();
+    const target = query ? `/?q=${encodeURIComponent(query)}#catalogue` : "/#catalogue";
+
+    setMenuOpen(false);
+
+    if (pathname === "/") {
+      window.dispatchEvent(new CustomEvent("chezolive:catalog-search", { detail: query }));
+      document.getElementById("catalogue")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      window.history.replaceState(null, "", target);
+      return;
+    }
+
+    window.location.href = target;
+  }, [pathname]);
+
+  const handleCatalogSearchSubmit = useCallback((event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    runCatalogSearch(catalogSearch);
+  }, [catalogSearch, runCatalogSearch]);
+
   return (
     <header className="nav-header glow-border">
       {/* ── Marque / Logo ── */}
@@ -158,6 +180,30 @@ export function Navigation({ language, t, user, onLogout }: Props) {
 
       {/* ── Nav-body : toujours rendu, CSS gère mobile/desktop ── */}
       <div className="nav-body">
+          <form
+            className="nav-search"
+            role="search"
+            onSubmit={handleCatalogSearchSubmit}
+          >
+            <span className="nav-search-icon" aria-hidden="true">🔍</span>
+            <input
+              className="nav-search-input"
+              type="search"
+              value={catalogSearch}
+              onChange={(event) => setCatalogSearch(event.target.value)}
+              placeholder={language === "fr" ? "Chercher croquettes, jouets..." : "Search food, toys..."}
+              aria-label={language === "fr" ? "Rechercher dans la boutique" : "Search the shop"}
+              suppressHydrationWarning
+            />
+            <button
+              className="nav-search-submit"
+              type="submit"
+              aria-label={language === "fr" ? "Lancer la recherche" : "Run search"}
+            >
+              →
+            </button>
+          </form>
+
           {/* Liens principaux */}
           <nav className="nav-primary" aria-label={language === "fr" ? "Navigation principale" : "Main navigation"}>
             <Link className={`pill-link${isActive("/") ? " pill-link--active" : ""}`} href="/">
@@ -185,6 +231,11 @@ export function Navigation({ language, t, user, onLogout }: Props) {
               {t.navFaq}
             </Link>
           </nav>
+
+          <Link className="nav-location-pill" href="/#catalogue">
+            <span aria-hidden="true">📍</span>
+            <span>Rimouski</span>
+          </Link>
 
           <div className="nav-sell-center">
             <Link className={`pill-link pill-link--sm pill-link--sell${isActive("/sell") ? " pill-link--active" : ""}`} href="/sell">
@@ -313,6 +364,39 @@ export function Navigation({ language, t, user, onLogout }: Props) {
             </div>
 
             {/* Liens de navigation */}
+            <form
+              className="nav-drawer-search"
+              role="search"
+              onSubmit={handleCatalogSearchSubmit}
+            >
+              <span className="nav-search-icon" aria-hidden="true">🔍</span>
+              <input
+                className="nav-search-input"
+                type="search"
+                value={catalogSearch}
+                onChange={(event) => setCatalogSearch(event.target.value)}
+                placeholder={language === "fr" ? "Chercher un produit" : "Search products"}
+                aria-label={language === "fr" ? "Rechercher dans la boutique" : "Search the shop"}
+                suppressHydrationWarning
+              />
+              <button
+                className="nav-search-submit"
+                type="submit"
+                aria-label={language === "fr" ? "Lancer la recherche" : "Run search"}
+              >
+                →
+              </button>
+            </form>
+
+            <Link
+              className="nav-drawer-local-chip"
+              href="/#catalogue"
+              onClick={() => setMenuOpen(false)}
+            >
+              <span aria-hidden="true">📍</span>
+              <span>{language === "fr" ? "Livraison locale Rimouski" : "Local delivery Rimouski"}</span>
+            </Link>
+
             <div className="nav-drawer-links">
               <Link
                 className={`nav-drawer-link${isActive("/") ? " nav-drawer-link--active" : ""}`}

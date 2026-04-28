@@ -56,6 +56,7 @@ type Props = {
   oliveMode?: "princess" | "gremlin";
   banners?: PromoBannerData[];
   initialRegisterEmail?: string;
+  initialSearch?: string;
 };
 
 const CART_STORAGE_KEY = "chezolive_cart_v1";
@@ -106,7 +107,15 @@ function getLocalizedCategoryLabel(category: string, language: Language): string
   return CATEGORY_LABELS[normalized]?.[language] ?? category;
 }
 
-export function StorefrontClient({ language, t, user, products, banners = [], initialRegisterEmail = "" }: Props) {
+export function StorefrontClient({
+  language,
+  t,
+  user,
+  products,
+  banners = [],
+  initialRegisterEmail = "",
+  initialSearch = "",
+}: Props) {
   const [cart, setCart] = useState<CartLine[]>([]);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [loginLoading, setLoginLoading] = useState(false);
@@ -121,7 +130,7 @@ export function StorefrontClient({ language, t, user, products, banners = [], in
   const [flyItems, setFlyItems] = useState<FlyItem[]>([]);
 
   // ── Catalog filters ──
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(initialSearch);
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [sortBy, setSortBy] = useState<SortBy>("newest");
 
@@ -140,6 +149,21 @@ export function StorefrontClient({ language, t, user, products, banners = [], in
   useEffect(() => {
     localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
   }, [cart]);
+
+  useEffect(() => {
+    const handleCatalogSearch = (event: Event) => {
+      const nextSearch =
+        event instanceof CustomEvent && typeof event.detail === "string"
+          ? event.detail
+          : "";
+
+      setSearch(nextSearch);
+      setCategoryFilter("all");
+    };
+
+    window.addEventListener("chezolive:catalog-search", handleCatalogSearch);
+    return () => window.removeEventListener("chezolive:catalog-search", handleCatalogSearch);
+  }, []);
 
   // ── Unique categories ──
   const categories = useMemo(() => {
@@ -166,6 +190,51 @@ export function StorefrontClient({ language, t, user, products, banners = [], in
       isFilterable: false,
     }));
   }, [categories, language]);
+
+  const marketHighlights = useMemo(() => [
+    {
+      value: products.length > 0 ? String(products.length) : language === "fr" ? "Bientôt" : "Soon",
+      label: language === "fr" ? "produits actifs" : "active products",
+    },
+    {
+      value: categories.length > 0 ? String(categories.length) : "6",
+      label: language === "fr" ? "rayons animaux" : "pet departments",
+    },
+    {
+      value: "Rimouski",
+      label: language === "fr" ? "livraison locale" : "local delivery",
+    },
+  ], [categories.length, language, products.length]);
+
+  const localPromiseCards = useMemo(() => [
+    {
+      title: language === "fr" ? "Sélections Chez Olive" : "Chez Olive picks",
+      text: language === "fr"
+        ? "Des essentiels utiles, choisis pour les vraies routines avec animaux."
+        : "Useful essentials selected for real pet routines.",
+    },
+    {
+      title: language === "fr" ? "Entreprises d'ici" : "Local businesses",
+      text: language === "fr"
+        ? "Une vitrine prête à accueillir les vendeurs de la région."
+        : "A storefront ready to welcome regional sellers.",
+    },
+    {
+      title: language === "fr" ? "Commande simple" : "Simple checkout",
+      text: language === "fr"
+        ? "Panier, livraison locale et paiement restent dans un parcours clair."
+        : "Cart, local delivery, and payment stay in a clear flow.",
+    },
+  ], [language]);
+
+  const featuredProducts = useMemo(
+    () => products.filter((product) => product.stock > 0).slice(0, 4),
+    [products],
+  );
+
+  const focusCatalog = () => {
+    document.getElementById("catalogue")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   // ── Filtered + sorted products ──
   const filteredProducts = useMemo(() => {
@@ -372,7 +441,11 @@ export function StorefrontClient({ language, t, user, products, banners = [], in
                     type="button"
                     key={category.key}
                     className={`home-category-chip${categoryFilter === category.value ? " home-category-chip--active" : ""}`}
-                    onClick={() => setCategoryFilter(category.value)}
+                    onClick={() => {
+                      setSearch("");
+                      setCategoryFilter(category.value);
+                      focusCatalog();
+                    }}
                   >
                     <span aria-hidden="true">{category.emoji}</span>
                     {category.label}
@@ -414,6 +487,99 @@ export function StorefrontClient({ language, t, user, products, banners = [], in
             <small>{language === "fr" ? "Une équipe d’ici" : "A local team"}</small>
           </article>
         </section>
+
+        <section className="home-market-overview" aria-label={language === "fr" ? "Aperçu marketplace" : "Marketplace overview"}>
+          <div className="home-market-copy">
+            <p className="home-eyebrow">
+              {language === "fr" ? "Magasiner sans détour" : "Shop without friction"}
+            </p>
+            <h2>
+              {language === "fr"
+                ? "Un accueil qui mène vite au bon produit."
+                : "A home page that gets shoppers to the right product fast."}
+            </h2>
+            <p>
+              {language === "fr"
+                ? "Recherche, catégories, coups de cœur et panier restent visibles pour donner une vraie sensation de boutique prête à vendre."
+                : "Search, categories, favorites, and cart stay visible so the shop feels ready to sell."}
+            </p>
+          </div>
+
+          <div className="home-market-stats">
+            {marketHighlights.map((item) => (
+              <article key={item.label}>
+                <strong>{item.value}</strong>
+                <span>{item.label}</span>
+              </article>
+            ))}
+          </div>
+
+          <div className="home-local-promises">
+            {localPromiseCards.map((card) => (
+              <article key={card.title}>
+                <strong>{card.title}</strong>
+                <span>{card.text}</span>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        {featuredProducts.length > 0 ? (
+          <section className="home-product-rail" aria-labelledby="home-product-rail-title">
+            <div className="home-section-head">
+              <div>
+                <p className="home-eyebrow">
+                  {language === "fr" ? "En vedette" : "Featured"}
+                </p>
+                <h2 id="home-product-rail-title">
+                  {language === "fr" ? "Prêts à ajouter au panier" : "Ready to add to cart"}
+                </h2>
+              </div>
+              <a className="home-section-link" href="#catalogue">
+                {language === "fr" ? "Voir toute la boutique" : "View full shop"}
+              </a>
+            </div>
+
+            <div className="home-rail-grid">
+              {featuredProducts.map((product) => (
+                <article className="home-rail-card" key={product.id}>
+                  <Link className="home-rail-visual" href={`/products/${product.slug}`}>
+                    {product.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={product.imageUrl} alt={product.name} />
+                    ) : (
+                      <span aria-hidden="true">{getCategoryEmoji(product.category)}</span>
+                    )}
+                  </Link>
+                  <div className="home-rail-copy">
+                    <span className="home-rail-category">
+                      {getLocalizedCategoryLabel(product.category, language)}
+                    </span>
+                    <Link className="home-rail-name" href={`/products/${product.slug}`}>
+                      {product.name}
+                    </Link>
+                    <div className="home-rail-bottom">
+                      <strong>{product.priceLabel}</strong>
+                      <button
+                        className="home-rail-add"
+                        type="button"
+                        disabled={addingId === product.id}
+                        onClick={(event) => {
+                          const rect = event.currentTarget.getBoundingClientRect();
+                          addToCart(product, rect.left + rect.width / 2, rect.top + rect.height / 2);
+                        }}
+                      >
+                        {addingId === product.id
+                          ? language === "fr" ? "Ajouté" : "Added"
+                          : language === "fr" ? "Ajouter" : "Add"}
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : null}
 
         {!user ? (
           <section className="section auth-section">

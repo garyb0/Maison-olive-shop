@@ -1063,6 +1063,19 @@ export function CheckoutClient({
           <span>{language === "fr" ? "AM ou PM" : "AM or PM"}</span>
           <span>{language === "fr" ? "Paiement sécurisé" : "Secure payment"}</span>
         </div>
+        <div className="checkout-local-reassurance">
+          <strong>{language === "fr" ? "Checkout local, clair et complet" : "Clear local checkout"}</strong>
+          <span>
+            {language === "fr"
+              ? "Le résumé, la livraison et le paiement restent visibles jusqu'à la confirmation."
+              : "Summary, delivery, and payment stay visible until confirmation."}
+          </span>
+          <small>
+            {language === "fr"
+              ? "Zone servie: Rimouski et environs selon le code postal."
+              : "Delivery area: Rimouski and nearby, based on postal code."}
+          </small>
+        </div>
       </section>
 
       {cartRows.length === 0 ? (
@@ -2105,6 +2118,15 @@ export function CheckoutClient({
                   📍 {language === "fr"
                     ? "Livraison locale à Rimouski et environs seulement."
                     : "Local delivery in Rimouski area only."}
+                </div>
+
+                <div className="checkout-final-trust">
+                  <strong>{language === "fr" ? "Avant de confirmer" : "Before confirming"}</strong>
+                  <ul>
+                    <li>{language === "fr" ? "Le total inclut les taxes estimées." : "The total includes estimated taxes."}</li>
+                    <li>{language === "fr" ? "Le créneau AM ou PM sert au suivi de livraison." : "The AM or PM window helps delivery tracking."}</li>
+                    <li>{language === "fr" ? "Le paiement par carte reste sécurisé par Stripe." : "Card payment stays secured by Stripe."}</li>
+                  </ul>
                 </div>
 
                 {message ? (
