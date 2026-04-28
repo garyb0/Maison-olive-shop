@@ -899,6 +899,9 @@ export function StorefrontClient({
                 >
                   {/* Visuel — image ou emoji de catégorie */}
                   <Link className="catalog-product-media" href={`/products/${product.slug}`}>
+                    <span className="catalog-product-category">
+                      {getLocalizedCategoryLabel(product.category, language)}
+                    </span>
                     {product.imageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={product.imageUrl} alt={product.name} className="catalog-product-img" />
@@ -909,7 +912,6 @@ export function StorefrontClient({
 
                   {/* Badges : catégorie + stock */}
                   <div className="catalog-product-meta">
-                    <span className="catalog-product-category">{getLocalizedCategoryLabel(product.category, language)}</span>
                     {product.stock === 0 ? (
                       <span className="catalog-stock-pill catalog-stock-pill--out">
                         {language === "fr" ? "Rupture" : "Out of stock"}
@@ -931,7 +933,10 @@ export function StorefrontClient({
                     <Link href={`/products/${product.slug}`} className="catalog-product-name">
                       {product.name}
                     </Link>
-                    <p>{product.description}</p>
+                    <p className="catalog-product-seller">Chez Olive &middot; Rimouski</p>
+                    <p className="catalog-product-rating" aria-label={language === "fr" ? "Note cinq etoiles" : "Five star rating"}>
+                      <span aria-hidden="true">★★★★★</span>
+                    </p>
                   </div>
 
                   {/* Ajout au panier */}
