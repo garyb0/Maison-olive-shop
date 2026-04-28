@@ -506,8 +506,6 @@ export function StorefrontClient({
         </section>
 
         <section className="home-market-overview" aria-label={language === "fr" ? "Aperçu marketplace" : "Marketplace overview"}>
-          <div className="home-rimouski-map-bg" aria-hidden="true" />
-
           <div className="home-market-copy">
             <p className="home-eyebrow">
               {language === "fr" ? "Boutique locale" : "Local shop"}
