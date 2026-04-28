@@ -206,7 +206,7 @@ export function Navigation({ language, t, user, onLogout }: Props) {
 
           {/* Liens principaux */}
           <nav className="nav-primary" aria-label={language === "fr" ? "Navigation principale" : "Main navigation"}>
-            <Link className={`pill-link${isActive("/") ? " pill-link--active" : ""}`} href="/">
+            <Link className={`pill-link pill-link--home${isActive("/") ? " pill-link--active" : ""}`} href="/">
               🏠 {t.navHome}
             </Link>
             <Link className="pill-link pill-link--shop" href="/#catalogue">

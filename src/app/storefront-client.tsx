@@ -208,22 +208,22 @@ export function StorefrontClient({
 
   const localPromiseCards = useMemo(() => [
     {
-      title: language === "fr" ? "Sélections Chez Olive" : "Chez Olive picks",
+      title: language === "fr" ? "Essentiels choisis" : "Curated essentials",
       text: language === "fr"
-        ? "Des essentiels utiles, choisis pour les vraies routines avec animaux."
-        : "Useful essentials selected for real pet routines.",
+        ? "Nourriture, confort, soins et jeux pour les routines du quotidien."
+        : "Food, comfort, care, and play for everyday routines.",
     },
     {
-      title: language === "fr" ? "Entreprises d'ici" : "Local businesses",
+      title: language === "fr" ? "Marché local" : "Local market",
       text: language === "fr"
-        ? "Une vitrine prête à accueillir les vendeurs de la région."
-        : "A storefront ready to welcome regional sellers.",
+        ? "Une boutique pensée pour mettre les produits de la région en avant."
+        : "A shop made to put regional products forward.",
     },
     {
-      title: language === "fr" ? "Commande simple" : "Simple checkout",
+      title: language === "fr" ? "Achat rassurant" : "Easy checkout",
       text: language === "fr"
-        ? "Panier, livraison locale et paiement restent dans un parcours clair."
-        : "Cart, local delivery, and payment stay in a clear flow.",
+        ? "Livraison locale, paiement sécurisé et suivi clair de la commande."
+        : "Local delivery, secure payment, and clear order follow-up.",
     },
   ], [language]);
 
@@ -491,17 +491,17 @@ export function StorefrontClient({
         <section className="home-market-overview" aria-label={language === "fr" ? "Aperçu marketplace" : "Marketplace overview"}>
           <div className="home-market-copy">
             <p className="home-eyebrow">
-              {language === "fr" ? "Magasiner sans détour" : "Shop without friction"}
+              {language === "fr" ? "Boutique locale" : "Local shop"}
             </p>
             <h2>
               {language === "fr"
-                ? "Un accueil qui mène vite au bon produit."
-                : "A home page that gets shoppers to the right product fast."}
+                ? "Trouver vite les essentiels de votre compagnon."
+                : "Find your companion’s essentials quickly."}
             </h2>
             <p>
               {language === "fr"
-                ? "Recherche, catégories, coups de cœur et panier restent visibles pour donner une vraie sensation de boutique prête à vendre."
-                : "Search, categories, favorites, and cart stay visible so the shop feels ready to sell."}
+                ? "Des produits sélectionnés pour chiens et chats, avec livraison locale à Rimouski et paiement sécurisé."
+                : "Selected products for dogs and cats, with local Rimouski delivery and secure payment."}
             </p>
           </div>
 
@@ -529,10 +529,10 @@ export function StorefrontClient({
             <div className="home-section-head">
               <div>
                 <p className="home-eyebrow">
-                  {language === "fr" ? "En vedette" : "Featured"}
+                  {language === "fr" ? "Coups de cœur" : "Favorites"}
                 </p>
                 <h2 id="home-product-rail-title">
-                  {language === "fr" ? "Prêts à ajouter au panier" : "Ready to add to cart"}
+                  {language === "fr" ? "Disponibles maintenant" : "Available now"}
                 </h2>
               </div>
               <a className="home-section-link" href="#catalogue">

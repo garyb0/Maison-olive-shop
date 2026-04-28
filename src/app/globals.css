@@ -9082,6 +9082,52 @@ button.home-category-chip:hover,
   padding-left: 1.1rem;
 }
 
+@media (min-width: 761px) {
+  .nav-header {
+    flex-wrap: nowrap;
+    align-items: center;
+  }
+
+  .nav-body {
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+  }
+
+  .pill-link--home,
+  .nav-sep {
+    display: none;
+  }
+
+  .nav-search {
+    flex: 1 1 240px;
+    max-width: 330px;
+  }
+
+  .nav-search-input {
+    min-height: 2.45rem;
+    font-size: 0.86rem;
+  }
+
+  .nav-primary,
+  .nav-secondary {
+    flex-wrap: nowrap;
+  }
+
+  .nav-actions {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.45rem;
+  }
+
+  .nav-actions-top {
+    order: 2;
+  }
+
+  .nav-cart-btn {
+    min-height: 2.2rem;
+  }
+}
+
 @media (max-width: 1180px) {
   .olive-product-summary {
     grid-template-columns: minmax(250px, 42%) minmax(0, 1fr);
@@ -9090,6 +9136,16 @@ button.home-category-chip:hover,
   .olive-product-purchase-card {
     grid-column: 1 / -1;
     align-self: stretch;
+  }
+}
+
+@media (max-width: 1180px) and (min-width: 761px) {
+  .nav-location-pill {
+    display: none;
+  }
+
+  .nav-search {
+    max-width: 280px;
   }
 }
 
