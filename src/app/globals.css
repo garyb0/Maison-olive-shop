@@ -9592,7 +9592,9 @@ button.home-category-chip:hover,
 }
 
 .nav-marketplace {
-  overflow: hidden;
+  position: relative;
+  z-index: 120;
+  overflow: visible;
   border: 1px solid var(--line);
   border-radius: 0;
   background: rgba(251, 247, 239, 0.94);
