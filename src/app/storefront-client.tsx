@@ -400,7 +400,7 @@ export function StorefrontClient({
           <Navigation language={language} t={t} user={user} />
         </header>
 
-        <PromoBanner language={language} banners={banners} />
+        {!isShopSurface ? <PromoBanner language={language} banners={banners} /> : null}
 
         {isShopSurface ? (
           <section className="shop-hero" aria-labelledby="shop-hero-title">
