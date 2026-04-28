@@ -222,12 +222,6 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
             <Link className={`nav-marketplace-link nav-marketplace-link--shop${isActive("/boutique") || isActive("/shop") ? " nav-marketplace-link--active" : ""}`} href="/boutique">
               {language === "fr" ? "Boutique" : "Shop"}
             </Link>
-            <Link className={`nav-marketplace-link${isActive("/sell") ? " nav-marketplace-link--active" : ""}`} href="/sell">
-              {language === "fr" ? "Vendre" : "Sell"}
-            </Link>
-            <Link className={`nav-marketplace-link${isActive("/faq") ? " nav-marketplace-link--active" : ""}`} href="/faq">
-              {t.navFaq}
-            </Link>
           </nav>
 
           <form

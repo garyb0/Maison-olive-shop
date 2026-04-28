@@ -10727,10 +10727,6 @@ a.home-category-chip {
     padding-inline: 0.42rem;
   }
 
-  .nav-marketplace-main-links .nav-marketplace-link:not(.nav-marketplace-link--shop) {
-    display: none;
-  }
-
   .nav-marketplace--light .nav-marketplace-action-icon,
   .nav-marketplace--light .nav-marketplace-cart > span {
     display: none;
