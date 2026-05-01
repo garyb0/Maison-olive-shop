@@ -1,13 +1,9 @@
-import { loadEnvFilesInOrder } from "./db-utils";
+import { loadEnvForTarget } from "./db-utils";
 
 const arg = (process.argv[2] ?? "development").toLowerCase();
 const target = arg === "production" ? "production" : "development";
 
-if (target === "production") {
-  loadEnvFilesInOrder([".env.production.local", ".env.production"]);
-}
-
-loadEnvFilesInOrder([".env.local", ".env"]);
+loadEnvForTarget(target);
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { validateEnv } = require("../src/lib/env");

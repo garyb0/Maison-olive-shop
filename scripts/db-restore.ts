@@ -1,10 +1,11 @@
-import path from "node:path";
 import {
   createSqliteBackup,
   getPositionalScriptArgs,
   getLatestBackupDbPath,
   loadDatabaseEnvForTarget,
+  resolveBackupDirFromEnv,
   resolveEnvTargetFromArgs,
+  resolveProjectPath,
   resolveDatabaseFromEnv,
   restoreSqliteBackup,
 } from "./db-utils";
@@ -12,7 +13,8 @@ import {
 const envTarget = resolveEnvTargetFromArgs();
 loadDatabaseEnvForTarget(envTarget);
 
-const [backupArg, backupDir = path.resolve(process.cwd(), "backups")] = getPositionalScriptArgs();
+const [backupArg, backupDirArg] = getPositionalScriptArgs();
+const backupDir = backupDirArg ? resolveProjectPath(backupDirArg) : resolveBackupDirFromEnv();
 const skipPreRestoreBackup = process.argv.includes("--no-pre-backup");
 
 const db = resolveDatabaseFromEnv();
@@ -29,7 +31,7 @@ if (db.kind === "non-sqlite") {
 }
 
 const backupPath = backupArg
-  ? path.resolve(process.cwd(), backupArg)
+  ? resolveProjectPath(backupArg)
   : getLatestBackupDbPath(backupDir);
 
 if (!backupPath) {

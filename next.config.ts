@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
+import { loadExternalSecretEnvForTarget } from "./scripts/db-utils";
 
 const isProd = process.env.NODE_ENV === "production";
+loadExternalSecretEnvForTarget(isProd ? "production" : "development");
 
 const contentSecurityPolicy = [
   "default-src 'self'",

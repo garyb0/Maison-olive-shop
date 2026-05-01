@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
+import Image from "next/image";
 import type { CurrentUser, DeliveryAddress } from "@/lib/types";
 import type { Language } from "@/lib/i18n";
 import QRCode from "qrcode";
@@ -123,22 +124,7 @@ const formatAddressLocation = (address: DeliveryAddress) =>
 
 function AddressGlyph() {
   return (
-    <span
-      aria-hidden="true"
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        width: 40,
-        height: 40,
-        borderRadius: 14,
-        border: "1px solid rgba(197, 170, 109, 0.26)",
-        background: "linear-gradient(180deg, rgba(255, 251, 242, 0.98) 0%, rgba(248, 240, 224, 0.92) 100%)",
-        boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.9)",
-        color: "#7a6946",
-        flex: "0 0 auto",
-      }}
-    >
+    <span aria-hidden="true" className="account-address-glyph">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" role="presentation">
         <path
           d="M5 10.2L12 4.5L19 10.2V18.2C19 18.64 18.64 19 18.2 19H14.5V14.7H9.5V19H5.8C5.36 19 5 18.64 5 18.2V10.2Z"
@@ -545,7 +531,7 @@ export function AccountProfileClient({ user, language, initialDeliveryAddresses 
         <label htmlFor={`${formIdPrefix}-phone`}>{language === "fr" ? "Téléphone pour la livraison" : "Delivery phone"}</label>
         <input id={`${formIdPrefix}-phone`} className="input" placeholder="418 555-1234" value={form.deliveryPhone} onChange={(event) => onChange("deliveryPhone", event.target.value)} />
       </div>
-      <div className="field" style={{ gridColumn: "1 / -1" }}>
+      <div className="field account-field-full">
         <label htmlFor={`${formIdPrefix}-line1`}>{language === "fr" ? "Adresse civique" : "Street address"}</label>
         <input id={`${formIdPrefix}-line1`} className="input" placeholder={language === "fr" ? "Ex. 123 rue des Oliviers" : "E.g. 123 Olive Street"} value={form.shippingLine1} onChange={(event) => onChange("shippingLine1", event.target.value)} />
       </div>
@@ -577,7 +563,7 @@ export function AccountProfileClient({ user, language, initialDeliveryAddresses 
           ))}
         </select>
       </div>
-      <div className="field" style={{ gridColumn: "1 / -1" }}>
+      <div className="field account-field-full">
         <label htmlFor={`${formIdPrefix}-instructions`}>{language === "fr" ? "Instructions de livraison" : "Delivery instructions"}</label>
         <textarea
           id={`${formIdPrefix}-instructions`}
@@ -595,13 +581,18 @@ export function AccountProfileClient({ user, language, initialDeliveryAddresses 
   }
 
   return (
-    <section className="section">
-      <h1>{language === "fr" ? "Mon profil" : "My profile"}</h1>
-      <p className="small" style={{ marginBottom: 24 }}>
-        {language === "fr" ? "Gère tes informations et ton carnet d'adresses de livraison." : "Manage your details and delivery address book."}
-      </p>
+    <section className="section account-profile-shell">
+      <div className="account-section-head">
+        <div>
+          <p className="account-home-hero__eyebrow">{language === "fr" ? "Profil" : "Profile"}</p>
+          <h1>{language === "fr" ? "Mon profil" : "My profile"}</h1>
+          <p className="small account-section-copy">
+            {language === "fr" ? "Gère tes informations et ton carnet d'adresses de livraison." : "Manage your details and delivery address book."}
+          </p>
+        </div>
+      </div>
 
-      <div className="card" style={{ maxWidth: 760, padding: 24, marginBottom: 24 }}>
+      <div className="account-form-card account-form-card--narrow">
         <div className="two-col">
           <div className="field">
             <label>{language === "fr" ? "Prénom" : "First name"}</label>
@@ -611,27 +602,30 @@ export function AccountProfileClient({ user, language, initialDeliveryAddresses 
             <label>{language === "fr" ? "Nom" : "Last name"}</label>
             <input className="input" defaultValue={user.lastName} readOnly />
           </div>
-          <div className="field" style={{ gridColumn: "1 / -1" }}>
+          <div className="field account-field-full">
             <label>{language === "fr" ? "Adresse email" : "Email address"}</label>
             <input className="input" defaultValue={user.email} readOnly />
           </div>
         </div>
       </div>
 
-      <div className="card" style={{ maxWidth: 760, padding: 24, marginBottom: 24 }}>
-        <h2 style={{ marginBottom: 6 }}>{language === "fr" ? "Sécurité du compte" : "Account security"}</h2>
-        <p className="small" style={{ marginTop: 0, marginBottom: 18 }}>
+      <div className="account-form-card account-form-card--narrow">
+        <div className="account-card-head">
+          <p className="account-home-hero__eyebrow">{language === "fr" ? "Sécurité" : "Security"}</p>
+          <h2>{language === "fr" ? "Sécurité du compte" : "Account security"}</h2>
+        </div>
+        <p className="small account-section-copy">
           {language === "fr"
             ? "Change ton mot de passe en confirmant d'abord ton mot de passe actuel."
             : "Change your password by confirming your current password first."}
         </p>
 
         {passwordMessage ? <p className="small ok">{passwordMessage}</p> : null}
-        {passwordError ? <p className="small" style={{ color: "#8f3b2e" }}>{passwordError}</p> : null}
+        {passwordError ? <p className="small account-error-text">{passwordError}</p> : null}
 
         <form onSubmit={(event) => void changePassword(event)}>
           <div className="two-col">
-            <div className="field" style={{ gridColumn: "1 / -1" }}>
+            <div className="field account-field-full">
               <label htmlFor="current-password">{language === "fr" ? "Mot de passe actuel" : "Current password"}</label>
               <input
                 id="current-password"
@@ -670,10 +664,10 @@ export function AccountProfileClient({ user, language, initialDeliveryAddresses 
               />
             </div>
           </div>
-          <p className="small" style={{ marginTop: 8, marginBottom: 0 }}>
+          <p className="small account-field-hint">
             {language === "fr" ? "Minimum 10 caractères." : "Minimum 10 characters."}
           </p>
-          <div style={{ display: "flex", gap: 12, marginTop: 14, flexWrap: "wrap" }}>
+          <div className="account-action-row">
             <button type="submit" className="btn" disabled={passwordSaving}>
               {passwordSaving
                 ? language === "fr"
@@ -689,9 +683,9 @@ export function AccountProfileClient({ user, language, initialDeliveryAddresses 
           </div>
         </form>
 
-        <div className="card" style={{ marginTop: 18, padding: 16, background: "#fbfaf6" }}>
-          <h3 style={{ marginBottom: 6 }}>{language === "fr" ? "Sessions actives" : "Active sessions"}</h3>
-          <p className="small" style={{ marginTop: 0 }}>
+        <div className="account-subcard">
+          <h3>{language === "fr" ? "Sessions actives" : "Active sessions"}</h3>
+          <p className="small account-section-copy">
             {language === "fr"
               ? "Si tu as ouvert ton compte ailleurs, tu peux déconnecter les autres appareils sans fermer cette session."
               : "If your account is open elsewhere, you can sign out other devices without ending this session."}
@@ -699,45 +693,33 @@ export function AccountProfileClient({ user, language, initialDeliveryAddresses 
           <button type="button" className="btn btn-secondary" disabled={sessionsSaving} onClick={() => void revokeOtherSessions()}>
             {sessionsSaving
               ? language === "fr"
-                ? "Verification..."
+                ? "Vérification..."
                 : "Checking..."
               : language === "fr"
-                ? "déconnecter les autres sessions"
+                ? "Déconnecter les autres sessions"
                 : "Sign out other sessions"}
           </button>
         </div>
 
         {user.role === "ADMIN" ? (
-          <div className="card" style={{ marginTop: 18, padding: 16, background: "#fbfaf6" }}>
-            <h3 style={{ marginBottom: 6 }}>{language === "fr" ? "Double authentification" : "Two-factor authentication"}</h3>
-            <p className="small" style={{ marginTop: 0 }}>
+          <div className="account-subcard">
+            <h3>{language === "fr" ? "Double authentification" : "Two-factor authentication"}</h3>
+            <p className="small account-section-copy">
               {language === "fr"
                 ? "Ajoute une vérification avec une application comme Google Authenticator, 1Password ou Authy."
                 : "Add an extra verification step with an app like Google Authenticator, 1Password, or Authy."}
             </p>
 
             {twoFactorMessage ? <p className="small ok">{twoFactorMessage}</p> : null}
-            {twoFactorError ? <p className="small" style={{ color: "#8f3b2e" }}>{twoFactorError}</p> : null}
+            {twoFactorError ? <p className="small account-error-text">{twoFactorError}</p> : null}
 
-            <div
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-                padding: "0.45rem 0.75rem",
-                borderRadius: 999,
-                background: twoFactorEnabled ? "rgba(123, 139, 90, 0.14)" : "rgba(143, 59, 46, 0.08)",
-                color: twoFactorEnabled ? "#55663b" : "#8f3b2e",
-                fontWeight: 700,
-                fontSize: "0.9rem",
-              }}
-            >
+            <div className={`account-status-pill account-status-pill--${twoFactorEnabled ? "ok" : "err"}`}>
               <span>{twoFactorEnabled ? "🔐" : "⚠️"}</span>
               <span>{twoFactorEnabled ? (language === "fr" ? "Activée" : "Enabled") : (language === "fr" ? "Désactivée" : "Disabled")}</span>
             </div>
 
             {!twoFactorEnabled ? (
-              <div style={{ marginTop: 16 }}>
+              <div className="account-stack">
                 {!twoFactorSetup ? (
                   <button type="button" className="btn" disabled={twoFactorLoading} onClick={() => void startTwoFactorSetup()}>
                     {twoFactorLoading
@@ -749,49 +731,36 @@ export function AccountProfileClient({ user, language, initialDeliveryAddresses 
                         : "Set up two-factor authentication"}
                   </button>
                 ) : (
-                  <div className="card" style={{ padding: 16, marginTop: 4 }}>
-                    <p className="small" style={{ marginTop: 0 }}>
+                  <div className="account-subcard account-subcard--inner">
+                    <p className="small account-section-copy">
                       {language === "fr"
                         ? "1. Ajoute un nouveau compte dans ton application d’authentification."
                         : "1. Add a new account in your authenticator app."}
                     </p>
                     {twoFactorQrDataUrl ? (
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "center",
-                          marginBottom: 16,
-                        }}
-                      >
-                        <div
-                          style={{
-                            padding: 12,
-                            borderRadius: 18,
-                            background: "#fffdf7",
-                            border: "1px solid rgba(197, 170, 109, 0.28)",
-                            boxShadow: "0 10px 24px rgba(95, 72, 28, 0.08)",
-                          }}
-                        >
-                          <img
+                      <div className="account-qr-wrap">
+                        <div className="account-qr-card">
+                          <Image
                             src={twoFactorQrDataUrl}
                             alt={language === "fr" ? "Code QR pour configurer la double authentification" : "QR code to configure two-factor authentication"}
                             width={220}
                             height={220}
-                            style={{ display: "block", borderRadius: 12 }}
+                            unoptimized
+                            className="account-qr-image"
                           />
                         </div>
                       </div>
                     ) : null}
-                    <p className="small" style={{ marginTop: 0 }}>
+                    <p className="small account-section-copy">
                       {language === "fr"
                         ? "2. Utilise cette clé manuelle si ton application ne scanne pas les liens automatiquement."
                         : "2. Use this manual key if your app does not automatically scan links."}
                     </p>
-                    <div className="field" style={{ marginBottom: 12 }}>
+                    <div className="field account-field-spaced">
                       <label>{language === "fr" ? "Clé manuelle" : "Manual key"}</label>
                       <input className="input" value={twoFactorSetup.manualEntryKey} readOnly />
                     </div>
-                    <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
+                    <div className="account-action-row account-action-row--spaced">
                       <a className="btn btn-secondary" href={twoFactorSetup.otpauthUri}>
                         {language === "fr" ? "Ouvrir le lien de configuration" : "Open setup link"}
                       </a>
@@ -837,7 +806,7 @@ export function AccountProfileClient({ user, language, initialDeliveryAddresses 
                           />
                         </div>
                       </div>
-                      <div style={{ display: "flex", gap: 12, marginTop: 14, flexWrap: "wrap" }}>
+                      <div className="account-action-row">
                         <button type="submit" className="btn" disabled={twoFactorLoading}>
                           {twoFactorLoading
                             ? language === "fr"
@@ -853,7 +822,7 @@ export function AccountProfileClient({ user, language, initialDeliveryAddresses 
                 )}
               </div>
             ) : (
-              <div style={{ marginTop: 16 }}>
+              <div className="account-stack">
                 <form onSubmit={(event) => void disableTwoFactor(event)}>
                   <div className="two-col">
                     <div className="field">
@@ -883,12 +852,12 @@ export function AccountProfileClient({ user, language, initialDeliveryAddresses 
                       />
                     </div>
                   </div>
-                  <p className="small" style={{ marginTop: 8, marginBottom: 0 }}>
+                  <p className="small account-field-hint">
                     {language === "fr"
                       ? "Utilise un code de ton application ou un code de secours restant."
                       : "Use a code from your app or one of your remaining backup codes."}
                   </p>
-                  <div style={{ display: "flex", gap: 12, marginTop: 14, flexWrap: "wrap" }}>
+                  <div className="account-action-row">
                     <button type="submit" className="btn btn-secondary" disabled={twoFactorLoading}>
                       {twoFactorLoading
                         ? language === "fr"
@@ -904,28 +873,16 @@ export function AccountProfileClient({ user, language, initialDeliveryAddresses 
             )}
 
             {twoFactorBackupCodes.length > 0 ? (
-              <div className="card" style={{ marginTop: 18, padding: 16, background: "#fffdf7" }}>
-                <h4 style={{ marginBottom: 8 }}>{language === "fr" ? "Codes de secours" : "Backup codes"}</h4>
-                <p className="small" style={{ marginTop: 0 }}>
+              <div className="account-subcard account-subcard--inner">
+                <h4>{language === "fr" ? "Codes de secours" : "Backup codes"}</h4>
+                <p className="small account-section-copy">
                   {language === "fr"
                     ? "Conserve-les hors ligne. Chaque code ne peut servir qu’une seule fois."
                     : "Store these offline. Each code can only be used once."}
                 </p>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
+                <div className="account-backup-code-grid">
                   {twoFactorBackupCodes.map((backupCode) => (
-                    <code
-                      key={backupCode}
-                      style={{
-                        display: "block",
-                        padding: "0.7rem 0.85rem",
-                        borderRadius: 12,
-                        background: "#f5f0e4",
-                        border: "1px solid rgba(197, 170, 109, 0.35)",
-                        fontSize: "0.95rem",
-                        fontWeight: 700,
-                        textAlign: "center",
-                      }}
-                    >
+                    <code key={backupCode} className="account-backup-code">
                       {backupCode}
                     </code>
                   ))}
@@ -936,45 +893,28 @@ export function AccountProfileClient({ user, language, initialDeliveryAddresses 
         ) : null}
       </div>
 
-      <div
-        className="card"
-        style={{
-          maxWidth: 920,
-          padding: 28,
-          background: "linear-gradient(180deg, #fffdf9 0%, #ffffff 100%)",
-          boxShadow: "0 18px 40px rgba(82, 58, 24, 0.06)",
-        }}
-      >
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
+      <div className="account-form-card account-address-book-card">
+        <div className="account-section-head">
           <div>
-            <h2 style={{ marginBottom: 6 }}>{language === "fr" ? "Mes adresses de livraison" : "My delivery addresses"}</h2>
-            <p className="small" style={{ margin: 0, maxWidth: 540 }}>
+            <p className="account-home-hero__eyebrow">{language === "fr" ? "Livraison" : "Delivery"}</p>
+            <h2>{language === "fr" ? "Mes adresses de livraison" : "My delivery addresses"}</h2>
+            <p className="small account-section-copy">
               {language === "fr"
                 ? "Choisis, ajoute ou modifie tes adresses enregistrées."
                 : "Choose, add, or edit your saved delivery addresses."}
             </p>
           </div>
           <span
-            className="small"
-            style={{
-              margin: 0,
-              padding: "0.48rem 0.8rem",
-              borderRadius: "999px",
-              border: addressLimitReached ? "1px solid rgba(143, 59, 46, 0.24)" : "1px solid rgba(123, 139, 90, 0.22)",
-              background: addressLimitReached ? "rgba(143, 59, 46, 0.08)" : "rgba(123, 139, 90, 0.08)",
-              color: addressLimitReached ? "#8f3b2e" : "#5c6d43",
-              fontWeight: 700,
-              whiteSpace: "nowrap",
-            }}
+            className={`account-count-pill${addressLimitReached ? " account-count-pill--limit" : ""}`}
           >
             {addresses.length} / {MAX_DELIVERY_ADDRESSES} {language === "fr" ? "adresse(s)" : "address(es)"}
           </span>
         </div>
 
-        {message ? <p className="small ok" style={{ marginTop: 16 }}>{message}</p> : null}
-        {error ? <p className="small" style={{ marginTop: 16, color: "#8f3b2e" }}>{error}</p> : null}
+        {message ? <p className="small ok account-feedback-text">{message}</p> : null}
+        {error ? <p className="small account-error-text account-feedback-text">{error}</p> : null}
 
-        <div style={{ display: "grid", gap: 16, marginTop: 20 }}>
+        <div className="account-address-list">
           {addresses.map((address) => {
             const editing = editingAddressId === address.id;
             const addressComplete = isAddressComplete(address);
@@ -982,117 +922,48 @@ export function AccountProfileClient({ user, language, initialDeliveryAddresses 
             return (
               <div
                 key={address.id}
-                className="card"
-                style={{
-                  padding: 20,
-                  borderRadius: 22,
-                  background: address.lastUsedAt ? "linear-gradient(180deg, #fffef8 0%, #fffdfa 100%)" : "#fff",
-                  border: address.lastUsedAt ? "1px solid rgba(197, 170, 109, 0.28)" : "1px solid rgba(197, 170, 109, 0.2)",
-                  boxShadow: address.lastUsedAt ? "0 12px 28px rgba(95, 72, 28, 0.08)" : "0 10px 24px rgba(95, 72, 28, 0.04)",
-                }}
+                className={`account-address-card${address.lastUsedAt ? " account-address-card--last-used" : ""}`}
               >
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 18, alignItems: "stretch", flexWrap: "wrap", minHeight: 136 }}>
-                  <div
-                    style={{
-                      flex: "1 1 320px",
-                      minWidth: 0,
-                      display: "flex",
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: 16,
-                      justifyContent: "center",
-                      padding: "8px 6px 8px 2px",
-                    }}
-                  >
+                <div className="account-address-card__body">
+                  <div className="account-address-card__main">
                     <AddressGlyph />
-                    <div style={{ minWidth: 0, flex: "1 1 auto" }}>
-                      <div
-                        className="small"
-                        style={{
-                          marginTop: 0,
-                          marginBottom: 6,
-                          textTransform: "uppercase",
-                          letterSpacing: "0.08em",
-                          fontWeight: 700,
-                          color: "#8a7a59",
-                        }}
-                      >
+                    <div className="account-address-card__copy">
+                      <div className="account-order-card__meta-label">
                         {formatAddressLabel(address, language)}
                       </div>
-                      <strong style={{ fontSize: "1.3rem", lineHeight: 1.2, color: addressComplete ? "#44321d" : "#8f3b2e" }}>
-                        {address.shippingLine1.trim() || (language === "fr" ? "Adresse incomplete a corriger" : "Incomplete address to fix")}
+                      <strong className={`account-address-card__line${addressComplete ? "" : " account-address-card__line--error"}`}>
+                        {address.shippingLine1.trim() || (language === "fr" ? "Adresse incomplète à corriger" : "Incomplete address to fix")}
                       </strong>
-                      <div
-                        style={{
-                          width: 48,
-                          height: 1,
-                          marginTop: 12,
-                          marginBottom: 12,
-                          background: "linear-gradient(90deg, rgba(197, 170, 109, 0.55) 0%, rgba(197, 170, 109, 0.08) 100%)",
-                        }}
-                      />
-                      <div className="small" style={{ fontSize: "0.98rem", color: "#76664c" }}>
-                        {addressLocation || (language === "fr" ? "Aucune ville ni region enregistree." : "No city or region saved yet.")}
+                      <div className="account-address-card__rule" />
+                      <div className="small account-address-card__meta">
+                        {addressLocation || (language === "fr" ? "Aucune ville ni région enregistrée." : "No city or region saved yet.")}
                       </div>
                       {!addressComplete ? (
-                        <div className="small" style={{ marginTop: 8, color: "#8f3b2e", maxWidth: 520 }}>
+                        <div className="small account-error-text account-address-card__note">
                           {language === "fr"
-                            ? "Cette adresse est incomplete. Ouvre Modifier pour ajouter la rue, la ville et la region avant une prochaine commande."
+                            ? "Cette adresse est incomplète. Ouvre Modifier pour ajouter la rue, la ville et la région avant une prochaine commande."
                             : "This address is incomplete. Open Edit to add the street, city, and region before placing another order."}
                         </div>
                       ) : null}
                       {address.deliveryPhone ? (
-                        <div className="small" style={{ marginTop: 8, color: "#6f624d" }}>
+                        <div className="small account-address-card__note">
                           {language === "fr" ? "Téléphone" : "Phone"}: {address.deliveryPhone}
                         </div>
                       ) : null}
                       {address.deliveryInstructions ? (
-                        <div
-                          className="small"
-                          style={{
-                            marginTop: 8,
-                            color: "#6f624d",
-                            maxWidth: 520,
-                          }}
-                        >
+                        <div className="small account-address-card__note">
                           {language === "fr" ? "Instructions" : "Instructions"}: {address.deliveryInstructions}
                         </div>
                       ) : null}
                     </div>
                   </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "flex-end",
-                      justifyContent: "space-between",
-                      gap: 14,
-                      minHeight: 96,
-                      flex: "0 0 220px",
-                      minWidth: 190,
-                      paddingLeft: 18,
-                      borderLeft: "1px solid rgba(197, 170, 109, 0.18)",
-                    }}
-                  >
+                  <div className="account-address-card__actions">
                     {address.lastUsedAt ? (
-                      <span
-                        className="small"
-                        style={{
-                          margin: 0,
-                          padding: "0.4rem 0.78rem",
-                          borderRadius: "999px",
-                          border: "1px solid rgba(123, 139, 90, 0.35)",
-                          background: "rgba(123, 139, 90, 0.12)",
-                          color: "#55663b",
-                          fontWeight: 700,
-                          whiteSpace: "nowrap",
-                          lineHeight: 1.1,
-                        }}
-                      >
+                      <span className="account-status-pill account-status-pill--ok">
                         {language === "fr" ? "Dernière utilisation" : "Last used"}
                       </span>
-                    ) : <span aria-hidden="true" style={{ height: 34 }} />}
-                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end", marginTop: "auto" }}>
+                    ) : <span aria-hidden="true" className="account-address-card__spacer" />}
+                    <div className="account-action-row account-action-row--end">
                       <button
                         type="button"
                         className="btn btn-secondary"
@@ -1113,17 +984,11 @@ export function AccountProfileClient({ user, language, initialDeliveryAddresses 
                 </div>
 
                 {editing ? (
-                  <div
-                    style={{
-                      marginTop: 18,
-                      paddingTop: 18,
-                      borderTop: "1px solid rgba(197, 170, 109, 0.18)",
-                    }}
-                  >
+                  <div className="account-address-edit">
                     {renderAddressForm(editingAddress, (field, value) => {
                       setEditingAddress((current) => ({ ...current, [field]: value }));
                     }, `edit-${address.id}`)}
-                    <div style={{ display: "flex", gap: 12, marginTop: 14, flexWrap: "wrap" }}>
+                    <div className="account-action-row">
                       <button type="button" className="btn" disabled={saving} onClick={() => void saveEditedAddress()}>
                         {language === "fr" ? "Enregistrer" : "Save"}
                       </button>
@@ -1145,21 +1010,11 @@ export function AccountProfileClient({ user, language, initialDeliveryAddresses 
           })}
         </div>
 
-        <div
-          className="card"
-          style={{
-            marginTop: 28,
-            padding: 22,
-            borderRadius: 24,
-            background: "linear-gradient(180deg, #fffdfa 0%, #ffffff 100%)",
-            border: "1px solid rgba(197, 170, 109, 0.2)",
-            boxShadow: "0 14px 34px rgba(95, 72, 28, 0.04)",
-          }}
-        >
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
+        <div className="account-subcard account-address-add-card">
+          <div className="account-section-head">
             <div>
-              <h3 style={{ marginBottom: 8 }}>{language === "fr" ? "Ajouter une adresse" : "Add an address"}</h3>
-              <p className="small" style={{ marginTop: 0, marginBottom: 0, maxWidth: 620 }}>
+              <h3>{language === "fr" ? "Ajouter une adresse" : "Add an address"}</h3>
+              <p className="small account-section-copy">
                 {addressLimitReached
                   ? language === "fr"
                     ? `Tu as atteint la limite de ${MAX_DELIVERY_ADDRESSES} adresses. Supprime-en une pour en ajouter une nouvelle.`
@@ -1170,28 +1025,13 @@ export function AccountProfileClient({ user, language, initialDeliveryAddresses 
               </p>
             </div>
             <span
-              className="small"
-              style={{
-                margin: 0,
-                padding: "0.45rem 0.72rem",
-                borderRadius: "999px",
-                background: addressLimitReached ? "rgba(143, 59, 46, 0.08)" : "rgba(197, 170, 109, 0.12)",
-                color: addressLimitReached ? "#8f3b2e" : "#7b6a48",
-                fontWeight: 700,
-                whiteSpace: "nowrap",
-              }}
+              className={`account-count-pill${addressLimitReached ? " account-count-pill--limit" : ""}`}
             >
               {language === "fr" ? "Section d’ajout" : "Add section"}
             </span>
           </div>
-          <div
-            style={{
-              marginTop: 18,
-              paddingTop: 18,
-              borderTop: "1px solid rgba(197, 170, 109, 0.18)",
-            }}
-          >
-          <p className="small" style={{ marginTop: 0 }}>
+          <div className="account-address-edit">
+          <p className="small account-section-copy">
             {addressLimitReached
               ? language === "fr"
                 ? "Ajout temporairement indisponible tant qu’une adresse existante n’est pas retirée."
@@ -1203,7 +1043,7 @@ export function AccountProfileClient({ user, language, initialDeliveryAddresses 
           {renderAddressForm(newAddress, (field, value) => {
             setNewAddress((current) => ({ ...current, [field]: value }));
           }, "new-address")}
-          <div style={{ display: "flex", gap: 12, marginTop: 14, flexWrap: "wrap" }}>
+          <div className="account-action-row">
             <button type="button" className="btn" disabled={saving || addressLimitReached} onClick={() => void saveNewAddress()}>
               {language === "fr" ? "Ajouter au carnet" : "Add to address book"}
             </button>

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { verifyEmailReplyToken } from "@/lib/support-email";
 import { createSupportMessageAsAdmin } from "@/lib/support";
 import { logApiEvent } from "@/lib/observability";
+import { applyRateLimit } from "@/lib/rate-limit";
 import type { CurrentUser } from "@/lib/types";
 
 /**
@@ -22,6 +23,11 @@ import type { CurrentUser } from "@/lib/types";
  * (Resend, SendGrid, etc.) to receive incoming emails.
  */
 export async function POST(request: NextRequest) {
+  const rate = await applyRateLimit(request, { namespace: "support:email-reply", windowMs: 60_000, max: 20 });
+  if (!rate.ok) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   try {
     const body = await request.json();
     const token = typeof body?.token === "string" ? body.token.trim() : "";
@@ -110,7 +116,6 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("[API] Email reply error:", error);
     logApiEvent({
       level: "ERROR",
       route: "/api/support/email-reply",
@@ -135,6 +140,5 @@ export async function GET() {
   return NextResponse.json({
     status: "ok",
     message: "Email reply endpoint is active",
-    documentation: "POST with { token, content, fromEmail } to reply to a conversation",
   });
 }

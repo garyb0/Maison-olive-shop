@@ -18,7 +18,6 @@ const PUBLIC_PROMO_ROUTE_PATTERNS = [
   /^\/products\/[^/]+$/,
   /^\/reset-password$/,
   /^\/returns$/,
-  /^\/sell$/,
   /^\/shipping$/,
   /^\/terms$/,
 ];

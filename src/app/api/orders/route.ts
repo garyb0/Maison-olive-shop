@@ -13,7 +13,7 @@ import { buildCheckoutConfirmation } from "@/lib/checkout-confirmation";
 import { resolvePublicSiteUrl } from "@/lib/site-url";
 
 const stripeMinimumAmountMessage =
-  "Stripe exige un total d'au moins 0,50 $ CAD. Augmente légèrement le montant de la commande ou retire le rabais de test.";
+  "Le paiement par carte exige un total d'au moins 0,50 $ CAD. Augmente légèrement le montant de la commande ou retire le rabais de test.";
 
 export async function GET() {
   try {
@@ -319,11 +319,11 @@ export async function POST(request: Request) {
     }
 
     if (error instanceof Error && error.message === "DELIVERY_DYNAMIC_DISABLED") {
-      return jsonError("Le mode de livraison expÃ©rimental est dÃ©sactivÃ©", 409);
+      return jsonError("Le mode de livraison expérimental est désactivé", 409);
     }
 
     if (error instanceof Error && error.message === "DELIVERY_WINDOW_INCOMPLETE") {
-      return jsonError("La fenÃªtre de livraison est incomplÃ¨te", 400);
+      return jsonError("La fenêtre de livraison est incomplète", 400);
     }
 
     if (error instanceof Error && error.message === "DELIVERY_SLOT_NOT_FOUND") {
@@ -377,7 +377,7 @@ export async function POST(request: Request) {
       return jsonError("Durée de fenêtre de livraison invalide", 400);
     }
     if (error instanceof Error && error.message === "DELIVERY_WINDOW_INVALID_PERIOD") {
-      return jsonError("PÃ©riode de livraison invalide", 400);
+      return jsonError("Période de livraison invalide", 400);
     }
     if (error instanceof Error && error.message === "DELIVERY_WINDOW_FULL") {
       return jsonError("La fenêtre de livraison sélectionnée est complète", 409);

@@ -4,8 +4,8 @@ import { getAdminSupportConversations } from "@/lib/support";
 
 export async function GET() {
   try {
-    await requireAdmin();
-    const conversations = await getAdminSupportConversations();
+    const admin = await requireAdmin();
+    const conversations = await getAdminSupportConversations(admin);
     return jsonOk({ conversations });
   } catch (error) {
     if (error instanceof Error && error.message === "UNAUTHORIZED") return jsonError("Unauthorized", 401);

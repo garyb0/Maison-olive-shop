@@ -1,5 +1,6 @@
 ﻿import { env } from "@/lib/env";
 import { sendEmail } from "@/lib/email";
+import { logApiEvent } from "@/lib/observability";
 import { computeStoredOrderTaxBreakdown } from "@/lib/taxes";
 import type { DeliveryStatus, PaymentMethod } from "@/lib/types";
 
@@ -38,6 +39,21 @@ const formatMoney = (amountCents: number, currency: string, language: "fr" | "en
     style: "currency",
     currency,
   }).format(amountCents / 100);
+
+const buildShippingPolicy = (language: "fr" | "en") => {
+  if (env.shippingFlatCents === 0 || env.shippingFreeThresholdCents === 0) {
+    return language === "fr"
+      ? "Livraison locale gratuite pour les adresses desservies."
+      : "Free local delivery for addresses inside the service area.";
+  }
+
+  const flatFeeLabel = formatMoney(env.shippingFlatCents, "CAD", language);
+  const freeThresholdLabel = formatMoney(env.shippingFreeThresholdCents, "CAD", language);
+
+  return language === "fr"
+    ? `Livraison locale forfaitaire de ${flatFeeLabel}. Gratuite dès ${freeThresholdLabel} après rabais, avant taxes.`
+    : `Flat local delivery fee of ${flatFeeLabel}. Free from ${freeThresholdLabel} after discounts, before taxes.`;
+};
 
 const formatDateTime = (date: Date | string | null | undefined, language: "fr" | "en") => {
   if (!date) return null;
@@ -139,31 +155,6 @@ const escapeHtml = (value: string) =>
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
 
-const renderLineItemsHtml = (
-  items: EmailTemplateInput["items"],
-  currency: string,
-  language: "fr" | "en",
-) =>
-  items
-    .map((item) => {
-      const unitPriceLabel = formatMoney(item.unitPriceCents, currency, language);
-      const lineTotalLabel = formatMoney(item.lineTotalCents, currency, language);
-
-      return `
-        <tr>
-          <td style="padding: 12px 0; border-bottom: 1px solid #E8DDD0;">
-            <div style="font-weight: 600; color: #2C1E0F;">${escapeHtml(item.name)}</div>
-            <div style="font-size: 12px; color: #8C7B65; margin-top: 4px;">
-              ${language === "fr" ? "Quantité" : "Quantity"}: ${item.quantity} · ${language === "fr" ? "Prix unit." : "Unit price"}: ${unitPriceLabel}
-            </div>
-          </td>
-          <td style="padding: 12px 0; border-bottom: 1px solid #E8DDD0; text-align: right; font-weight: 600; color: #2C1E0F;">
-            ${lineTotalLabel}
-          </td>
-        </tr>`;
-    })
-    .join("");
-
 const renderSummaryRowHtml = (label: string, value: string, strong = false) => `
   <tr>
     <td style="padding: 8px 0; color: ${strong ? "#2C1E0F" : "#6B5B47"}; font-weight: ${strong ? 700 : 500};">${escapeHtml(label)}</td>
@@ -185,10 +176,7 @@ export function getBusinessInfo(language: "fr" | "en") {
       language === "fr"
         ? "Lundi au vendredi, 9h à 17h (heure de Montréal)"
         : "Monday to Friday, 9am to 5pm (Montreal time)",
-    shippingPolicy:
-      language === "fr"
-        ? "Expédition en 24 à 72h ouvrables. Livraison gratuite dès 75 $ CAD."
-        : "Ships within 24 to 72 business hours. Free shipping over 75 CAD.",
+    shippingPolicy: buildShippingPolicy(language),
   };
 }
 
@@ -520,11 +508,15 @@ export async function sendOrderConfirmationEmail(input: EmailTemplateInput) {
 
   try {
     if (!env.resendApiKey && !env.smtpHost) {
-      console.log("[ORDER_EMAIL:DEV_FALLBACK]", {
-        to: input.customerEmail,
-        subject: message.subject,
-        text: message.text,
-        html: message.html,
+      logApiEvent({
+        level: "WARN",
+        route: "lib/business",
+        event: "ORDER_EMAIL_SKIPPED_NO_PROVIDER",
+        details: {
+          to: input.customerEmail,
+          subject: message.subject,
+          orderNumber: input.orderNumber,
+        },
       });
       return;
     }
@@ -536,7 +528,12 @@ export async function sendOrderConfirmationEmail(input: EmailTemplateInput) {
       text: message.text,
     });
   } catch (error) {
-    console.error("[ORDER_EMAIL:SEND_FAILED]", error);
+    logApiEvent({
+      level: "ERROR",
+      route: "lib/business",
+      event: "ORDER_EMAIL_SEND_FAILED",
+      details: { error, orderNumber: input.orderNumber, to: input.customerEmail },
+    });
   }
 }
 

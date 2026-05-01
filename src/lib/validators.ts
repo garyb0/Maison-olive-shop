@@ -354,6 +354,21 @@ export const driverLocationSampleSchema = z.object({
   recordedAt: z.string().datetime(),
 });
 
+export const driverRunOptimizeSchema = z.object({
+  lat: z.number().min(-90).max(90),
+  lng: z.number().min(-180).max(180),
+  accuracyMeters: z.number().min(0).max(5000),
+  recordedAt: z.string().datetime(),
+  navigationProvider: z.enum(["WAZE", "GOOGLE_MAPS"]).optional().default("WAZE"),
+});
+
+export const driverStopArriveSchema = z.object({
+  lat: z.number().min(-90).max(90),
+  lng: z.number().min(-180).max(180),
+  accuracyMeters: z.number().min(0).max(5000),
+  recordedAt: z.string().datetime(),
+});
+
 export const driverStopCompleteSchema = z.object({
   result: z.enum(["DELIVERED", "FAILED"]),
   note: z.preprocess(emptyToUndefined, z.string().trim().max(1000).optional()),
@@ -691,6 +706,53 @@ export const supportGuestMessageCreateSchema = z.object({
   guestEmail: z.string().trim().email().max(160),
   guestToken: z.string().trim().min(1).max(2000),
 });
+
+export const supportGuestReadSchema = z.object({
+  guestEmail: z.string().trim().email().max(160),
+  guestToken: z.string().trim().min(1).max(2000),
+});
+
+export const adminSupportConversationPatchSchema = z
+  .object({
+    priority: z.enum(["LOW", "NORMAL", "HIGH", "URGENT"]).optional(),
+    tags: z.array(z.string().trim().min(1).max(40)).max(12).optional(),
+    orderId: z.preprocess(emptyToUndefined, z.string().trim().min(1).max(191).optional()),
+  })
+  .refine((input) => input.priority !== undefined || input.tags !== undefined || input.orderId !== undefined, {
+    message: "SUPPORT_CONVERSATION_UPDATE_REQUIRED",
+    path: ["priority"],
+  });
+
+export const adminSupportNoteCreateSchema = z.object({
+  content: z.string().trim().min(1).max(2000),
+});
+
+export const adminSupportCloseSchema = z.object({
+  reason: z.enum(["RESOLVED", "DELIVERY", "PRODUCT", "PAYMENT", "REFUND", "DUPLICATE", "OTHER"]).optional(),
+  note: z.preprocess(emptyToUndefined, z.string().trim().max(2000).optional()),
+});
+
+export const adminSupportQuickReplyCreateSchema = z.object({
+  title: z.string().trim().min(1).max(100),
+  content: z.string().trim().min(1).max(2000),
+  category: z.preprocess(emptyToUndefined, z.string().trim().max(60).optional()),
+  language: z.enum(["fr", "en"]).default("fr"),
+  sortOrder: z.coerce.number().int().min(0).max(9999).optional(),
+});
+
+export const adminSupportQuickReplyPatchSchema = z
+  .object({
+    title: z.preprocess(emptyToUndefined, z.string().trim().min(1).max(100).optional()),
+    content: z.preprocess(emptyToUndefined, z.string().trim().min(1).max(2000).optional()),
+    category: z.preprocess(emptyToUndefined, z.string().trim().max(60).optional()),
+    language: z.enum(["fr", "en"]).optional(),
+    isActive: z.boolean().optional(),
+    sortOrder: z.coerce.number().int().min(0).max(9999).optional(),
+  })
+  .refine((input) => Object.values(input).some((value) => value !== undefined), {
+    message: "SUPPORT_QUICK_REPLY_UPDATE_REQUIRED",
+    path: ["title"],
+  });
 
 export const supportPromoLeadSchema = z.object({
   email: z.string().trim().email().max(160),

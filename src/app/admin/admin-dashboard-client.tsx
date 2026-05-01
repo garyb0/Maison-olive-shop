@@ -43,6 +43,18 @@ type Props = {
   }>;
 };
 
+const ORDER_STATUS_LABELS_FR: Record<string, string> = {
+  PENDING: "À vérifier",
+  PAID: "Payée",
+  PROCESSING: "En préparation",
+  SHIPPED: "Expédiée",
+  DELIVERED: "Livrée",
+  CANCELLED: "Annulée",
+};
+
+const formatOrderStatus = (status: string, language: Language) =>
+  language === "fr" ? ORDER_STATUS_LABELS_FR[status] ?? status : status;
+
 export function AdminDashboardClient({
   language,
   t,
@@ -165,8 +177,8 @@ export function AdminDashboardClient({
       setOliveModeMessage(
         language === "fr"
           ? mode === "gremlin"
-            ? "Mode gremlin d'Olive active."
-            : "Mode princesse d'Olive active."
+            ? "Mode gremlin d'Olive activé."
+            : "Mode princesse d'Olive activé."
           : mode === "gremlin"
             ? "Olive gremlin mode activated."
             : "Olive princess mode activated.",
@@ -263,74 +275,59 @@ export function AdminDashboardClient({
 
   return (
     <>
-      <section className="section">
-        <h1>{t.adminTitle}</h1>
-        <p className="small">
-          {language === "fr" ? "Bienvenue dans le panneau d'administration." : "Welcome to the admin panel."}
-        </p>
+      <section className="section admin-page-header">
+        <div className="admin-page-header__copy">
+          <span className="admin-page-header__eyebrow">
+            {language === "fr" ? "Administration" : "Administration"}
+          </span>
+          <h1>{t.adminTitle}</h1>
+          <p className="small">
+            {language === "fr"
+              ? "Survole les opérations du jour, les alertes et les chiffres sensibles."
+              : "Monitor daily operations, alerts, and sensitive figures."}
+          </p>
+        </div>
       </section>
 
       <section className="section">
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 12,
-            flexWrap: "wrap",
-          }}
-        >
-          <h2 style={{ margin: 0 }}>{language === "fr" ? "Mode Maintenance" : "Maintenance Mode"}</h2>
+        <div className="admin-section-head">
+          <div>
+            <h2>{language === "fr" ? "Mode maintenance" : "Maintenance mode"}</h2>
+            <p className="small">
+              {language === "fr"
+                ? "Ferme le site proprement quand une intervention est nécessaire."
+                : "Close the site cleanly when maintenance is needed."}
+            </p>
+          </div>
           <Link className="btn btn-secondary" href="/admin/maintenance-cloudflare">
             {language === "fr" ? "Aide maintenance Cloudflare" : "Cloudflare maintenance help"}
           </Link>
         </div>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-            gap: 12,
-            marginTop: 14,
-          }}
-        >
-          <div
-            style={{
-              padding: 14,
-              borderRadius: 16,
-              border: "1px solid rgba(120, 113, 108, 0.16)",
-              background: "rgba(250, 250, 249, 0.95)",
-            }}
-          >
-            <p className="small" style={{ margin: 0, fontWeight: 700, color: "#1c1917" }}>
+        <div className="admin-info-grid">
+          <div className="admin-info-tile">
+            <p className="admin-info-tile__title">
               {language === "fr" ? "Maintenance normale" : "Normal maintenance"}
             </p>
-            <p className="small" style={{ margin: "6px 0 0" }}>
+            <p className="small">
               {language === "fr"
                 ? "Utilise ce bouton pour fermer le site proprement, avec réouverture planifiée si besoin."
                 : "Use this button to close the site cleanly, with scheduled reopening if needed."}
             </p>
           </div>
-          <div
-            style={{
-              padding: 14,
-              borderRadius: 16,
-              border: "1px solid rgba(180, 83, 9, 0.18)",
-              background: "rgba(255, 247, 237, 0.92)",
-            }}
-          >
-            <p className="small" style={{ margin: 0, fontWeight: 700, color: "#9a3412" }}>
+          <div className="admin-info-tile admin-info-tile--warn">
+            <p className="admin-info-tile__title">
               {language === "fr" ? "Urgence Cloudflare" : "Cloudflare emergency"}
             </p>
-            <p className="small" style={{ margin: "6px 0 0" }}>
+            <p className="small">
               {language === "fr"
                 ? "À utiliser seulement si le PC local, PM2 ou le tunnel ne répond plus."
                 : "Use only if the local PC, PM2, or the tunnel stops responding."}
             </p>
           </div>
         </div>
-        <p className="small">
+        <p className="small admin-status-line">
           {language === "fr"
-            ? `État actuel : ${maintenanceEnabled ? "Site FERME" : "Site OUVERT"}`
+            ? `État actuel : ${maintenanceEnabled ? "site fermé" : "site ouvert"}`
             : `Current status: ${maintenanceEnabled ? "Site CLOSED" : "Site OPEN"}`}
         </p>
         {maintenanceOpenAt ? (
@@ -342,7 +339,7 @@ export function AdminDashboardClient({
         ) : null}
         {maintenanceMessage ? <p className={maintenanceEnabled ? "err small" : "ok small"}>{maintenanceMessage}</p> : null}
         {maintenanceError ? <p className="err small">{maintenanceError}</p> : null}
-        <div style={{ marginTop: 10 }}>
+        <div className="admin-field-compact">
           <label className="small" htmlFor="maintenance-open-at">
             {language === "fr" ? "Réouverture automatique (optionnel)" : "Automatic reopening (optional)"}
           </label>
@@ -352,9 +349,8 @@ export function AdminDashboardClient({
             value={maintenanceOpenAtInput}
             onChange={(e) => setMaintenanceOpenAtInput(e.target.value)}
             className="input"
-            style={{ marginTop: 6, maxWidth: 320 }}
           />
-          <div className="row" style={{ marginTop: 8, gap: 8, flexWrap: "wrap" }}>
+          <div className="admin-action-row">
             <button className="btn btn-secondary" type="button" onClick={() => applyQuickReopenDelay(1)} disabled={maintenanceLoading}>
               +1h
             </button>
@@ -369,13 +365,12 @@ export function AdminDashboardClient({
             </button>
           </div>
         </div>
-        <div style={{ marginTop: 10 }}>
+        <div className="admin-action-row">
           <button
             className={maintenanceEnabled ? "btn btn-danger" : "btn"}
             disabled={maintenanceLoading}
             onClick={() => void toggleMaintenance()}
             type="button"
-            style={{ minWidth: 280 }}
           >
             {maintenanceLoading
               ? language === "fr"
@@ -391,7 +386,7 @@ export function AdminDashboardClient({
           </button>
         </div>
         {maintenanceEnabled ? (
-          <p className="small" style={{ marginTop: 12, color: "#dc2626" }}>
+          <p className="small err">
             {language === "fr"
               ? "Les administrateurs continuent de voir le site normalement."
               : "Administrators still see the site normally."}
@@ -400,7 +395,14 @@ export function AdminDashboardClient({
       </section>
 
       <section className="section">
-        <h2>{language === "fr" ? "Statistiques rapides" : "Quick stats"}</h2>
+        <div className="admin-section-head">
+          <div>
+            <h2>{language === "fr" ? "Statistiques rapides" : "Quick stats"}</h2>
+            <p className="small">
+              {language === "fr" ? "Vue rapide des volumes actifs." : "Quick view of active volumes."}
+            </p>
+          </div>
+        </div>
         <div className="admin-stats-grid">
           <div className="admin-stat-card">
             <div className="admin-stat-icon">🏬</div>
@@ -434,7 +436,7 @@ export function AdminDashboardClient({
       </section>
 
       <section className="section">
-        <h2>{language === "fr" ? "Vue interne rentabilite" : "Internal profitability view"}</h2>
+        <h2>{language === "fr" ? "Vue interne rentabilité" : "Internal profitability view"}</h2>
         <p className="small">
           {language === "fr"
             ? "Section réservée à l'administration pour lire les chiffres sensibles de rentabilité."
@@ -444,7 +446,7 @@ export function AdminDashboardClient({
           <div className="admin-stat-card">
             <div className="admin-stat-content">
               <div className="admin-stat-value">{profitabilitySummary.stockValueAtCostLabel}</div>
-              <div className="admin-stat-label">{language === "fr" ? "Valeur stock au cout" : "Stock value at cost"}</div>
+              <div className="admin-stat-label">{language === "fr" ? "Valeur stock au coût" : "Stock value at cost"}</div>
             </div>
           </div>
           <div className="admin-stat-card">
@@ -458,43 +460,43 @@ export function AdminDashboardClient({
           <div className="admin-stat-card">
             <div className="admin-stat-content">
               <div className="admin-stat-value">{profitabilitySummary.grossRevenueLabel}</div>
-              <div className="admin-stat-label">{language === "fr" ? "Revenu brut estime" : "Estimated gross revenue"}</div>
+              <div className="admin-stat-label">{language === "fr" ? "Revenu brut estimé" : "Estimated gross revenue"}</div>
             </div>
           </div>
           <div className="admin-stat-card">
             <div className="admin-stat-content">
               <div className="admin-stat-value">{profitabilitySummary.estimatedGrossProfitLabel}</div>
               <div className="admin-stat-label">
-                {language === "fr" ? "Profit brut estime" : "Estimated gross profit"}
+                {language === "fr" ? "Profit brut estimé" : "Estimated gross profit"}
               </div>
             </div>
           </div>
         </div>
 
-        <div className="table-wrap" style={{ marginTop: 12 }}>
-          <table>
+        <div className="table-wrap admin-dashboard-table-wrap admin-table-spaced">
+          <table className="admin-dashboard-table">
             <thead>
               <tr>
                 <th>{language === "fr" ? "Produit" : "Product"}</th>
                 <th>{language === "fr" ? "Stock" : "Stock"}</th>
-                <th>{language === "fr" ? "Entrees" : "Added"}</th>
+                <th>{language === "fr" ? "Entrées" : "Added"}</th>
                 <th>{language === "fr" ? "Vendus" : "Sold"}</th>
-                <th>{language === "fr" ? "Ajustes" : "Adjusted"}</th>
-                <th>{language === "fr" ? "Profit brut estime" : "Estimated gross profit"}</th>
+                <th>{language === "fr" ? "Ajustés" : "Adjusted"}</th>
+                <th>{language === "fr" ? "Profit brut estimé" : "Estimated gross profit"}</th>
               </tr>
             </thead>
             <tbody>
               {profitabilityRows.map((row) => (
                 <tr key={row.id}>
-                  <td>
+                  <td data-label={language === "fr" ? "Produit" : "Product"}>
                     <strong>{row.name}</strong>
                     <div className="small">{row.slug}</div>
                   </td>
-                  <td>{row.stock}</td>
-                  <td>{row.quantityAdded}</td>
-                  <td>{row.quantitySold}</td>
-                  <td>{row.quantityAdjusted}</td>
-                  <td>{row.estimatedGrossProfitLabel}</td>
+                  <td data-label={language === "fr" ? "Stock" : "Stock"}>{row.stock}</td>
+                  <td data-label={language === "fr" ? "Entrées" : "Added"}>{row.quantityAdded}</td>
+                  <td data-label={language === "fr" ? "Vendus" : "Sold"}>{row.quantitySold}</td>
+                  <td data-label={language === "fr" ? "Ajustés" : "Adjusted"}>{row.quantityAdjusted}</td>
+                  <td data-label={language === "fr" ? "Profit brut estimé" : "Estimated gross profit"}>{row.estimatedGrossProfitLabel}</td>
                 </tr>
               ))}
             </tbody>
@@ -511,7 +513,7 @@ export function AdminDashboardClient({
         </p>
         {oliveModeMessage ? <p className="ok small">{oliveModeMessage}</p> : null}
         {oliveModeError ? <p className="err small">{oliveModeError}</p> : null}
-        <div className="row" style={{ marginTop: 10 }}>
+        <div className="admin-action-row">
           <button
             className={currentOliveMode === "princess" ? "btn" : "btn btn-secondary"}
             disabled={oliveModeLoading}
@@ -532,8 +534,13 @@ export function AdminDashboardClient({
       </section>
 
       <section className="section">
-        <div className="row" style={{ justifyContent: "space-between", alignItems: "center" }}>
-          <h2>{language === "fr" ? "Commandes récentes" : "Recent orders"}</h2>
+        <div className="admin-section-head">
+          <div>
+            <h2>{language === "fr" ? "Commandes récentes" : "Recent orders"}</h2>
+            <p className="small">
+              {language === "fr" ? "Dernières commandes à surveiller." : "Latest orders to monitor."}
+            </p>
+          </div>
           <Link className="btn btn-secondary" href="/admin/orders">
             {language === "fr" ? "Voir tout" : "View all"}
           </Link>
@@ -541,8 +548,8 @@ export function AdminDashboardClient({
         {recentOrders.length === 0 ? (
           <p className="small">{language === "fr" ? "Aucune commande récente." : "No recent orders."}</p>
         ) : (
-          <div className="table-wrap" style={{ marginTop: 12 }}>
-            <table>
+          <div className="table-wrap admin-dashboard-table-wrap admin-table-spaced">
+            <table className="admin-dashboard-table">
               <thead>
                 <tr>
                   <th>{language === "fr" ? "Commande" : "Order"}</th>
@@ -554,12 +561,12 @@ export function AdminDashboardClient({
               <tbody>
                 {recentOrders.map((order) => (
                   <tr key={order.id}>
-                    <td>{order.orderNumber}</td>
-                    <td>{order.customerName}</td>
-                    <td>
-                      <span className="badge">{order.status}</span>
+                    <td data-label={language === "fr" ? "Commande" : "Order"}>{order.orderNumber}</td>
+                    <td data-label={language === "fr" ? "Client" : "Customer"}>{order.customerName}</td>
+                    <td data-label={language === "fr" ? "Statut" : "Status"}>
+                      <span className="badge">{formatOrderStatus(order.status, language)}</span>
                     </td>
-                    <td>{order.totalLabel}</td>
+                    <td data-label={language === "fr" ? "Total" : "Total"}>{order.totalLabel}</td>
                   </tr>
                 ))}
               </tbody>

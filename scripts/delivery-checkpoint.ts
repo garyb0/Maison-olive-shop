@@ -4,6 +4,7 @@ import {
   createSqliteBackup,
   getPositionalScriptArgs,
   loadDatabaseEnvForTarget,
+  resolveBackupDirFromEnv,
   resolveEnvTargetFromArgs,
   resolveDatabaseFromEnv,
   timestampForFile,
@@ -30,7 +31,7 @@ if (process.argv.includes("--help") || process.argv.includes("-h")) {
 const [rawLabel = "delivery-change"] = getPositionalScriptArgs();
 const label = sanitizeDeliveryCheckpointLabel(rawLabel);
 const allowDirty = process.argv.includes("--allow-dirty");
-const checkpointDir = path.resolve(process.cwd(), "backups", "delivery-checkpoints");
+const checkpointDir = path.join(resolveBackupDirFromEnv(), "delivery-checkpoints");
 const stamp = timestampForFile();
 const tag = `delivery-checkpoint-${stamp}-${label}`;
 

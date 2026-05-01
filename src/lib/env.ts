@@ -47,6 +47,10 @@ export const env = {
   allowStripeTestKeysInProduction: process.env.ALLOW_STRIPE_TEST_KEYS_IN_PRODUCTION === "true",
   siteUrl: normalizeSiteUrl(process.env.NEXT_PUBLIC_SITE_URL),
   businessSupportEmail: process.env.BUSINESS_SUPPORT_EMAIL ?? "support@chezolive.ca",
+  supportAiEnabled: process.env.SUPPORT_AI_ENABLED === "true",
+  supportAiProvider: process.env.SUPPORT_AI_PROVIDER ?? "openai",
+  openAiApiKey: process.env.OPENAI_API_KEY ?? "",
+  openAiSupportModel: process.env.OPENAI_SUPPORT_MODEL ?? "gpt-5-mini",
   resendApiKey: process.env.RESEND_API_KEY ?? "",
   resendFromEmail: process.env.RESEND_FROM_EMAIL ?? "Chez Olive <onboarding@resend.dev>",
   adminSmsEmail: process.env.ADMIN_SMS_EMAIL ?? "",
@@ -83,6 +87,12 @@ export function validateEnv(target: "development" | "production" = "development"
 
   if (!env.databaseUrl) {
     errors.push("DATABASE_URL is required.");
+  }
+
+  if (env.shippingFlatCents === 0 && env.shippingFreeThresholdCents > 0) {
+    warnings.push(
+      "SHIPPING_FLAT_CENTS is 0 while SHIPPING_FREE_THRESHOLD_CENTS is above 0; local delivery is free before the configured free-delivery threshold."
+    );
   }
 
   if (target === "production") {
@@ -173,6 +183,14 @@ export function validateEnv(target: "development" | "production" = "development"
 
     if (!env.resendApiKey && !env.smtpHost) {
       errors.push("Email provider required in production (RESEND_API_KEY or SMTP_HOST).");
+    }
+
+    if (env.supportAiEnabled && !env.openAiApiKey) {
+      errors.push("OPENAI_API_KEY is required when SUPPORT_AI_ENABLED=true.");
+    }
+
+    if (env.supportAiEnabled && env.supportAiProvider !== "openai") {
+      warnings.push("SUPPORT_AI_PROVIDER is not openai; support AI will need a compatible provider implementation.");
     }
 
     if (env.resendApiKey && !env.resendFromEmail) {

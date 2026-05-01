@@ -34,8 +34,8 @@ export function SiteFooter() {
         : "Monday to Friday, 9am to 5pm (Montreal time)",
     shippingPolicy:
       language === "fr"
-        ? "Livraison locale simple et claire, avec suivi dans ton espace client."
-        : "Simple local delivery, with follow-up in your customer account.",
+        ? "Livraison locale à Rimouski et environs. Les frais et le seuil gratuit sont confirmés au panier et au passage à la caisse."
+        : "Local delivery in Rimouski and nearby areas. Fees and the free-delivery threshold are confirmed in cart and checkout.",
   };
 
   if (pathname.startsWith("/admin")) {
@@ -56,8 +56,8 @@ export function SiteFooter() {
             </p>
             <h2 className="site-footer__title">
               {language === "fr"
-                ? "Le marché local pour les humains et leurs compagnons."
-                : "The local market for humans and their companions."}
+                ? "La boutique locale pour les humains et leurs compagnons."
+                : "The local boutique for humans and their companions."}
             </h2>
             <p className="site-footer__text">
               {language === "fr"
@@ -76,7 +76,6 @@ export function SiteFooter() {
                 <Link href="/boutique">{language === "fr" ? "Boutique" : "Shop"}</Link>
                 <Link href="/faq">{language === "fr" ? "Centre d’aide" : "Help center"}</Link>
                 <Link href="/shipping">{language === "fr" ? "Livraison" : "Shipping"}</Link>
-                <Link href="/sell">{t.navSell}</Link>
               </div>
             </div>
 

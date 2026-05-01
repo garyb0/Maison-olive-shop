@@ -7,6 +7,51 @@ import { isMaintenanceEnabled } from '@/lib/maintenance'
 const PUBLIC_FILE_REGEX = /\.(ico|png|jpg|jpeg|svg|webp|gif|css|js|woff|woff2)$/i
 const MAINTENANCE_BYPASS_PREFIXES = ['/admin', '/login', '/forgot-password', '/reset-password', '/api/auth', '/api/admin']
 const MAINTENANCE_BYPASS_EXACT = ['/maintenance', '/api/health', '/favicon.ico', '/robots.txt', '/sitemap.xml']
+const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
+const CROSS_SITE_API_EXEMPT_PREFIXES = ['/api/stripe/webhook', '/api/support/email-reply']
+
+function normalizeOrigin(value: string | null) {
+  if (!value) return null
+  try {
+    return new URL(value).origin
+  } catch {
+    return null
+  }
+}
+
+function getTrustedOrigins(request: NextRequest) {
+  const origins = new Set<string>()
+  const requestOrigin = normalizeOrigin(request.nextUrl.origin)
+  const configuredOrigin = normalizeOrigin(env.siteUrl)
+
+  if (requestOrigin) origins.add(requestOrigin)
+  if (configuredOrigin) origins.add(configuredOrigin)
+
+  return origins
+}
+
+function isTrustedRequestOrigin(request: NextRequest, value: string | null) {
+  const origin = normalizeOrigin(value)
+  if (!origin) return false
+  return getTrustedOrigins(request).has(origin)
+}
+
+function isCrossSiteApiMutation(request: NextRequest, path: string) {
+  if (!path.startsWith('/api/')) return false
+  if (!UNSAFE_METHODS.has(request.method.toUpperCase())) return false
+  if (CROSS_SITE_API_EXEMPT_PREFIXES.some((prefix) => path.startsWith(prefix))) return false
+
+  const origin = request.headers.get('origin')
+  if (origin && !isTrustedRequestOrigin(request, origin)) return true
+
+  const referer = request.headers.get('referer')
+  if (!origin && referer && !isTrustedRequestOrigin(request, referer)) return true
+
+  const fetchSite = request.headers.get('sec-fetch-site')?.toLowerCase()
+  if (fetchSite && !['same-origin', 'same-site', 'none'].includes(fetchSite)) return true
+
+  return false
+}
 
 export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname
@@ -17,6 +62,10 @@ export async function proxy(request: NextRequest) {
     PUBLIC_FILE_REGEX.test(path)
   ) {
     return NextResponse.next()
+  }
+
+  if (isCrossSiteApiMutation(request, path)) {
+    return NextResponse.json({ error: 'FORBIDDEN_CROSS_SITE_REQUEST' }, { status: 403 })
   }
 
   // Toujours laisser passer l'admin et les APIs nécessaires

@@ -274,7 +274,7 @@ export function AdminPromoCodesClient({ language, promoCodes: initialPromoCodes 
             <thead>
               <tr>
                 <th>{language === "fr" ? "Code" : "Code"}</th>
-                <th>{language === "fr" ? "Details" : "Details"}</th>
+                <th>{language === "fr" ? "Détails" : "Details"}</th>
                 <th>{language === "fr" ? "Statut" : "Status"}</th>
                 <th>{language === "fr" ? "Actions" : "Actions"}</th>
               </tr>
@@ -291,9 +291,15 @@ export function AdminPromoCodesClient({ language, promoCodes: initialPromoCodes 
                     <span className={`badge ${promoCode.isActive && !promoCode.isLaunchBlocked ? "" : "badge--inactive"}`}>
                       {promoCode.isLaunchBlocked
                         ? language === "fr"
-                          ? "BLOQUÉ LANCEMENT"
-                          : "LAUNCH BLOCKED"
-                        : promoCode.isActive ? "ACTIVE" : "INACTIVE"}
+                          ? "Bloqué pour lancement"
+                          : "Launch blocked"
+                        : promoCode.isActive
+                          ? language === "fr"
+                            ? "Actif"
+                            : "Active"
+                          : language === "fr"
+                            ? "Inactif"
+                            : "Inactive"}
                     </span>
                   </td>
                   <td>

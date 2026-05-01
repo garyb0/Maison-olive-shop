@@ -103,6 +103,10 @@ export function CartClient({
     };
   });
 
+  const itemCount = rows.reduce((sum, row) => sum + row.quantity, 0);
+  const itemCountLabel = language === "fr"
+    ? `${itemCount} article${itemCount !== 1 ? "s" : ""}`
+    : `${itemCount} item${itemCount !== 1 ? "s" : ""}`;
   const totalCents = rows.reduce((acc, r) => acc + r.subtotalCents, 0);
   const totalLabel = rows.length > 0
     ? fmt(totalCents, rows[0]?.currency ?? "CAD", locale)
@@ -227,13 +231,20 @@ export function CartClient({
         <>
           <section className="cart-route-strip" aria-label={language === "fr" ? "Progression de commande" : "Order progress"}>
             <span className="cart-route-step cart-route-step--active">
-              {language === "fr" ? "1. Panier" : "1. Cart"}
+              <strong aria-hidden="true">1</strong>
+              {language === "fr" ? "Panier" : "Cart"}
             </span>
             <span className="cart-route-step">
-              {language === "fr" ? "2. Livraison" : "2. Delivery"}
+              <strong aria-hidden="true">2</strong>
+              {language === "fr" ? "Infos" : "Info"}
             </span>
             <span className="cart-route-step">
-              {language === "fr" ? "3. Paiement" : "3. Payment"}
+              <strong aria-hidden="true">3</strong>
+              {language === "fr" ? "Livraison" : "Delivery"}
+            </span>
+            <span className="cart-route-step">
+              <strong aria-hidden="true">4</strong>
+              {language === "fr" ? "Paiement" : "Payment"}
             </span>
           </section>
 
@@ -329,34 +340,67 @@ export function CartClient({
             {/* Récapitulatif total */}
             <div className="cart-summary">
               <div className="cart-summary-inner">
-                <p className="home-eyebrow">{language === "fr" ? "Résumé" : "Summary"}</p>
-                <h2 className="cart-summary-title">{language === "fr" ? "Total estimé" : "Estimated total"}</h2>
-                <div className="cart-summary-row">
-                  <span className="cart-summary-label">
-                    {language === "fr" ? "Sous-total" : "Subtotal"}
-                  </span>
-                  <span className="cart-summary-value">
-                    {visibleQuote ? fmt(visibleQuote.subtotalCents, "CAD", locale) : totalLabel}
-                  </span>
+                <div className="cart-summary-head">
+                  <div>
+                    <p className="home-eyebrow">{language === "fr" ? "Résumé" : "Summary"}</p>
+                    <h2 className="cart-summary-title">{language === "fr" ? "Total estimé" : "Estimated total"}</h2>
+                  </div>
+                  <span className="cart-summary-count">{itemCountLabel}</span>
                 </div>
-                {visibleQuote && visibleQuote.discountCents > 0 ? (
+
+                <div className="cart-summary-panel cart-summary-panel--totals">
                   <div className="cart-summary-row">
                     <span className="cart-summary-label">
-                      {language === "fr" ? "Rabais promo" : "Promo discount"}
+                      {language === "fr" ? "Sous-total" : "Subtotal"}
                     </span>
                     <span className="cart-summary-value">
-                      -{fmt(visibleQuote.discountCents, "CAD", locale)}
+                      {visibleQuote ? fmt(visibleQuote.subtotalCents, "CAD", locale) : totalLabel}
                     </span>
                   </div>
-                ) : null}
-                <div className="cart-summary-row">
-                  <span className="cart-summary-label">
-                    {language === "fr" ? "Livraison estimée" : "Estimated shipping"}
-                  </span>
-                  <span className="cart-summary-value">
-                    {visibleQuote ? fmt(visibleQuote.shippingCents, "CAD", locale) : language === "fr" ? "Calcul..." : "Calculating..."}
-                  </span>
+                  {visibleQuote && visibleQuote.discountCents > 0 ? (
+                    <div className="cart-summary-row">
+                      <span className="cart-summary-label">
+                        {language === "fr" ? "Rabais promo" : "Promo discount"}
+                      </span>
+                      <span className="cart-summary-value">
+                        -{fmt(visibleQuote.discountCents, "CAD", locale)}
+                      </span>
+                    </div>
+                  ) : null}
+                  <div className="cart-summary-row">
+                    <span className="cart-summary-label">
+                      {language === "fr" ? "Livraison estimée" : "Estimated shipping"}
+                    </span>
+                    <span className="cart-summary-value">
+                      {visibleQuote ? fmt(visibleQuote.shippingCents, "CAD", locale) : language === "fr" ? "Calcul..." : "Calculating..."}
+                    </span>
+                  </div>
+                  <div className="cart-summary-row">
+                    <span className="cart-summary-label">
+                      {language === "fr" ? "Total avant taxes" : "Total before taxes"}
+                    </span>
+                    <span className="cart-summary-value">
+                      {visibleQuote ? fmt(beforeTaxCents, "CAD", locale) : totalLabel}
+                    </span>
+                  </div>
+                  <div className="cart-summary-row">
+                    <span className="cart-summary-label">
+                      {language === "fr" ? "Taxes estimées" : "Estimated taxes"}
+                    </span>
+                    <span className="cart-summary-value">
+                      {visibleQuote ? fmt(visibleQuote.taxCents, "CAD", locale) : language === "fr" ? "Calcul..." : "Calculating..."}
+                    </span>
+                  </div>
+                  <div className="cart-summary-row cart-summary-row--total">
+                    <span className="cart-summary-label">
+                      {language === "fr" ? "Total estimé" : "Estimated total"}
+                    </span>
+                    <span className="cart-summary-total">
+                      {visibleQuote ? fmt(visibleQuote.totalCents, "CAD", locale) : totalLabel}
+                    </span>
+                  </div>
                 </div>
+
                 {rows.length > 0 ? (
                   <div
                     className={`cart-summary-goal${qualifiesForFreeShipping ? " cart-summary-goal--active" : ""}`}
@@ -385,46 +429,32 @@ export function CartClient({
                     </p>
                   </div>
                 ) : null}
-                <div className="cart-summary-row">
-                  <span className="cart-summary-label">
-                    {language === "fr" ? "Total avant taxes" : "Total before taxes"}
-                  </span>
-                  <span className="cart-summary-value">
-                    {visibleQuote ? fmt(beforeTaxCents, "CAD", locale) : totalLabel}
-                  </span>
-                </div>
-                <div className="cart-summary-row">
-                  <span className="cart-summary-label">
-                    {language === "fr" ? "Taxes estimées" : "Estimated taxes"}
-                  </span>
-                  <span className="cart-summary-value">
-                    {visibleQuote ? fmt(visibleQuote.taxCents, "CAD", locale) : language === "fr" ? "Calcul..." : "Calculating..."}
-                  </span>
-                </div>
-                <div className="cart-summary-row cart-summary-row--total">
-                  <span className="cart-summary-label">
-                    {language === "fr" ? "Total estimé" : "Estimated total"}
-                  </span>
-                  <span className="cart-summary-total">
-                    {visibleQuote ? fmt(visibleQuote.totalCents, "CAD", locale) : totalLabel}
-                  </span>
-                </div>
-                <p className="small" style={{ marginTop: 10 }}>
+                <p className="small cart-summary-note">
                   {language === "fr"
                     ? "Estimation avant confirmation de livraison au checkout."
                     : "Estimate shown before delivery confirmation at checkout."}
                 </p>
                 <div className="cart-summary-trust">
                   <span>{language === "fr" ? "Livraison locale à Rimouski" : "Local delivery in Rimouski"}</span>
-                  <span>{language === "fr" ? "Visa, Mastercard ou paiement local" : "Visa, Mastercard, or local payment"}</span>
+                  <span>
+                    {language === "fr"
+                      ? user
+                        ? "Visa, Mastercard ou paiement local"
+                        : "Visa, Mastercard; paiement local avec compte"
+                      : user
+                        ? "Visa, Mastercard, or local payment"
+                        : "Visa, Mastercard; local payment with an account"}
+                  </span>
                   <span>{language === "fr" ? "Support attentionné" : "Thoughtful support"}</span>
                 </div>
-                <Link className="btn cart-checkout-btn" href="/checkout">
-                  {language === "fr" ? "Passer à la caisse" : "Proceed to checkout"}
-                </Link>
-                <Link className="cart-continue-link" href="/">
-                  {language === "fr" ? "Retour à l’accueil" : "Back to home"}
-                </Link>
+                <div className="cart-summary-actions">
+                  <Link className="btn cart-checkout-btn" href="/checkout">
+                    {language === "fr" ? "Passer à la caisse" : "Proceed to checkout"}
+                  </Link>
+                  <Link className="cart-continue-link" href="/">
+                    {language === "fr" ? "Retour à l’accueil" : "Back to home"}
+                  </Link>
+                </div>
               </div>
             </div>
           </section>

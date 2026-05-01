@@ -222,10 +222,10 @@ export function StorefrontClient({
         : "Food, comfort, care, and play for everyday routines.",
     },
     {
-      title: language === "fr" ? "Marché local" : "Local market",
+      title: language === "fr" ? "Sélection locale" : "Local selection",
       text: language === "fr"
-        ? "Une boutique pensée pour mettre les produits de la région en avant."
-        : "A shop made to put regional products forward.",
+        ? "Une boutique pensée pour choisir des produits utiles, fiables et adaptés aux routines d'ici."
+        : "A shop built around useful, reliable products for local routines.",
     },
     {
       title: language === "fr" ? "Achat rassurant" : "Easy checkout",
@@ -436,7 +436,7 @@ export function StorefrontClient({
 
           <div className="home-hero-copy">
             <p className="home-eyebrow">
-              {language === "fr" ? "Marketplace locale animalière" : "Local pet marketplace"}
+              {language === "fr" ? "Boutique animalière locale" : "Local pet boutique"}
             </p>
             <h1 id="home-hero-title">
               {language === "fr"
@@ -445,15 +445,15 @@ export function StorefrontClient({
             </h1>
             <p className="home-hero-text">
               {language === "fr"
-                ? "Des produits choisis avec soin pour vos chiens et chats, des entreprises d’ici, et une expérience d’achat simple, chaleureuse et fiable."
-                : "Carefully selected products for your dogs and cats, local businesses, and a simple, warm, reliable shopping experience."}
+                ? "Des produits choisis avec soin pour vos chiens et chats, une livraison locale à Rimouski, et une expérience d'achat simple, chaleureuse et fiable."
+                : "Carefully selected products for your dogs and cats, local Rimouski delivery, and a simple, warm, reliable shopping experience."}
             </p>
             <div className="home-hero-actions">
               <Link className="btn home-hero-primary" href="/boutique">
                 {language === "fr" ? "Magasiner maintenant" : "Shop now"}
               </Link>
-              <Link className="btn btn-secondary home-hero-secondary" href="/sell">
-                {language === "fr" ? "Découvrir les entreprises locales" : "Discover local businesses"}
+              <Link className="btn btn-secondary home-hero-secondary" href="/shipping">
+                {language === "fr" ? "Voir la livraison locale" : "See local delivery"}
               </Link>
             </div>
             <div className="home-category-strip" aria-label={language === "fr" ? "Catégories en vedette" : "Featured categories"}>
@@ -496,7 +496,15 @@ export function StorefrontClient({
           <article>
             <span aria-hidden="true">🔒</span>
             <strong>{language === "fr" ? "Paiement sécurisé" : "Secure payment"}</strong>
-            <small>{language === "fr" ? "Visa, Mastercard ou paiement local" : "Visa, Mastercard, or local payment"}</small>
+            <small>
+              {language === "fr"
+                ? user
+                  ? "Visa, Mastercard ou paiement local"
+                  : "Visa, Mastercard; paiement local avec compte"
+                : user
+                  ? "Visa, Mastercard, or local payment"
+                  : "Visa, Mastercard; local payment with an account"}
+            </small>
           </article>
           <article>
             <span aria-hidden="true">💚</span>
@@ -505,7 +513,7 @@ export function StorefrontClient({
           </article>
         </section>
 
-        <section className="home-market-overview" aria-label={language === "fr" ? "Aperçu marketplace" : "Marketplace overview"}>
+        <section className="home-market-overview" aria-label={language === "fr" ? "Aperçu boutique" : "Shop overview"}>
           <div className="home-market-copy">
             <p className="home-eyebrow">
               {language === "fr" ? "Boutique locale" : "Local shop"}
@@ -824,7 +832,7 @@ export function StorefrontClient({
               <p className="home-eyebrow">
                 {language === "fr" ? "Boutique locale" : "Local shop"}
               </p>
-              <h2>{t.catalogTitle}</h2>
+              <h1>{t.catalogTitle}</h1>
             </div>
           </div>
 

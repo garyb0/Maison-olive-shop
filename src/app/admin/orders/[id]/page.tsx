@@ -130,6 +130,30 @@ function getDeliveryStatusLabel(status: string, language: "fr" | "en") {
   return labels[status]?.[language] ?? status;
 }
 
+function getOrderStatusLabel(status: string, language: "fr" | "en") {
+  const labels: Record<string, { fr: string; en: string }> = {
+    PENDING: { fr: "À vérifier", en: "Pending" },
+    PAID: { fr: "Payée", en: "Paid" },
+    PROCESSING: { fr: "En préparation", en: "Processing" },
+    SHIPPED: { fr: "Expédiée", en: "Shipped" },
+    DELIVERED: { fr: "Livrée", en: "Delivered" },
+    CANCELLED: { fr: "Annulée", en: "Cancelled" },
+  };
+
+  return labels[status]?.[language] ?? status;
+}
+
+function getPaymentStatusLabel(status: string, language: "fr" | "en") {
+  const labels: Record<string, { fr: string; en: string }> = {
+    PENDING: { fr: "À confirmer", en: "Pending" },
+    PAID: { fr: "Payé", en: "Paid" },
+    FAILED: { fr: "Échec", en: "Failed" },
+    REFUNDED: { fr: "Remboursé", en: "Refunded" },
+  };
+
+  return labels[status]?.[language] ?? status;
+}
+
 export default async function AdminOrderDetailsPage({ params }: AdminOrderDetailsPageProps) {
   const { id } = await params;
   const [language, user, order, logs] = await Promise.all([
@@ -213,11 +237,11 @@ export default async function AdminOrderDetailsPage({ params }: AdminOrderDetail
         <div className="row" style={{ gap: 24, flexWrap: "wrap" }}>
           <div>
             <p className="small">{language === "fr" ? "Statut commande" : "Order status"}</p>
-            <span className="badge">{order.status}</span>
+            <span className="badge">{getOrderStatusLabel(order.status, language)}</span>
           </div>
           <div>
             <p className="small">{language === "fr" ? "Paiement" : "Payment"}</p>
-            <span className="badge">{order.paymentStatus}</span>
+            <span className="badge">{getPaymentStatusLabel(order.paymentStatus, language)}</span>
           </div>
           <div>
             <p className="small">{language === "fr" ? "Livraison" : "Delivery"}</p>
@@ -291,48 +315,48 @@ export default async function AdminOrderDetailsPage({ params }: AdminOrderDetail
 
       <section className="section">
         <h2>{language === "fr" ? "Montants" : "Amounts"}</h2>
-        <div className="table-wrap">
-          <table>
+        <div className="table-wrap admin-mobile-table-wrap">
+          <table className="admin-mobile-table">
             <tbody>
               <tr>
-                <td>{language === "fr" ? "Sous-total" : "Subtotal"}</td>
-                <td>{formatCurrency(order.subtotalCents, order.currency, locale)}</td>
+                <td data-label={language === "fr" ? "Ligne" : "Line"}>{language === "fr" ? "Sous-total" : "Subtotal"}</td>
+                <td data-label={language === "fr" ? "Montant" : "Amount"}>{formatCurrency(order.subtotalCents, order.currency, locale)}</td>
               </tr>
               <tr>
-                <td>{language === "fr" ? "Remise" : "Discount"}</td>
-                <td>{formatCurrency(order.discountCents, order.currency, locale)}</td>
+                <td data-label={language === "fr" ? "Ligne" : "Line"}>{language === "fr" ? "Remise" : "Discount"}</td>
+                <td data-label={language === "fr" ? "Montant" : "Amount"}>{formatCurrency(order.discountCents, order.currency, locale)}</td>
               </tr>
               <tr>
-                <td>{language === "fr" ? "Code promo" : "Promo code"}</td>
-                <td>{order.promoCode ?? "-"}</td>
+                <td data-label={language === "fr" ? "Ligne" : "Line"}>{language === "fr" ? "Code promo" : "Promo code"}</td>
+                <td data-label={language === "fr" ? "Valeur" : "Value"}>{order.promoCode ?? "-"}</td>
               </tr>
               <tr>
-                <td>{language === "fr" ? "Base taxable" : "Taxable amount"}</td>
-                <td>{formatCurrency(taxSummary.taxableCents, order.currency, locale)}</td>
+                <td data-label={language === "fr" ? "Ligne" : "Line"}>{language === "fr" ? "Base taxable" : "Taxable amount"}</td>
+                <td data-label={language === "fr" ? "Montant" : "Amount"}>{formatCurrency(taxSummary.taxableCents, order.currency, locale)}</td>
               </tr>
               <tr>
-                <td>{language === "fr" ? "TPS (5%)" : "GST (5%)"}</td>
-                <td>{formatCurrency(taxSummary.gstCents, order.currency, locale)}</td>
+                <td data-label={language === "fr" ? "Ligne" : "Line"}>{language === "fr" ? "TPS (5%)" : "GST (5%)"}</td>
+                <td data-label={language === "fr" ? "Montant" : "Amount"}>{formatCurrency(taxSummary.gstCents, order.currency, locale)}</td>
               </tr>
               <tr>
-                <td>{language === "fr" ? "TVQ (9,975%)" : "QST (9.975%)"}</td>
-                <td>{formatCurrency(taxSummary.qstCents, order.currency, locale)}</td>
+                <td data-label={language === "fr" ? "Ligne" : "Line"}>{language === "fr" ? "TVQ (9,975%)" : "QST (9.975%)"}</td>
+                <td data-label={language === "fr" ? "Montant" : "Amount"}>{formatCurrency(taxSummary.qstCents, order.currency, locale)}</td>
               </tr>
               <tr>
-                <td>{language === "fr" ? "Taxes totales" : "Total taxes"}</td>
-                <td>{formatCurrency(order.taxCents, order.currency, locale)}</td>
+                <td data-label={language === "fr" ? "Ligne" : "Line"}>{language === "fr" ? "Taxes totales" : "Total taxes"}</td>
+                <td data-label={language === "fr" ? "Montant" : "Amount"}>{formatCurrency(order.taxCents, order.currency, locale)}</td>
               </tr>
               <tr>
-                <td>{language === "fr" ? "Livraison" : "Shipping"}</td>
-                <td>{formatCurrency(order.shippingCents, order.currency, locale)}</td>
+                <td data-label={language === "fr" ? "Ligne" : "Line"}>{language === "fr" ? "Livraison" : "Shipping"}</td>
+                <td data-label={language === "fr" ? "Montant" : "Amount"}>{formatCurrency(order.shippingCents, order.currency, locale)}</td>
               </tr>
               <tr>
-                <td>{language === "fr" ? "Remboursement" : "Refunded"}</td>
-                <td>{formatCurrency(order.refundedCents, order.currency, locale)}</td>
+                <td data-label={language === "fr" ? "Ligne" : "Line"}>{language === "fr" ? "Remboursement" : "Refunded"}</td>
+                <td data-label={language === "fr" ? "Montant" : "Amount"}>{formatCurrency(order.refundedCents, order.currency, locale)}</td>
               </tr>
               <tr>
-                <td><strong>{language === "fr" ? "Total" : "Total"}</strong></td>
-                <td><strong>{formatCurrency(order.totalCents, order.currency, locale)}</strong></td>
+                <td data-label={language === "fr" ? "Ligne" : "Line"}><strong>{language === "fr" ? "Total" : "Total"}</strong></td>
+                <td data-label={language === "fr" ? "Montant" : "Amount"}><strong>{formatCurrency(order.totalCents, order.currency, locale)}</strong></td>
               </tr>
             </tbody>
           </table>
@@ -345,8 +369,8 @@ export default async function AdminOrderDetailsPage({ params }: AdminOrderDetail
 
       <section className="section">
         <h2>{language === "fr" ? "Articles" : "Items"}</h2>
-        <div className="table-wrap">
-          <table>
+        <div className="table-wrap admin-mobile-table-wrap">
+          <table className="admin-mobile-table">
             <thead>
               <tr>
                 <th>{language === "fr" ? "Produit" : "Product"}</th>
@@ -358,15 +382,15 @@ export default async function AdminOrderDetailsPage({ params }: AdminOrderDetail
             <tbody>
               {order.items.map((item) => (
                 <tr key={item.id}>
-                  <td>
+                  <td data-label={language === "fr" ? "Produit" : "Product"}>
                     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                       <strong>{language === "fr" ? item.productNameSnapshotFr : item.productNameSnapshotEn}</strong>
                       {item.product?.slug ? <span className="small">/{item.product.slug}</span> : null}
                     </div>
                   </td>
-                  <td>{item.quantity}</td>
-                  <td>{formatCurrency(item.unitPriceCents, order.currency, locale)}</td>
-                  <td>{formatCurrency(item.lineTotalCents, order.currency, locale)}</td>
+                  <td data-label={language === "fr" ? "Quantité" : "Quantity"}>{item.quantity}</td>
+                  <td data-label={language === "fr" ? "Prix unitaire" : "Unit price"}>{formatCurrency(item.unitPriceCents, order.currency, locale)}</td>
+                  <td data-label={language === "fr" ? "Ligne" : "Line total"}>{formatCurrency(item.lineTotalCents, order.currency, locale)}</td>
                 </tr>
               ))}
             </tbody>

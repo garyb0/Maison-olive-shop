@@ -1,5 +1,7 @@
-import "dotenv/config";
 import { defineConfig } from "prisma/config";
+import { loadEnvForTarget } from "./scripts/db-utils";
+
+loadEnvForTarget(process.env.NODE_ENV === "production" ? "production" : "development");
 
 export default defineConfig({
   schema: "prisma/schema.prisma",

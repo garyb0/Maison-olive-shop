@@ -25,14 +25,14 @@ export default async function UserSubscriptionsPage() {
           {language === "fr" ? "Abonnements" : "Subscriptions"}
         </p>
         <h1>{language === "fr" ? "Mes abonnements" : "My subscriptions"}</h1>
-        <p className="small" style={{ marginBottom: 0, maxWidth: 620 }}>
+        <p className="small account-section-copy">
           {language === "fr"
             ? "Gère tes abonnements récurrents. Tu peux les ajuster ou les annuler au bon moment."
             : "Manage your recurring subscriptions. You can adjust or cancel them when needed."}
         </p>
       </section>
 
-      <section className="section">
+      <section className="section account-section-card">
         <UserSubscriptionsClient
           subscriptions={subscriptions.map((sub) => ({
             id: sub.id,

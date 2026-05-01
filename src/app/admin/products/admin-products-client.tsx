@@ -190,14 +190,14 @@ export function AdminProductsClient({ language, products, inventoryMovements }: 
 
   const getStatusLabel = (product: ProductRow) => {
     if (product.isActive) {
-      return language === "fr" ? "ACTIF" : "ACTIVE";
+      return language === "fr" ? "Actif" : "Active";
     }
 
     if (product.orderHistoryCount > 0) {
-      return language === "fr" ? "ARCHIVÉ" : "ARCHIVED";
+      return language === "fr" ? "Archivé" : "Archived";
     }
 
-    return language === "fr" ? "INACTIF" : "INACTIVE";
+    return language === "fr" ? "Inactif" : "Inactive";
   };
 
   const getToggleLabel = (product: ProductRow) => {
@@ -503,13 +503,18 @@ export function AdminProductsClient({ language, products, inventoryMovements }: 
 
   return (
     <>
-      <section className="section">
-        <h1>{language === "fr" ? "Produits & Inventaire" : "Products & Inventory"}</h1>
-        <p className="small">
-          {language === "fr"
-            ? "Ajoute, modifie, désactive les produits et ajuste le stock sans toucher à la base manuellement."
-            : "Add, edit, deactivate products and adjust stock without touching the database manually."}
-        </p>
+      <section className="section admin-page-header">
+        <div className="admin-page-header__copy">
+          <span className="admin-page-header__eyebrow">
+            {language === "fr" ? "Catalogue" : "Catalog"}
+          </span>
+          <h1>{language === "fr" ? "Produits & Inventaire" : "Products & Inventory"}</h1>
+          <p className="small">
+            {language === "fr"
+              ? "Ajoute, modifie, désactive les produits et ajuste le stock sans toucher à la base manuellement."
+              : "Add, edit, deactivate products and adjust stock without touching the database manually."}
+          </p>
+        </div>
       </section>
 
       <section className="section">

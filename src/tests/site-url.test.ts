@@ -108,4 +108,24 @@ describe("validateEnv production hardening", () => {
       "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is test key while STRIPE_SECRET_KEY is live.",
     );
   });
+
+  it("warns when the shipping flat fee contradicts the free-delivery threshold", async () => {
+    Object.assign(process.env, {
+      NODE_ENV: "production",
+      NEXT_PUBLIC_SITE_URL: "https://chezolive.ca",
+      DATABASE_URL: "file:./prod.db",
+      SESSION_SECRET: "x".repeat(48),
+      RESEND_API_KEY: "re_live_key",
+      RESEND_FROM_EMAIL: "Chez Olive <support@chezolive.ca>",
+      SHIPPING_FLAT_CENTS: "0",
+      SHIPPING_FREE_THRESHOLD_CENTS: "7500",
+    });
+
+    const { validateEnv } = await import("@/lib/env");
+    const report = validateEnv("production");
+
+    expect(report.warnings).toContain(
+      "SHIPPING_FLAT_CENTS is 0 while SHIPPING_FREE_THRESHOLD_CENTS is above 0; local delivery is free before the configured free-delivery threshold.",
+    );
+  });
 });

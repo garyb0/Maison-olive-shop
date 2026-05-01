@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { getEnvFilesForTarget, loadEnvFilesInOrder, resolveEnvTargetFromArgs } from "./db-utils";
+import { loadEnvForTarget, resolveEnvTargetFromArgs } from "./db-utils";
 
 type CheckLevel = "pass" | "warn" | "fail";
 
@@ -370,7 +370,7 @@ function pushWarning(results: CheckResult[], name: string, details: string) {
 
 function resolveConfig(): ScriptConfig {
   const envTarget = resolveEnvTargetFromArgs(process.argv, "development");
-  loadEnvFilesInOrder(getEnvFilesForTarget(envTarget));
+  loadEnvForTarget(envTarget);
 
   const envSeedDemo = parseEnvBoolean(process.env.DELIVERY_SMOKE_SEED_DEMO);
   const seedDemo = hasFlag("--no-seed-demo")
@@ -860,7 +860,7 @@ async function main() {
         run.deliverySlot.note?.startsWith(DEMO_SLOT_NOTE_PREFIX),
     ) ?? listedRuns[0];
 
-    const runDetail = await runStep(results, "admin:run-detail", async () => {
+    await runStep(results, "admin:run-detail", async () => {
       const result = await adminSession.request<{ run?: DeliveryRunSummary }>(
         `/api/admin/delivery/runs/${targetRun.id}`,
       );
@@ -917,7 +917,7 @@ async function main() {
       };
     });
 
-    const reorderedRun = await runStep(results, "admin:run-reorder", async () => {
+    await runStep(results, "admin:run-reorder", async () => {
       const reorderedStopIds = [...optimizedRun.stops].map((stop) => stop.id).reverse();
       const result = await adminSession.request<{ run?: DeliveryRunSummary; warning?: string }>(
         `/api/admin/delivery/runs/${targetRun.id}/reorder`,

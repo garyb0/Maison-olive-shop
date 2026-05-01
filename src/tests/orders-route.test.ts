@@ -169,6 +169,34 @@ describe("POST /api/orders", () => {
     });
   });
 
+  it("bloque le paiement manuel pour une commande invitee", async () => {
+    getCurrentUserMock.mockResolvedValue(null);
+
+    const { POST } = await import("@/app/api/orders/route");
+    const req = new Request("http://localhost:3101/api/orders", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        items: [{ productId: "prod_test", quantity: 1 }],
+        paymentMethod: "MANUAL",
+        customerName: "Client Invite",
+        customerEmail: "client@example.com",
+        shippingLine1: "22 rue de l'etang",
+        shippingCity: "Rimouski",
+        shippingRegion: "QC",
+        shippingPostal: "G0L1B0",
+        shippingCountry: "CA",
+      }),
+    });
+
+    const res = await POST(req);
+    const payload = (await res.json()) as { error?: string };
+
+    expect(res.status).toBe(401);
+    expect(payload.error).toContain("paiement manuel");
+    expect(createOrderSafelyMock).not.toHaveBeenCalled();
+  });
+
   it("retourne un message clair quand Stripe refuse un total inferieur a 0,50 $ CAD", async () => {
     stripeSessionsCreateMock.mockRejectedValue(
       new Error("The Checkout Session's total amount due must add up to at least $0.50 cad"),
@@ -194,7 +222,7 @@ describe("POST /api/orders", () => {
 
     expect(res.status).toBe(400);
     expect(payload.error).toBe(
-      "Stripe exige un total d'au moins 0,50 $ CAD. Augmente légèrement le montant de la commande ou retire le rabais de test.",
+      "Le paiement par carte exige un total d'au moins 0,50 $ CAD. Augmente légèrement le montant de la commande ou retire le rabais de test.",
     );
     expect(logApiEventMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -256,6 +284,6 @@ describe("POST /api/orders", () => {
     const payload = (await res.json()) as { error?: string };
 
     expect(res.status).toBe(409);
-    expect(payload.error).toBe("Le mode de livraison expÃ©rimental est dÃ©sactivÃ©");
+    expect(payload.error).toBe("Le mode de livraison expérimental est désactivé");
   });
 });

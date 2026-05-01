@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
+import { env } from "@/lib/env";
 import { getCurrentLanguage } from "@/lib/language";
 
 export default async function AccountSupportPage() {
   await getCurrentUser();
   const language = await getCurrentLanguage();
+  const supportEmail = env.businessSupportEmail;
 
   return (
     <>
@@ -13,7 +15,7 @@ export default async function AccountSupportPage() {
           {language === "fr" ? "Support" : "Support"}
         </p>
         <h1>{language === "fr" ? "Support client" : "Customer support"}</h1>
-        <p className="small" style={{ marginBottom: 0, maxWidth: 620 }}>
+        <p className="small account-section-copy">
           {language === "fr"
             ? "Besoin d'aide avant ou après une commande ? On t'oriente rapidement vers la bonne ressource."
             : "Need help before or after an order? We will guide you quickly to the right resource."}
@@ -30,7 +32,7 @@ export default async function AccountSupportPage() {
               : "For questions about an order, product, or delivery, email us directly."}
           </p>
           <div className="support-lite-card__actions">
-            <a className="btn" href="mailto:support@chezolive.ca">
+            <a className="btn" href={`mailto:${supportEmail}`}>
               {language === "fr" ? "Envoyer un courriel" : "Send an email"}
             </a>
           </div>
@@ -52,9 +54,14 @@ export default async function AccountSupportPage() {
         </article>
       </section>
 
-      <section className="section">
-        <h2>{language === "fr" ? "Quand nous écrire ?" : "When should you contact us?"}</h2>
-        <div className="support-lite-grid" style={{ marginTop: 16 }}>
+      <section className="section account-section-card">
+        <div className="account-section-head">
+          <div>
+            <p className="account-home-hero__eyebrow">{language === "fr" ? "Repères" : "Guidance"}</p>
+            <h2>{language === "fr" ? "Quand nous écrire ?" : "When should you contact us?"}</h2>
+          </div>
+        </div>
+        <div className="support-lite-grid account-support-grid">
           <article className="support-lite-card">
             <h3 className="support-lite-card__title">{language === "fr" ? "Avant la commande" : "Before ordering"}</h3>
             <p className="small support-lite-card__text">

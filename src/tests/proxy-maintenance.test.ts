@@ -63,4 +63,60 @@ describe("proxy maintenance", () => {
 
     expect(response.headers.get("x-middleware-rewrite")).toContain("/maintenance");
   });
+
+  it("bloque une mutation API cross-site avant les routes sensibles", async () => {
+    isMaintenanceEnabledMock.mockReturnValue(false);
+
+    const { NextRequest } = await import("next/server");
+    const { proxy } = await import("@/proxy");
+
+    const request = new NextRequest("https://chezolive.ca/api/admin/orders", {
+      method: "POST",
+      headers: {
+        origin: "https://attacker.example",
+        "sec-fetch-site": "cross-site",
+      },
+    });
+
+    const response = await proxy(request);
+    const payload = (await response.json()) as { error?: string };
+
+    expect(response.status).toBe(403);
+    expect(payload.error).toBe("FORBIDDEN_CROSS_SITE_REQUEST");
+  });
+
+  it("laisse passer une mutation API same-origin", async () => {
+    isMaintenanceEnabledMock.mockReturnValue(false);
+
+    const { NextRequest } = await import("next/server");
+    const { proxy } = await import("@/proxy");
+
+    const request = new NextRequest("https://chezolive.ca/api/orders", {
+      method: "POST",
+      headers: {
+        origin: "https://chezolive.ca",
+        "sec-fetch-site": "same-origin",
+      },
+    });
+
+    const response = await proxy(request);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("x-middleware-rewrite")).toBeNull();
+  });
+
+  it("ne bloque pas le webhook Stripe sans Origin", async () => {
+    isMaintenanceEnabledMock.mockReturnValue(false);
+
+    const { NextRequest } = await import("next/server");
+    const { proxy } = await import("@/proxy");
+
+    const request = new NextRequest("https://chezolive.ca/api/stripe/webhook", {
+      method: "POST",
+    });
+
+    const response = await proxy(request);
+
+    expect(response.status).toBe(200);
+  });
 });

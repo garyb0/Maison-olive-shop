@@ -3,9 +3,9 @@ import { execSync } from "node:child_process";
 import Stripe from "stripe";
 import { resolvePublicSiteUrl } from "../src/lib/site-url";
 import { STRIPE_API_VERSION } from "../src/lib/stripe-server";
-import { loadEnvFilesInOrder } from "./db-utils";
+import { loadEnvForTarget } from "./db-utils";
 
-loadEnvFilesInOrder([".env.production.local", ".env.production", ".env"]);
+loadEnvForTarget("production");
 
 type CheckLevel = "pass" | "warn" | "fail";
 
@@ -64,8 +64,8 @@ async function checkDbConnectivity() {
   let prismaClient: { $disconnect: () => Promise<void> } | null = null;
 
   try {
-    const { loadEnvFilesInOrder: localLoad } = await import("./db-utils");
-    localLoad([".env.production.local", ".env.production", ".env"]);
+    const { loadEnvForTarget: localLoad } = await import("./db-utils");
+    localLoad("production");
 
     const { prisma } = await import("../src/lib/prisma");
     prismaClient = prisma;

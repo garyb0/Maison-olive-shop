@@ -534,11 +534,11 @@ function LegacyAdminPromoClient({ language, banners: initialBanners, freeShippin
                     <span className={`badge ${banner.isActive ? "" : "badge--inactive"}`}>
                       {banner.isActive
                         ? language === "fr"
-                          ? "ACTIVE"
-                          : "ACTIVE"
+                          ? "Active"
+                          : "Active"
                         : language === "fr"
-                          ? "INACTIVE"
-                          : "INACTIVE"}
+                          ? "Inactive"
+                          : "Inactive"}
                     </span>
                   </td>
                   <td>

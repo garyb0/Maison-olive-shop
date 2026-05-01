@@ -79,7 +79,7 @@ function StripeInlineCheckoutForm({
 
       onSuccess(result.session);
     } catch (error) {
-      onError(error instanceof Error ? error.message : "Stripe confirmation failed");
+      onError(error instanceof Error ? error.message : "La confirmation du paiement a échoué.");
     } finally {
       setSubmitting(false);
     }
@@ -133,7 +133,7 @@ export function StripeInlineCheckout({
     return (
       <div className="auth-alert auth-alert--err">
         <span>⚠️</span>{" "}
-        {errorMessage ?? "Stripe n’est pas prêt côté navigateur. Ajoute NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY."}
+        {errorMessage ?? "Le paiement par carte n'est pas disponible pour le moment. Réessaie dans quelques instants ou contacte le support."}
       </div>
     );
   }

@@ -1,16 +1,18 @@
-import path from "node:path";
 import {
   createSqliteBackup,
   getPositionalScriptArgs,
   loadDatabaseEnvForTarget,
+  resolveBackupDirFromEnv,
   resolveEnvTargetFromArgs,
+  resolveProjectPath,
   resolveDatabaseFromEnv,
 } from "./db-utils";
 
 const envTarget = resolveEnvTargetFromArgs();
 loadDatabaseEnvForTarget(envTarget);
 
-const [label = "manual", backupDir = path.resolve(process.cwd(), "backups")] = getPositionalScriptArgs();
+const [label = "manual", backupDirArg] = getPositionalScriptArgs();
+const backupDir = backupDirArg ? resolveProjectPath(backupDirArg) : resolveBackupDirFromEnv();
 
 const db = resolveDatabaseFromEnv();
 

@@ -1,13 +1,12 @@
-import type { ImgHTMLAttributes } from "react";
+import { createElement, type ImgHTMLAttributes } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { AdminProductsClient } from "@/app/admin/products/admin-products-client";
 
 const fetchMock = vi.fn();
 
 vi.mock("next/image", () => ({
-  default: ({ alt, src, ...props }: ImgHTMLAttributes<HTMLImageElement> & { src: string }) => (
-    <img alt={alt} src={src} {...props} />
-  ),
+  default: ({ alt, src, ...props }: ImgHTMLAttributes<HTMLImageElement> & { src: string }) =>
+    createElement("img", { alt, src, ...props }),
 }));
 
 vi.mock("@/components/ImageSelector", () => ({
@@ -162,7 +161,7 @@ describe("admin product form", () => {
     expect(screen.getByText("Produit archivé et retiré de la vente.")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Archivés (1)" }));
-    expect(screen.getByText("ARCHIVÉ")).toBeInTheDocument();
+    expect(screen.getByText("Archivé")).toBeInTheDocument();
   });
 
   it("supprime définitivement un produit sans historique", async () => {

@@ -34,7 +34,7 @@ export function getHelpCenterCards(language: Language, business: BusinessInfo): 
       },
       {
         title: "Livraison",
-        description: "Zone desservie, d\u00e9lais, livraison gratuite et planification.",
+        description: "Zone desservie, frais, seuil gratuit et planification.",
         href: "/shipping",
       },
       {
@@ -64,7 +64,7 @@ export function getHelpCenterCards(language: Language, business: BusinessInfo): 
     },
     {
       title: "Shipping",
-      description: "Delivery area, timing, free shipping, and scheduling details.",
+      description: "Delivery area, fees, free threshold, and scheduling details.",
       href: "/shipping",
     },
     {
