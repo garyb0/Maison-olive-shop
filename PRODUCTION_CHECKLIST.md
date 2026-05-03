@@ -123,6 +123,29 @@ Note:
 - [ ] Processus de support documenté
 - [ ] Procédure de maintenance Cloudflare de secours documentée
 - [ ] Worker Cloudflare de maintenance prêt à activer en cas de panne origin
+- [ ] `npm run ops:status` passe sans `FAIL`
+- [ ] Backup horaire Windows actif et caché (`MaisonOlive-DB-Backup-Hourly`)
+- [ ] Diagnostic backup horaire OK: `npm run ops:backup-hourly:diagnose`
+- [ ] Aucun popup CMD/PowerShell visible après lancement manuel de la tâche horaire
+
+### Backup horaire invisible Windows
+
+```powershell
+# Réinstaller/forcer la tâche horaire cachée
+npm run ops:backup-hourly:install
+
+# Voir état, action, dernier résultat et logs récents
+npm run ops:backup-hourly:diagnose
+
+# Santé complète ops
+npm run ops:status
+```
+
+Notes:
+- La tâche horaire doit utiliser `powershell.exe -WindowStyle Hidden -File scripts/windows/db-backup-hourly-hidden.ps1`.
+- Le vieux wrapper `scripts/windows/db-backup-hourly.cmd` ne doit pas être l'action de la tâche horaire.
+- Les logs horaires sont dans `maison-olive-data/logs` et le wrapper garde environ 14 jours de logs.
+- Le compte `smoke.admin@chezolive.local` est réservé aux smokes automatisés; ses secrets restent dans les variables d'environnement Windows utilisateur, jamais dans Git.
 
 ---
 

@@ -1,4 +1,7 @@
 import { execFileSync, execSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
+import { resolveLogDirFromEnv } from "./db-utils";
 
 type CheckLevel = "pass" | "warn" | "fail";
 
@@ -6,6 +9,18 @@ type Check = {
   level: CheckLevel;
   name: string;
   details: string;
+};
+
+type HourlyTaskPayload = {
+  Present?: boolean;
+  TaskName?: string;
+  State?: string;
+  LastRunTime?: string;
+  LastTaskResult?: number;
+  NextRunTime?: string;
+  Execute?: string;
+  Arguments?: string;
+  WorkingDirectory?: string;
 };
 
 function flagValue(name: string, fallback: string) {
@@ -52,6 +67,12 @@ function commandName(baseName: "npm" | "npx" | "powershell" | "git") {
 function print(check: Check) {
   const label = check.level === "pass" ? "PASS" : check.level === "warn" ? "WARN" : "FAIL";
   console.log(`${label} ${check.name}: ${check.details}`);
+}
+
+function formatAgeHours(date: Date) {
+  const ageHours = (Date.now() - date.getTime()) / 3_600_000;
+  if (!Number.isFinite(ageHours) || ageHours < 0) return "unknown age";
+  return ageHours < 1 ? "<1h" : `${ageHours.toFixed(1)}h`;
 }
 
 async function checkHealth(baseUrl: string): Promise<Check> {
@@ -111,6 +132,10 @@ function checkBackupHealth(): Check {
 }
 
 function checkScheduledTasks(): Check {
+  if (process.platform !== "win32") {
+    return { level: "warn", name: "scheduled-tasks", details: "Windows scheduled tasks unavailable" };
+  }
+
   const script = [
     "$names = 'MaisonOlive-DB-Backup','MaisonOlive-DB-Backup-Hourly','MaisonOlive-DB-Backup-Health';",
     "Get-ScheduledTask -TaskName $names -ErrorAction SilentlyContinue |",
@@ -135,6 +160,159 @@ function checkScheduledTasks(): Check {
   }
 }
 
+function isHiddenHourlyAction(payload: HourlyTaskPayload) {
+  const execute = payload.Execute ?? "";
+  const args = payload.Arguments ?? "";
+  return (
+    /(^|\\)powershell(\.exe)?$/i.test(execute) &&
+    args.includes("-WindowStyle Hidden") &&
+    args.includes("db-backup-hourly-hidden.ps1") &&
+    !args.toLowerCase().includes(".cmd")
+  );
+}
+
+function checkHourlyTaskDetails(): Check {
+  if (process.platform !== "win32") {
+    return { level: "warn", name: "hourly-backup-task", details: "Windows scheduled tasks unavailable" };
+  }
+
+  const script = [
+    "$task = Get-ScheduledTask -TaskName 'MaisonOlive-DB-Backup-Hourly' -ErrorAction SilentlyContinue;",
+    "if (-not $task) { [pscustomobject]@{ Present = $false } | ConvertTo-Json -Compress; exit 0 }",
+    "$info = Get-ScheduledTaskInfo -TaskName 'MaisonOlive-DB-Backup-Hourly';",
+    "$action = @($task.Actions)[0];",
+    "[pscustomobject]@{",
+    "Present = $true;",
+    "TaskName = $task.TaskName;",
+    "State = $task.State.ToString();",
+    "LastRunTime = $info.LastRunTime.ToString('o');",
+    "LastTaskResult = $info.LastTaskResult;",
+    "NextRunTime = $info.NextRunTime.ToString('o');",
+    "Execute = $action.Execute;",
+    "Arguments = $action.Arguments;",
+    "WorkingDirectory = $action.WorkingDirectory;",
+    "} | ConvertTo-Json -Compress",
+  ].join(" ");
+
+  const result = run(commandName("powershell"), ["-NoProfile", "-Command", script], 30_000);
+  if (!result.ok) return { level: "warn", name: "hourly-backup-task", details: "unable to query hourly task" };
+
+  try {
+    const payload = JSON.parse(result.output) as HourlyTaskPayload;
+    if (!payload.Present) {
+      return { level: "warn", name: "hourly-backup-task", details: "MaisonOlive-DB-Backup-Hourly missing" };
+    }
+
+    const hidden = isHiddenHourlyAction(payload);
+    const stateOk = payload.State === "Ready" || payload.State === "Running";
+    const resultOk = payload.LastTaskResult === 0;
+    const level: CheckLevel = stateOk && resultOk && hidden ? "pass" : "warn";
+    const details = [
+      `state=${payload.State ?? "unknown"}`,
+      `last=${payload.LastTaskResult ?? "unknown"}`,
+      `next=${payload.NextRunTime ?? "unknown"}`,
+      `hidden=${hidden}`,
+      `action=${payload.Execute ?? "unknown"} ${payload.Arguments ?? ""}`,
+    ].join(", ");
+
+    return { level, name: "hourly-backup-task", details };
+  } catch {
+    return { level: "warn", name: "hourly-backup-task", details: "unable to parse hourly task details" };
+  }
+}
+
+function checkHourlyBackupLogs(): Check {
+  const logDir = resolveLogDirFromEnv();
+  if (!fs.existsSync(logDir)) {
+    return { level: "warn", name: "hourly-backup-logs", details: `missing log dir ${logDir}` };
+  }
+
+  const logs = fs.readdirSync(logDir)
+    .filter((name) => /^db-backup-hourly-\d{8}-\d{6}\.(out|err)\.log$/.test(name))
+    .map((name) => {
+      const fullPath = path.join(logDir, name);
+      const stats = fs.statSync(fullPath);
+      return { name, fullPath, stats };
+    })
+    .sort((a, b) => b.stats.mtimeMs - a.stats.mtimeMs);
+
+  if (logs.length < 1) {
+    return { level: "warn", name: "hourly-backup-logs", details: `no hourly logs in ${logDir}` };
+  }
+
+  const latest = logs[0];
+  const latestErr = logs.find((log) => log.name.endsWith(".err.log") && log.stats.size > 0);
+  return {
+    level: latestErr ? "warn" : "pass",
+    name: "hourly-backup-logs",
+    details: latestErr
+      ? `latest=${latest.name} (${formatAgeHours(latest.stats.mtime)}), non-empty err=${latestErr.name}`
+      : `latest=${latest.name} (${formatAgeHours(latest.stats.mtime)}), count=${logs.length}`,
+  };
+}
+
+function checkSmokeAdminEnv(): Check {
+  const email = process.env.ACCOUNT_SMOKE_ADMIN_EMAIL || process.env.DELIVERY_SMOKE_ADMIN_EMAIL || "";
+  const password = process.env.ACCOUNT_SMOKE_ADMIN_PASSWORD || process.env.DELIVERY_SMOKE_ADMIN_PASSWORD || "";
+
+  if (email && password) {
+    return { level: "pass", name: "smoke-admin-env", details: `email=${email}, password=set` };
+  }
+
+  if (process.platform === "win32") {
+    const script = [
+      "$email = [Environment]::GetEnvironmentVariable('ACCOUNT_SMOKE_ADMIN_EMAIL', 'User');",
+      "$pass = [Environment]::GetEnvironmentVariable('ACCOUNT_SMOKE_ADMIN_PASSWORD', 'User');",
+      "[pscustomobject]@{ Email = $email; PasswordSet = [bool]$pass } | ConvertTo-Json -Compress",
+    ].join(" ");
+    const result = run(commandName("powershell"), ["-NoProfile", "-Command", script], 30_000);
+    if (result.ok) {
+      try {
+        const payload = JSON.parse(result.output) as { Email?: string; PasswordSet?: boolean };
+        if (payload.Email && payload.PasswordSet) {
+          return { level: "pass", name: "smoke-admin-env", details: `email=${payload.Email}, password=set (Windows user env)` };
+        }
+      } catch {
+        // fall through to warning
+      }
+    }
+  }
+
+  return {
+    level: "warn",
+    name: "smoke-admin-env",
+    details: "ACCOUNT_SMOKE_ADMIN_EMAIL/PASSWORD missing for automated smokes",
+  };
+}
+
+function checkLatestAccountSmokeArtifact(): Check {
+  const smokeRoot = path.resolve(process.cwd(), "test-results", "account-smoke");
+  if (!fs.existsSync(smokeRoot)) {
+    return { level: "warn", name: "latest-account-smoke", details: "no account smoke artifact directory" };
+  }
+
+  const runs = fs.readdirSync(smokeRoot)
+    .map((name) => {
+      const fullPath = path.join(smokeRoot, name);
+      const stats = fs.statSync(fullPath);
+      return { name, fullPath, stats };
+    })
+    .filter((entry) => entry.stats.isDirectory())
+    .sort((a, b) => b.stats.mtimeMs - a.stats.mtimeMs);
+
+  if (runs.length < 1) {
+    return { level: "warn", name: "latest-account-smoke", details: "no account smoke run found" };
+  }
+
+  const latest = runs[0];
+  const screenshotCount = fs.readdirSync(latest.fullPath).filter((name) => name.endsWith(".png")).length;
+  return {
+    level: "pass",
+    name: "latest-account-smoke",
+    details: `run=${latest.name}, age=${formatAgeHours(latest.stats.mtime)}, screenshots=${screenshotCount}`,
+  };
+}
+
 async function main() {
   const baseUrl = flagValue("--base-url", "https://chezolive.ca");
   const checks: Check[] = [
@@ -143,6 +321,10 @@ async function main() {
     checkPm2(),
     checkBackupHealth(),
     checkScheduledTasks(),
+    checkHourlyTaskDetails(),
+    checkHourlyBackupLogs(),
+    checkSmokeAdminEnv(),
+    checkLatestAccountSmokeArtifact(),
   ];
 
   console.log(`Ops status for ${baseUrl}`);

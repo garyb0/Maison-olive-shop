@@ -46,6 +46,8 @@
     "db:backup:hourly": "tsx scripts/db-backup-hourly.ts",
     "db:backup:health": "tsx scripts/db-backup-health.ts --env=production",
     "ops:status": "tsx scripts/ops-status.ts",
+    "ops:backup-hourly:install": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/install-db-backup-hourly-hidden.ps1",
+    "ops:backup-hourly:diagnose": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/diagnose-db-backup-hourly.ps1",
     "db:restore": "tsx scripts/db-restore.ts",
     "release:prepare-data-root": "tsx scripts/prepare-release-data-root.ts --env=production",
     "prisma:migrate:create": "prisma migrate dev --create-only",

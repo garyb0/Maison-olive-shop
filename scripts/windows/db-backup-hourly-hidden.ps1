@@ -13,6 +13,11 @@ if (-not $LogDir) {
 
 New-Item -ItemType Directory -Force -Path $LogDir | Out-Null
 
+$RetentionCutoff = (Get-Date).AddDays(-14)
+Get-ChildItem -Path $LogDir -Filter "db-backup-hourly-*.log" -File -ErrorAction SilentlyContinue |
+  Where-Object { $_.LastWriteTime -lt $RetentionCutoff } |
+  ForEach-Object { Remove-Item -LiteralPath $_.FullName -Force }
+
 $Stamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $OutLog = Join-Path $LogDir "db-backup-hourly-$Stamp.out.log"
 $ErrLog = Join-Path $LogDir "db-backup-hourly-$Stamp.err.log"
