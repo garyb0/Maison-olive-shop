@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { Language } from "@/lib/i18n";
+import { trackConversionEvent } from "@/lib/conversion-tracker";
 
 const CART_STORAGE_KEY = "chezolive_cart_v1";
 
@@ -13,13 +14,14 @@ type CartLine = {
 
 type Props = {
   productId: string;
+  productSlug?: string;
   productName: string;
   language: Language;
   disabled?: boolean;
   maxQuantity?: number;
 };
 
-export function ProductAddToCartButton({ productId, productName, language, disabled = false, maxQuantity = 99 }: Props) {
+export function ProductAddToCartButton({ productId, productSlug, productName, language, disabled = false, maxQuantity = 99 }: Props) {
   const [added, setAdded] = useState(false);
   const [quantity, setQuantity] = useState(1);
 
@@ -49,6 +51,13 @@ export function ProductAddToCartButton({ productId, productName, language, disab
 
     localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(next));
     window.dispatchEvent(new StorageEvent("storage", { key: CART_STORAGE_KEY, newValue: JSON.stringify(next) }));
+    trackConversionEvent("CART_ADD", {
+      productId,
+      productSlug,
+      quantity: safeQuantity,
+      language,
+      metadata: { surface: "product" },
+    });
     setAdded(true);
     window.setTimeout(() => setAdded(false), 1600);
   };

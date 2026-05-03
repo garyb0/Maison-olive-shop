@@ -21,6 +21,7 @@ const REQUIRED_MODEL_DELEGATES = [
   "supportInternalNote",
   "supportQuickReply",
   "rateLimitBucket",
+  "conversionEvent",
 ] as const;
 
 function hasRequiredModelDelegates(client: PrismaClient) {

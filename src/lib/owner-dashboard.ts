@@ -1,4 +1,9 @@
 import { prisma } from "@/lib/prisma";
+import {
+  getConversionDashboardSnapshot,
+  getEmptyConversionDashboardSnapshot,
+  type ConversionDashboardSnapshot,
+} from "@/lib/conversion-analytics";
 
 export type OwnerTodaySnapshot = {
   dateKey: string;
@@ -62,6 +67,7 @@ export type OwnerTodaySnapshot = {
     latestName: string | null;
     ageHours: number | null;
   };
+  conversion: ConversionDashboardSnapshot;
 };
 
 function localDateKey(date = new Date()) {
@@ -103,6 +109,7 @@ export async function getOwnerTodaySnapshot(): Promise<OwnerTodaySnapshot> {
     todaySales,
     lowStockCount,
     lowStockProducts,
+    conversion,
   ] = await Promise.all([
     prisma.order.count({ where: { createdAt: { gte: startOfDay } } }),
     prisma.order.count({
@@ -215,6 +222,7 @@ export async function getOwnerTodaySnapshot(): Promise<OwnerTodaySnapshot> {
         stock: true,
       },
     }),
+    getConversionDashboardSnapshot().catch(() => getEmptyConversionDashboardSnapshot()),
   ]);
 
   return {
@@ -268,5 +276,6 @@ export async function getOwnerTodaySnapshot(): Promise<OwnerTodaySnapshot> {
     lowStockCount,
     lowStockProducts,
     backup: readBackupSnapshot(),
+    conversion,
   };
 }

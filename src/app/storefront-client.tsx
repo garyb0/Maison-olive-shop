@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { Dictionary, Language } from "@/lib/i18n";
 import type { CurrentUser } from "@/lib/types";
+import { trackConversionEvent } from "@/lib/conversion-tracker";
 import { Navigation } from "@/components/Navigation";
 
 type ProductCard = {
@@ -150,6 +151,11 @@ export function StorefrontClient({
   }, []);
 
   useEffect(() => {
+    if (!isShopSurface) return;
+    trackConversionEvent("SHOP_VIEW", { language });
+  }, [isShopSurface, language]);
+
+  useEffect(() => {
     localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
   }, [cart]);
 
@@ -292,6 +298,13 @@ export function StorefrontClient({
     const flyId = `fly-${product.id}-${Date.now()}`;
     setFlyItems((prev) => [...prev, { id: flyId, x, y }]);
     setAddingId(product.id);
+    trackConversionEvent("CART_ADD", {
+      productId: product.id,
+      productSlug: product.slug,
+      quantity,
+      language,
+      metadata: { surface: isShopSurface ? "shop" : "home" },
+    });
 
     setTimeout(() => {
       setFlyItems((prev) => prev.filter((i) => i.id !== flyId));

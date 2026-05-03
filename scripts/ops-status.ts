@@ -1,7 +1,7 @@
 import { execFileSync, execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { resolveLogDirFromEnv } from "./db-utils";
+import { loadDatabaseEnvForTarget, resolveLogDirFromEnv, type EnvTarget } from "./db-utils";
 
 type CheckLevel = "pass" | "warn" | "fail";
 
@@ -26,6 +26,10 @@ type HourlyTaskPayload = {
 function flagValue(name: string, fallback: string) {
   const prefix = `${name}=`;
   return process.argv.find((arg) => arg.startsWith(prefix))?.slice(prefix.length) ?? fallback;
+}
+
+function flagEnvTarget(fallback: EnvTarget = "production"): EnvTarget {
+  return flagValue("--env", fallback) === "development" ? "development" : "production";
 }
 
 function run(command: string, args: string[], timeout = 30_000) {
@@ -313,6 +317,77 @@ function checkLatestAccountSmokeArtifact(): Check {
   };
 }
 
+async function checkBusinessSignals(): Promise<Check> {
+  const target = flagEnvTarget();
+  const noOrderWarnHours = Number(flagValue("--no-order-warn-hours", process.env.OPS_NO_ORDER_WARN_HOURS ?? "24"));
+  const checkoutErrorWarnHours = Number(flagValue("--checkout-error-warn-hours", process.env.OPS_CHECKOUT_ERROR_WARN_HOURS ?? "24"));
+
+  try {
+    loadDatabaseEnvForTarget(target);
+    const { prisma } = await import("../src/lib/prisma");
+    const now = Date.now();
+    const noOrderSince = new Date(now - Math.max(1, noOrderWarnHours) * 3_600_000);
+    const checkoutErrorSince = new Date(now - Math.max(1, checkoutErrorWarnHours) * 3_600_000);
+
+    const conversionTables = await prisma.$queryRaw<Array<{ name: string }>>`
+      SELECT name FROM sqlite_master WHERE type='table' AND name='ConversionEvent'
+    `.catch(() => []);
+    const hasConversionTable = conversionTables.length > 0;
+
+    const [lastOrder, recentOrderCount, criticalStockCount] = await Promise.all([
+      prisma.order.findFirst({
+        where: { status: { not: "CANCELLED" } },
+        orderBy: { createdAt: "desc" },
+        select: { orderNumber: true, createdAt: true },
+      }),
+      prisma.order.count({
+        where: {
+          status: { not: "CANCELLED" },
+          createdAt: { gte: noOrderSince },
+        },
+      }),
+      prisma.product.count({ where: { isActive: true, stock: { lte: 0 } } }),
+    ]);
+    const checkoutErrorCount = hasConversionTable
+      ? await prisma.conversionEvent.count({
+          where: {
+            type: "CHECKOUT_ERROR",
+            createdAt: { gte: checkoutErrorSince },
+          },
+        })
+      : null;
+
+    const warnings: string[] = [];
+    if (recentOrderCount === 0) {
+      warnings.push(
+        lastOrder
+          ? `no order in ${noOrderWarnHours}h; last=${lastOrder.orderNumber} (${formatAgeHours(lastOrder.createdAt)})`
+          : `no order found in ${target} DB`,
+      );
+    }
+    if ((checkoutErrorCount ?? 0) > 0) {
+      warnings.push(`${checkoutErrorCount} checkout error(s) in ${checkoutErrorWarnHours}h`);
+    }
+    if (criticalStockCount > 0) {
+      warnings.push(`${criticalStockCount} active product(s) out of stock`);
+    }
+
+    return {
+      level: warnings.length > 0 ? "warn" : "pass",
+      name: "business-signals",
+      details: warnings.length > 0
+        ? warnings.join("; ")
+        : `orders=${recentOrderCount}/${noOrderWarnHours}h, checkoutErrors=${checkoutErrorCount ?? "n/a"}/${checkoutErrorWarnHours}h, criticalStock=0`,
+    };
+  } catch (error) {
+    return {
+      level: "warn",
+      name: "business-signals",
+      details: error instanceof Error ? error.message : "unable to read business signals",
+    };
+  }
+}
+
 async function main() {
   const baseUrl = flagValue("--base-url", "https://chezolive.ca");
   const checks: Check[] = [
@@ -325,6 +400,7 @@ async function main() {
     checkHourlyBackupLogs(),
     checkSmokeAdminEnv(),
     checkLatestAccountSmokeArtifact(),
+    await checkBusinessSignals(),
   ];
 
   console.log(`Ops status for ${baseUrl}`);

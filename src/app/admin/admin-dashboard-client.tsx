@@ -54,6 +54,12 @@ type Props = {
       latestName: string | null;
       ageHours: number | null;
     };
+    conversion: {
+      today: AdminConversionPeriod;
+      sevenDays: AdminConversionPeriod;
+      topAddedProducts: AdminConversionProduct[];
+      topAbandonedProducts: AdminConversionProduct[];
+    };
     siteStatus: string;
   };
   profitabilitySummary: {
@@ -79,6 +85,25 @@ type Props = {
     status: string;
     totalLabel: string;
   }>;
+};
+
+type AdminConversionPeriod = {
+  shopVisitors: number;
+  productViews: number;
+  cartAdds: number;
+  cartViews: number;
+  checkoutStarts: number;
+  ordersCreated: number;
+  checkoutErrors: number;
+  cartToCheckoutRateLabel: string;
+  checkoutToOrderRateLabel: string;
+};
+
+type AdminConversionProduct = {
+  key: string;
+  name: string;
+  quantity: number;
+  addCount: number;
 };
 
 const ORDER_STATUS_LABELS_FR: Record<string, string> = {
@@ -143,6 +168,68 @@ function AdminActionCard({
       <Link className="admin-action-card__link" href={href}>
         {actionLabel}
       </Link>
+    </article>
+  );
+}
+
+function ConversionMetricCard({
+  language,
+  title,
+  period,
+}: {
+  language: Language;
+  title: string;
+  period: AdminConversionPeriod;
+}) {
+  return (
+    <article className="admin-conversion-card">
+      <div className="admin-conversion-card__head">
+        <span>{title}</span>
+        <strong>{period.ordersCreated}</strong>
+      </div>
+      <div className="admin-conversion-metrics">
+        <span>{language === "fr" ? "Visiteurs boutique" : "Shop visitors"} <strong>{period.shopVisitors}</strong></span>
+        <span>{language === "fr" ? "Ajouts panier" : "Cart adds"} <strong>{period.cartAdds}</strong></span>
+        <span>Checkout <strong>{period.checkoutStarts}</strong></span>
+        <span>{language === "fr" ? "Commandes" : "Orders"} <strong>{period.ordersCreated}</strong></span>
+        <span>{language === "fr" ? "Panier vers checkout" : "Cart to checkout"} <strong>{period.cartToCheckoutRateLabel}</strong></span>
+        <span>{language === "fr" ? "Checkout vers commande" : "Checkout to order"} <strong>{period.checkoutToOrderRateLabel}</strong></span>
+        <span>{language === "fr" ? "Erreurs checkout" : "Checkout errors"} <strong>{period.checkoutErrors}</strong></span>
+      </div>
+    </article>
+  );
+}
+
+function ConversionProductList({
+  language,
+  title,
+  emptyLabel,
+  products,
+}: {
+  language: Language;
+  title: string;
+  emptyLabel: string;
+  products: AdminConversionProduct[];
+}) {
+  return (
+    <article className="admin-conversion-card admin-conversion-card--list">
+      <h3>{title}</h3>
+      {products.length > 0 ? (
+        <div className="admin-conversion-product-list">
+          {products.map((product) => (
+            <div className="admin-conversion-product" key={product.key}>
+              <strong>{product.name}</strong>
+              <span>
+                {language === "fr"
+                  ? `${product.quantity} unite(s), ${product.addCount} ajout(s)`
+                  : `${product.quantity} unit(s), ${product.addCount} add(s)`}
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="admin-action-empty">{emptyLabel}</p>
+      )}
     </article>
   );
 }
@@ -500,6 +587,48 @@ export function AdminDashboardClient({
             items={healthActionItems}
             emptyLabel={language === "fr" ? "Aucune alerte ops." : "No ops alert."}
             tone={maintenanceEnabled || todayCockpit.backup.status !== "ok" ? "warn" : "default"}
+          />
+        </div>
+      </section>
+
+      <section className="section admin-conversion-section" aria-label={language === "fr" ? "Conversion boutique" : "Shop conversion"}>
+        <div className="admin-section-head">
+          <div>
+            <h2>{language === "fr" ? "Conversion" : "Conversion"}</h2>
+            <p className="small">
+              {language === "fr"
+                ? "Lecture simple du tunnel boutique: boutique, panier, checkout et commandes."
+                : "Simple shop funnel view: shop, cart, checkout, and orders."}
+            </p>
+          </div>
+          <Link className="btn btn-secondary" href="/boutique">
+            {language === "fr" ? "Voir boutique" : "View shop"}
+          </Link>
+        </div>
+        <div className="admin-conversion-grid">
+          <ConversionMetricCard
+            language={language}
+            title={language === "fr" ? "Aujourd'hui" : "Today"}
+            period={todayCockpit.conversion.today}
+          />
+          <ConversionMetricCard
+            language={language}
+            title={language === "fr" ? "7 jours" : "7 days"}
+            period={todayCockpit.conversion.sevenDays}
+          />
+        </div>
+        <div className="admin-conversion-grid admin-conversion-grid--products">
+          <ConversionProductList
+            language={language}
+            title={language === "fr" ? "Produits les plus ajoutés" : "Most added products"}
+            emptyLabel={language === "fr" ? "Aucun ajout panier mesuré." : "No cart adds measured."}
+            products={todayCockpit.conversion.topAddedProducts}
+          />
+          <ConversionProductList
+            language={language}
+            title={language === "fr" ? "Produits abandonnés" : "Abandoned products"}
+            emptyLabel={language === "fr" ? "Aucun abandon mesuré." : "No abandonment measured."}
+            products={todayCockpit.conversion.topAbandonedProducts}
           />
         </div>
       </section>

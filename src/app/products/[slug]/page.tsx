@@ -9,6 +9,7 @@ import { Navigation } from "@/components/Navigation";
 import { PromoBanner } from "@/components/PromoBanner";
 import { ProductSubscriptionInlineClient } from "./product-subscription-inline-panel";
 import { ProductAddToCartButton } from "./product-add-to-cart-button";
+import { ProductConversionTracker } from "./product-conversion-tracker";
 import { getCheckoutSession, stripeEnabled } from "@/lib/stripe";
 
 type ProductPageProps = {
@@ -100,6 +101,7 @@ export default async function ProductDetailsPage({ params, searchParams }: Produ
 
   return (
     <div className="app-shell">
+      <ProductConversionTracker productId={product.id} productSlug={product.slug} language={language} />
       <header className="topbar">
         <div className="brand">{t.brandName}</div>
         <Navigation language={language} t={t} user={user} />
@@ -177,6 +179,7 @@ export default async function ProductDetailsPage({ params, searchParams }: Produ
             </div>
             <ProductAddToCartButton
               productId={product.id}
+              productSlug={product.slug}
               productName={productName}
               language={language}
               disabled={product.stock <= 0}

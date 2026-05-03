@@ -114,6 +114,13 @@ export default async function AdminDashboardPage() {
 
     return `${formatShortDateTime(startAt)} - ${formatShortDateTime(endAt)}`;
   };
+  const formatRate = (rate: number | null) => {
+    if (rate === null) return "-";
+    return new Intl.NumberFormat(locale, {
+      style: "percent",
+      maximumFractionDigits: 0,
+    }).format(rate);
+  };
 
   const recentOrders = orders.slice(0, 5).map((order) => ({
     id: order.id,
@@ -206,6 +213,42 @@ export default async function AdminDashboardPage() {
           })),
         },
         backup: todaySnapshot.backup,
+        conversion: {
+          today: {
+            shopVisitors: todaySnapshot.conversion.today.shopVisitors,
+            productViews: todaySnapshot.conversion.today.productViews,
+            cartAdds: todaySnapshot.conversion.today.cartAdds,
+            cartViews: todaySnapshot.conversion.today.cartViews,
+            checkoutStarts: todaySnapshot.conversion.today.checkoutStarts,
+            ordersCreated: todaySnapshot.conversion.today.ordersCreated,
+            checkoutErrors: todaySnapshot.conversion.today.checkoutErrors,
+            cartToCheckoutRateLabel: formatRate(todaySnapshot.conversion.today.cartToCheckoutRate),
+            checkoutToOrderRateLabel: formatRate(todaySnapshot.conversion.today.checkoutToOrderRate),
+          },
+          sevenDays: {
+            shopVisitors: todaySnapshot.conversion.sevenDays.shopVisitors,
+            productViews: todaySnapshot.conversion.sevenDays.productViews,
+            cartAdds: todaySnapshot.conversion.sevenDays.cartAdds,
+            cartViews: todaySnapshot.conversion.sevenDays.cartViews,
+            checkoutStarts: todaySnapshot.conversion.sevenDays.checkoutStarts,
+            ordersCreated: todaySnapshot.conversion.sevenDays.ordersCreated,
+            checkoutErrors: todaySnapshot.conversion.sevenDays.checkoutErrors,
+            cartToCheckoutRateLabel: formatRate(todaySnapshot.conversion.sevenDays.cartToCheckoutRate),
+            checkoutToOrderRateLabel: formatRate(todaySnapshot.conversion.sevenDays.checkoutToOrderRate),
+          },
+          topAddedProducts: todaySnapshot.conversion.sevenDays.topAddedProducts.map((product) => ({
+            key: product.key,
+            name: language === "fr" ? product.nameFr : product.nameEn,
+            quantity: product.quantity,
+            addCount: product.addCount,
+          })),
+          topAbandonedProducts: todaySnapshot.conversion.sevenDays.topAbandonedProducts.map((product) => ({
+            key: product.key,
+            name: language === "fr" ? product.nameFr : product.nameEn,
+            quantity: product.quantity,
+            addCount: product.addCount,
+          })),
+        },
         siteStatus: maintenanceState.enabled
           ? language === "fr"
             ? "Maintenance active"

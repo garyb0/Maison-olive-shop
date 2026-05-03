@@ -6078,6 +6078,86 @@ tr:last-child td {
   color: #fff;
 }
 
+.admin-conversion-section {
+  background: rgba(255, 253, 248, 0.92);
+}
+
+.admin-conversion-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0.85rem;
+}
+
+.admin-conversion-grid--products {
+  margin-top: 0.85rem;
+}
+
+.admin-conversion-card {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid rgba(84, 93, 46, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.admin-conversion-card__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.admin-conversion-card__head span,
+.admin-conversion-card h3 {
+  margin: 0;
+  color: var(--brand);
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.admin-conversion-card__head strong {
+  color: var(--olive-900);
+  font-family: 'Playfair Display', serif;
+  font-size: 1.75rem;
+  line-height: 1;
+}
+
+.admin-conversion-metrics,
+.admin-conversion-product-list {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.admin-conversion-metrics span,
+.admin-conversion-product {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid rgba(84, 93, 46, 0.1);
+  border-radius: 8px;
+  background: rgba(248, 251, 242, 0.58);
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.admin-conversion-metrics strong,
+.admin-conversion-product strong {
+  color: var(--brand-2);
+}
+
+.admin-conversion-product {
+  align-items: flex-start;
+  flex-direction: column;
+  justify-content: center;
+}
+
 .admin-today-card {
   display: grid;
   gap: 0.35rem;
@@ -15726,4 +15806,30 @@ body:has(.account-access-card) .support-lite-window {
     min-height: 44px;
     padding: 0.82rem;
   }
+}
+
+/* Mobile conversion polish: keep checkout/product helper links finger-sized. */
+.olive-product-page .olive-product-trust-grid {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.olive-product-page .olive-product-trust-grid > a {
+  display: grid;
+  min-height: 44px;
+  align-content: center;
+  gap: 0.18rem;
+  border: 1px solid rgba(84, 93, 46, 0.12);
+  border-radius: 0.9rem;
+  background: rgba(255, 253, 248, 0.92);
+  color: var(--olive-900);
+  padding: 0.68rem 0.78rem;
+  text-decoration: none;
+}
+
+.checkout-section-card .checkout-payment-assurance > a {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  padding-block: 0.35rem;
 }

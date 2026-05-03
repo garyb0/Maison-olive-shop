@@ -6,6 +6,7 @@ const createOrderSafelyMock = vi.fn();
 const logApiEventMock = vi.fn();
 const stripeSessionsCreateMock = vi.fn();
 const buildCheckoutConfirmationMock = vi.fn();
+const recordOrderCreatedConversionMock = vi.fn();
 
 const prismaMock = {
   order: {
@@ -40,6 +41,10 @@ vi.mock("@/lib/stripe", () => ({
 
 vi.mock("@/lib/checkout-confirmation", () => ({
   buildCheckoutConfirmation: (...args: unknown[]) => buildCheckoutConfirmationMock(...args),
+}));
+
+vi.mock("@/lib/conversion-analytics", () => ({
+  recordOrderCreatedConversion: (...args: unknown[]) => recordOrderCreatedConversionMock(...args),
 }));
 
 vi.mock("@/lib/prisma", () => ({
@@ -113,6 +118,7 @@ describe("POST /api/orders", () => {
       id: "cs_test_1",
       client_secret: "cs_test_secret_1",
     });
+    recordOrderCreatedConversionMock.mockResolvedValue(undefined);
   });
 
   it("returns an inline Stripe checkout session instead of a hosted checkout URL", async () => {
@@ -167,6 +173,13 @@ describe("POST /api/orders", () => {
       where: { id: "order_1" },
       data: { stripeSessionId: "cs_test_1" },
     });
+    expect(recordOrderCreatedConversionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderId: "order_1",
+        orderNumber: "MO-20260420-1234",
+        paymentMethod: "STRIPE",
+      }),
+    );
   });
 
   it("bloque le paiement manuel pour une commande invitee", async () => {

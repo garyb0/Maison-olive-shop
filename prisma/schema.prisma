@@ -37,6 +37,18 @@ enum PaymentMethod {
   STRIPE
 }
 
+enum ConversionEventType {
+  SHOP_VIEW
+  PRODUCT_VIEW
+  CART_ADD
+  CART_VIEW
+  CHECKOUT_START
+  DELIVERY_SELECTED
+  PAYMENT_SELECTED
+  ORDER_CREATED
+  CHECKOUT_ERROR
+}
+
 enum DeliveryStatus {
   UNSCHEDULED
   SCHEDULED
@@ -484,6 +496,36 @@ model OrderItem {
 
   @@index([orderId])
   @@index([productId])
+}
+
+model ConversionEvent {
+  id              String              @id @default(cuid())
+  type            ConversionEventType
+  sessionKey      String
+  userId          String?
+  productId       String?
+  productSlug     String?
+  orderId         String?
+  orderNumber     String?
+  currency        String              @default("CAD")
+  cartTotalCents  Int?
+  itemCount       Int?
+  quantity        Int?
+  paymentMethod   String?
+  deliveryMode    String?
+  language        String?
+  device          String?
+  path            String?
+  referrerPath    String?
+  metadataJson    String?
+  createdAt       DateTime            @default(now())
+
+  @@index([type, createdAt])
+  @@index([sessionKey, createdAt])
+  @@index([userId, createdAt])
+  @@index([productId, createdAt])
+  @@index([orderId])
+  @@index([createdAt])
 }
 
 model InventoryMovement {

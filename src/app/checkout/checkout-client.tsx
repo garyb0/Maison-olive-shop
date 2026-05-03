@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Dictionary, Language } from "@/lib/i18n";
 import type {
   CheckoutConfirmation,
@@ -20,6 +20,7 @@ import {
   normalizeProvinceCode,
 } from "@/lib/address-fields";
 import { isRimouskiPostalCode } from "@/lib/delivery-zone";
+import { getConversionSessionKey, trackConversionEvent } from "@/lib/conversion-tracker";
 import { Navigation } from "@/components/Navigation";
 import { StripeInlineCheckout } from "@/components/StripeInlineCheckoutSurface";
 import { CheckoutSuccessView } from "@/components/CheckoutSuccessView";
@@ -326,6 +327,9 @@ export function CheckoutClient({
   const [selectedDeliveryPeriod, setSelectedDeliveryPeriod] = useState<DeliveryPeriodKey | null>(null);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [quote, setQuote] = useState<CheckoutQuote | null>(null);
+  const checkoutStartTrackedRef = useRef(false);
+  const paymentTrackedRef = useRef<string | null>(null);
+  const deliveryTrackedRef = useRef<string | null>(null);
   const isCreatingNewAddress = prefersNewDeliveryAddress || !selectedSavedAddressId;
   const selectedSavedAddress = deliveryAddresses.find((address) => address.id === selectedSavedAddressId) ?? null;
   const guestEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestCustomerEmail.trim());
@@ -526,6 +530,50 @@ export function CheckoutClient({
         : !selectedDeliveryPeriod
           ? (language === "fr" ? "Choisis maintenant AM ou PM." : "Now choose AM or PM.")
           : (language === "fr" ? "Ta période de livraison est prête. Tu peux finaliser la commande." : "Your delivery period is ready. You can finish checkout.");
+
+  const trackCheckoutError = (reason: string) => {
+    trackConversionEvent("CHECKOUT_ERROR", {
+      itemCount: summaryItemCount,
+      cartTotalCents: quote?.totalCents ?? subtotalCents,
+      paymentMethod,
+      deliveryMode,
+      language,
+      metadata: { reason },
+    });
+  };
+
+  useEffect(() => {
+    if (!cartRows.length || checkoutStartTrackedRef.current) return;
+    checkoutStartTrackedRef.current = true;
+    trackConversionEvent("CHECKOUT_START", {
+      itemCount: summaryItemCount,
+      cartTotalCents: quote?.totalCents ?? subtotalCents,
+      paymentMethod,
+      language,
+    });
+  }, [cartRows.length, language, paymentMethod, quote?.totalCents, subtotalCents, summaryItemCount]);
+
+  useEffect(() => {
+    if (!cartRows.length || paymentTrackedRef.current === paymentMethod) return;
+    paymentTrackedRef.current = paymentMethod;
+    trackConversionEvent("PAYMENT_SELECTED", {
+      itemCount: summaryItemCount,
+      cartTotalCents: quote?.totalCents ?? subtotalCents,
+      paymentMethod,
+      language,
+    });
+  }, [cartRows.length, language, paymentMethod, quote?.totalCents, subtotalCents, summaryItemCount]);
+
+  useEffect(() => {
+    if (!cartRows.length || !selectedSlot || deliveryTrackedRef.current === selectedSlot.id) return;
+    deliveryTrackedRef.current = selectedSlot.id;
+    trackConversionEvent("DELIVERY_SELECTED", {
+      itemCount: summaryItemCount,
+      cartTotalCents: quote?.totalCents ?? subtotalCents,
+      deliveryMode,
+      language,
+    });
+  }, [cartRows.length, deliveryMode, language, quote?.totalCents, selectedSlot, subtotalCents, summaryItemCount]);
 
   const applyDeliveryAddress = (address: DeliveryAddress) => {
     setPrefersNewDeliveryAddress(false);
@@ -790,6 +838,7 @@ export function CheckoutClient({
 
   const submitOrder = async () => {
     if (!user && paymentMethod !== "STRIPE") {
+      trackCheckoutError("manual_payment_guest");
       setError(
         language === "fr"
           ? "Le paiement local/manuel nécessite un compte. Utilisez le paiement par carte en invité ou connectez-vous."
@@ -798,20 +847,24 @@ export function CheckoutClient({
       return;
     }
     if (!user && !guestCustomerName.trim()) {
+      trackCheckoutError("guest_name_missing");
       setError(language === "fr" ? "Entre ton nom complet pour commander en invité." : "Enter your full name to checkout as a guest.");
       return;
     }
     if (!user && !guestEmailValid) {
+      trackCheckoutError("guest_email_invalid");
       setError(language === "fr" ? "Entre une adresse courriel valide pour commander en invité." : "Enter a valid email address to checkout as a guest.");
       return;
     }
     if (!cartRows.length) {
+      trackCheckoutError("empty_cart");
       setError(language === "fr" ? "Panier vide." : "Cart is empty.");
       return;
     }
 
     // Validation zone de livraison
     if (shippingPostal && !isRimouskiPostalCode(shippingPostal)) {
+      trackCheckoutError("outside_delivery_zone");
       setAddressError(
         language === "fr"
           ? "Désolé, nous livrons uniquement dans la région de Rimouski (ex: G5L, G5M, G5N, G0L, G0J). Vérifie ton code postal."
@@ -821,12 +874,14 @@ export function CheckoutClient({
     }
 
     if ((isDeliveryPhoneRequired && !hasDeliveryPhoneValue) || isDeliveryPhoneInvalid) {
+      trackCheckoutError("delivery_phone_invalid");
       setDeliveryPhoneTouched(true);
       setAddressError(deliveryPhoneErrorMessage);
       return;
     }
 
     if (paymentMethod === "STRIPE" && quote && quote.totalCents < STRIPE_MINIMUM_TOTAL_CENTS) {
+      trackCheckoutError("stripe_minimum_total");
       setError(
         language === "fr"
           ? "Le paiement par carte exige un total d'au moins 0,50 $ CAD. Augmente légèrement le montant ou retire le rabais de test."
@@ -847,6 +902,7 @@ export function CheckoutClient({
       );
 
       if (duplicateAddress) {
+        trackCheckoutError("duplicate_address");
         applyDeliveryAddress(duplicateAddress);
         setSaveDeliveryAddress(false);
         setAddressError(
@@ -892,12 +948,14 @@ export function CheckoutClient({
             deliveryMode === "dynamic" ? selectedSlot?.endAt || undefined : undefined,
           deliveryInstructions: deliveryInstructions.trim() || undefined,
           deliveryPhone: deliveryPhone.trim() || undefined,
+          conversionSessionKey: getConversionSessionKey(),
         }),
       });
 
       const json = (await res.json()) as Partial<OrderCheckoutResponse> & { error?: string };
 
       if (!res.ok) {
+        trackCheckoutError("api_error");
         if (json.error === "Adresse hors zone de livraison") {
           setAddressError(json.error);
           return;
@@ -949,6 +1007,7 @@ export function CheckoutClient({
       }
 
       if (paymentMethod === "STRIPE") {
+        trackCheckoutError("stripe_checkout_missing");
         setError(
           language === "fr"
             ? "Stripe est indisponible pour le moment. Essaie le paiement comptant ou vérifie la configuration."
@@ -970,6 +1029,9 @@ export function CheckoutClient({
           ? `Commande ${json.order?.orderNumber ?? ""} créée avec succès, paiement comptant à la livraison.`
           : `Order ${json.order?.orderNumber ?? ""} created successfully with cash on delivery.`,
       );
+    } catch {
+      trackCheckoutError("network_error");
+      setError(language === "fr" ? "Commande impossible pour le moment." : "Could not place order right now.");
     } finally {
       setLoading(false);
     }
@@ -2204,6 +2266,7 @@ export function CheckoutClient({
                     }}
                     onSuccess={handleStripeInlineSuccess}
                     onError={(message) => {
+                      trackCheckoutError("stripe_inline_error");
                       setError(message);
                       setMessage("");
                     }}

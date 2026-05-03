@@ -7,6 +7,8 @@ import { StorefrontClient } from "@/app/storefront-client";
 import { getDictionary } from "@/lib/i18n";
 
 const fetchMock = vi.fn();
+const trackConversionEventMock = vi.fn();
+const getConversionSessionKeyMock = vi.fn(() => "session-test-123");
 
 vi.mock("next/link", () => ({
   default: ({ children, href, ...props }: AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }) => (
@@ -26,6 +28,11 @@ vi.mock("@/components/Navigation", () => ({
 
 vi.mock("@/components/StripeInlineCheckoutSurface", () => ({
   StripeInlineCheckout: () => <div data-testid="stripe-inline-checkout" />,
+}));
+
+vi.mock("@/lib/conversion-tracker", () => ({
+  trackConversionEvent: (type: unknown, payload?: unknown) => trackConversionEventMock(type, payload),
+  getConversionSessionKey: () => getConversionSessionKeyMock(),
 }));
 
 const productIndex = {
@@ -56,6 +63,8 @@ describe("public cart and checkout flow", () => {
       ok: true,
       json: async () => ({ quote }),
     });
+    trackConversionEventMock.mockReset();
+    getConversionSessionKeyMock.mockClear();
     vi.stubGlobal("fetch", fetchMock);
   });
 
@@ -98,6 +107,7 @@ describe("public cart and checkout flow", () => {
     );
 
     expect(screen.getByRole("heading", { level: 1, name: "Catalogue" })).toBeInTheDocument();
+    await waitFor(() => expect(trackConversionEventMock).toHaveBeenCalledWith("SHOP_VIEW", { language: "fr" }));
     expect(screen.getByText("Livraison locale Rimouski")).toBeInTheDocument();
     expect(screen.getByText("Paiement carte/local")).toBeInTheDocument();
     expect(screen.getByText("Retour ou problème")).toBeInTheDocument();
@@ -112,6 +122,15 @@ describe("public cart and checkout flow", () => {
         JSON.stringify([{ productId: "prod_cart", name: "Lit Douillet Anti-Stress", quantity: 1 }]),
       );
     });
+    expect(trackConversionEventMock).toHaveBeenCalledWith(
+      "CART_ADD",
+      expect.objectContaining({
+        productId: "prod_cart",
+        productSlug: "lit-douillet",
+        quantity: 1,
+        language: "fr",
+      }),
+    );
   });
 
   it("lit le panier local sur la page panier", async () => {
@@ -129,6 +148,10 @@ describe("public cart and checkout flow", () => {
     );
 
     await waitFor(() => expect(screen.getAllByText("Lit Douillet Anti-Stress").length).toBeGreaterThan(0));
+    await waitFor(() => expect(trackConversionEventMock).toHaveBeenCalledWith(
+      "CART_VIEW",
+      expect.objectContaining({ itemCount: 1, cartTotalCents: 6999, language: "fr" }),
+    ));
     expect(screen.getByText("1 article dans ton panier")).toBeInTheDocument();
     expect(screen.queryByText("Chargement du panier...")).not.toBeInTheDocument();
     expect(screen.getByText("Visa, Mastercard; paiement local avec compte")).toBeInTheDocument();
@@ -158,6 +181,10 @@ describe("public cart and checkout flow", () => {
         JSON.stringify([{ productId: "prod_cart", name: "Lit Douillet Anti-Stress", quantity: 1 }]),
       );
     });
+    expect(trackConversionEventMock).toHaveBeenCalledWith(
+      "CART_ADD",
+      expect.objectContaining({ productId: "prod_cart", quantity: 1, language: "fr" }),
+    );
 
     rerender(
       <ProductAddToCartButton
@@ -191,6 +218,14 @@ describe("public cart and checkout flow", () => {
     );
 
     await waitFor(() => expect(screen.getAllByText("Lit Douillet Anti-Stress").length).toBeGreaterThan(0));
+    await waitFor(() => expect(trackConversionEventMock).toHaveBeenCalledWith(
+      "CHECKOUT_START",
+      expect.objectContaining({ itemCount: 1, cartTotalCents: 6999, paymentMethod: "STRIPE", language: "fr" }),
+    ));
+    expect(trackConversionEventMock).toHaveBeenCalledWith(
+      "PAYMENT_SELECTED",
+      expect.objectContaining({ paymentMethod: "STRIPE", language: "fr" }),
+    );
     expect(screen.getByText("Commande en invité")).toBeInTheDocument();
     expect(screen.getByText("Livraison locale (Rimouski) — paiement par carte en invité; paiement local avec compte.")).toBeInTheDocument();
     expect(screen.getByText("En invité, seul le paiement par carte est disponible. Ton paiement est confirmé immédiatement et ton courriel sert au reçu.")).toBeInTheDocument();

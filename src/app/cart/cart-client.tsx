@@ -1,9 +1,10 @@
 ﻿"use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Dictionary, Language } from "@/lib/i18n";
 import type { CurrentUser } from "@/lib/types";
+import { trackConversionEvent } from "@/lib/conversion-tracker";
 import { Navigation } from "@/components/Navigation";
 
 type ProductInfo = {
@@ -67,6 +68,7 @@ export function CartClient({
   const [cart, setCart] = useState<CartLine[]>([]);
   const [cartLoaded, setCartLoaded] = useState(false);
   const [quote, setQuote] = useState<CartQuote | null>(null);
+  const cartViewTrackedRef = useRef(false);
   const locale = language === "fr" ? "fr-CA" : "en-CA";
 
   const saveCart = (updated: CartLine[]) => {
@@ -172,6 +174,16 @@ export function CartClient({
   const pricedSubtotalCents = visibleQuote?.subtotalCents ?? totalCents;
   const remainingForFreeShippingCents = Math.max(0, shippingFreeThresholdCents - pricedSubtotalCents);
   const qualifiesForFreeShipping = rows.length > 0 && visibleQuote?.shippingCents === 0;
+
+  useEffect(() => {
+    if (!cartLoaded || cartViewTrackedRef.current) return;
+    cartViewTrackedRef.current = true;
+    trackConversionEvent("CART_VIEW", {
+      itemCount,
+      cartTotalCents: totalCents,
+      language,
+    });
+  }, [cartLoaded, itemCount, language, totalCents]);
 
   return (
     <div className="app-shell">

@@ -11,6 +11,7 @@ import { logApiEvent } from "@/lib/observability";
 import { applyRateLimit } from "@/lib/rate-limit";
 import { buildCheckoutConfirmation } from "@/lib/checkout-confirmation";
 import { resolvePublicSiteUrl } from "@/lib/site-url";
+import { recordOrderCreatedConversion } from "@/lib/conversion-analytics";
 
 const stripeMinimumAmountMessage =
   "Le paiement par carte exige un total d'au moins 0,50 $ CAD. Augmente légèrement le montant de la commande ou retire le rabais de test.";
@@ -126,6 +127,17 @@ export async function POST(request: Request) {
     }
 
     const confirmation = buildCheckoutConfirmation(orderForResponse);
+    await recordOrderCreatedConversion({
+      sessionKey: input.conversionSessionKey,
+      userId: user?.id ?? null,
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      totalCents: orderForResponse.totalCents,
+      itemCount: orderForResponse.items.reduce((sum, item) => sum + item.quantity, 0),
+      paymentMethod: input.paymentMethod,
+      deliveryMode: input.deliverySlotId ? "legacy" : input.deliveryWindowStartAt ? "dynamic" : null,
+      language: customerLanguage,
+    }).catch(() => undefined);
 
     if (input.paymentMethod === "STRIPE" && stripeEnabled && stripe) {
       const siteUrl = resolvePublicSiteUrl({

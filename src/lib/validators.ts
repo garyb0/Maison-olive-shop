@@ -77,6 +77,7 @@ export const checkoutSchema = z.object({
         .refine((value) => !value || isValidDeliveryPhone(value), "INVALID_DELIVERY_PHONE"),
     )
     .optional(),
+  conversionSessionKey: z.preprocess(emptyToUndefined, z.string().trim().min(8).max(120).optional()),
 });
 
 export const deliveryAddressUpsertSchema = z.object({
@@ -512,6 +513,55 @@ const productSlugSchema = z
   .min(1)
   .max(120)
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/i, "INVALID_SLUG");
+
+const conversionSensitiveKeyPattern =
+  /(email|mail|name|nom|address|adresse|phone|tel|password|motdepasse|card|carte|postal|zip|line1|customer|client|shipping|billing|token|secret)/i;
+
+const conversionMetadataValueSchema = z.union([
+  z.string().trim().max(120),
+  z.number().finite(),
+  z.boolean(),
+  z.null(),
+]);
+
+const conversionMetadataSchema = z
+  .record(z.string().trim().min(1).max(40), conversionMetadataValueSchema)
+  .optional()
+  .refine(
+    (metadata) => !metadata || Object.keys(metadata).every((key) => !conversionSensitiveKeyPattern.test(key)),
+    { message: "SENSITIVE_CONVERSION_METADATA" },
+  );
+
+export const conversionEventSchema = z.object({
+  type: z.enum([
+    "SHOP_VIEW",
+    "PRODUCT_VIEW",
+    "CART_ADD",
+    "CART_VIEW",
+    "CHECKOUT_START",
+    "DELIVERY_SELECTED",
+    "PAYMENT_SELECTED",
+    "ORDER_CREATED",
+    "CHECKOUT_ERROR",
+  ]),
+  sessionKey: z.string().trim().min(8).max(120),
+  productId: z.preprocess(emptyToUndefined, z.string().trim().min(1).max(191).optional()),
+  productSlug: z.preprocess(emptyToUndefined, productSlugSchema.optional()),
+  orderId: z.preprocess(emptyToUndefined, z.string().trim().min(1).max(191).optional()),
+  orderNumber: z.preprocess(emptyToUndefined, z.string().trim().min(1).max(80).optional()),
+  currency: z.preprocess(emptyToUndefined, z.string().trim().min(3).max(10).optional()),
+  cartTotalCents: z.preprocess(emptyToUndefined, z.coerce.number().int().min(0).max(100000000).optional()),
+  itemCount: z.preprocess(emptyToUndefined, z.coerce.number().int().min(0).max(1000).optional()),
+  quantity: z.preprocess(emptyToUndefined, z.coerce.number().int().min(1).max(1000).optional()),
+  paymentMethod: z.preprocess(emptyToUndefined, z.enum(["MANUAL", "STRIPE"]).optional()),
+  deliveryMode: z.preprocess(emptyToUndefined, z.string().trim().min(1).max(40).optional()),
+  language: z.preprocess(emptyToUndefined, z.enum(["fr", "en"]).optional()),
+  path: z.preprocess(emptyToUndefined, z.string().trim().max(300).optional()),
+  referrerPath: z.preprocess(emptyToUndefined, z.string().trim().max(300).optional()),
+  metadata: conversionMetadataSchema,
+});
+
+export const hasSensitiveConversionKey = (key: string) => conversionSensitiveKeyPattern.test(key);
 
 const optionalImageUrlSchema = z.preprocess(
   emptyToUndefined,

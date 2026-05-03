@@ -94,6 +94,36 @@ describe("AdminDashboardClient mobile table labels", () => {
             latestName: "hourly-test.db",
             ageHours: 0.25,
           },
+          conversion: {
+            today: {
+              shopVisitors: 12,
+              productViews: 18,
+              cartAdds: 5,
+              cartViews: 4,
+              checkoutStarts: 3,
+              ordersCreated: 2,
+              checkoutErrors: 1,
+              cartToCheckoutRateLabel: "60 %",
+              checkoutToOrderRateLabel: "67 %",
+            },
+            sevenDays: {
+              shopVisitors: 40,
+              productViews: 64,
+              cartAdds: 20,
+              cartViews: 15,
+              checkoutStarts: 10,
+              ordersCreated: 6,
+              checkoutErrors: 2,
+              cartToCheckoutRateLabel: "50 %",
+              checkoutToOrderRateLabel: "60 %",
+            },
+            topAddedProducts: [
+              { key: "prod_1", name: "Produit test", quantity: 8, addCount: 5 },
+            ],
+            topAbandonedProducts: [
+              { key: "prod_2", name: "Produit abandonne", quantity: 3, addCount: 2 },
+            ],
+          },
           siteStatus: "Site ouvert",
         }}
         profitabilitySummary={{
@@ -132,6 +162,10 @@ describe("AdminDashboardClient mobile table labels", () => {
     expect(screen.getByRole("link", { name: /Voir les commandes/ })).toHaveAttribute("href", "/admin/orders");
     expect(screen.getByRole("link", { name: /Ouvrir support/ })).toHaveAttribute("href", "/admin/support");
     expect(screen.getByText("Backup")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Conversion" })).toBeInTheDocument();
+    expect(screen.getAllByText("Visiteurs boutique").length).toBeGreaterThan(0);
+    expect(screen.getByText("Produits les plus ajoutés")).toBeInTheDocument();
+    expect(screen.getByText("Produit abandonne")).toBeInTheDocument();
     expect(container.querySelectorAll(".admin-dashboard-table-wrap")).toHaveLength(2);
     expect(container.querySelectorAll(".admin-dashboard-table")).toHaveLength(2);
     const productTableCell = screen.getAllByText("Produit test").find((element) => element.closest("td"))?.closest("td");
