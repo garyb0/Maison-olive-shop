@@ -87,6 +87,7 @@ describe("public cart and checkout flow", () => {
 
     expect(screen.getByRole("heading", { level: 1, name: "Catalogue" })).toBeInTheDocument();
     expect(screen.getByText("Livraison locale Rimouski")).toBeInTheDocument();
+    expect(screen.getByText("Retour ou probleme")).toBeInTheDocument();
 
     fireEvent.click(screen.getAllByRole("button", { name: "Ajouter" })[0]);
 
@@ -117,6 +118,8 @@ describe("public cart and checkout flow", () => {
     expect(screen.getByText("Visa, Mastercard; paiement local avec compte")).toBeInTheDocument();
     expect(screen.getByText("Besoin d'aide avant de payer?")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Voir l'aide commande" })).toHaveAttribute("href", "/faq#commandes");
+    expect(screen.getByRole("link", { name: "Livraison locale" })).toHaveAttribute("href", "/faq#livraison");
+    expect(screen.getByRole("link", { name: "Paiement" })).toHaveAttribute("href", "/faq#paiement");
   });
 
   it("reprend le panier local au checkout invite et garde le paiement local connecte seulement", async () => {
@@ -144,6 +147,7 @@ describe("public cart and checkout flow", () => {
 
     expect(screen.getByText("Carte en invite, paiement local avec compte, et support si quelque chose bloque.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Paiement" })).toHaveAttribute("href", "/faq#paiement");
+    expect(screen.getByRole("link", { name: "Probleme" })).toHaveAttribute("href", "/faq#retours");
 
     const manualPayment = container.querySelector('input[value="MANUAL"]') as HTMLInputElement | null;
     const stripePayment = container.querySelector('input[value="STRIPE"]') as HTMLInputElement | null;

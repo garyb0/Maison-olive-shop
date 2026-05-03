@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { getAdminOrders, getAdminCustomers, getAdminProductInventoryMetrics, getAdminProducts, getTaxReport } from "@/lib/admin";
 import { formatCurrency } from "@/lib/format";
 import { getMaintenanceState } from "@/lib/maintenance";
+import { getOwnerTodaySnapshot } from "@/lib/owner-dashboard";
 import { AdminDashboardClient } from "./admin-dashboard-client";
 
 export default async function AdminDashboardPage() {
@@ -27,12 +28,13 @@ export default async function AdminDashboardPage() {
     );
   }
 
-  const [orders, customers, taxReport, products, inventoryMetrics] = await Promise.all([
+  const [orders, customers, taxReport, products, inventoryMetrics, todaySnapshot] = await Promise.all([
     getAdminOrders({}),
     getAdminCustomers(),
     getTaxReport(),
     getAdminProducts(),
     getAdminProductInventoryMetrics(),
+    getOwnerTodaySnapshot(),
   ]);
 
   const activeProducts = products.filter((product) => product.isActive).length;
@@ -61,6 +63,30 @@ export default async function AdminDashboardPage() {
         pendingOrders,
         totalCustomers: customers.length,
         taxTotal: formatCurrency(taxReport.summary.totalCents, "CAD", locale),
+      }}
+      todayCockpit={{
+        dateKey: todaySnapshot.dateKey,
+        todayOrderCount: todaySnapshot.todayOrderCount,
+        ordersToPrepareCount: todaySnapshot.ordersToPrepareCount,
+        deliveryOrderCount: todaySnapshot.deliveryOrderCount,
+        openSupportCount: todaySnapshot.openSupportCount,
+        activeRunCount: todaySnapshot.activeRunCount,
+        todaySalesLabel: formatCurrency(todaySnapshot.todaySalesCents, "CAD", locale),
+        lowStockCount: todaySnapshot.lowStockCount,
+        lowStockProducts: todaySnapshot.lowStockProducts.map((product) => ({
+          id: product.id,
+          name: language === "fr" ? product.nameFr : product.nameEn,
+          slug: product.slug,
+          stock: product.stock,
+        })),
+        backup: todaySnapshot.backup,
+        siteStatus: maintenanceState.enabled
+          ? language === "fr"
+            ? "Maintenance active"
+            : "Maintenance active"
+          : language === "fr"
+            ? "Site ouvert"
+            : "Site open",
       }}
       profitabilitySummary={{
         stockValueAtCostLabel: formatCurrency(inventoryMetrics.summary.stockValueAtCostCents, "CAD", locale),

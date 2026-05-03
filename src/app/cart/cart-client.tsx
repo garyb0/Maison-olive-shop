@@ -452,6 +452,12 @@ export function CartClient({
                   <Link href="/faq#commandes">
                     {language === "fr" ? "Voir l'aide commande" : "View order help"}
                   </Link>
+                  <Link href="/faq#livraison">
+                    {language === "fr" ? "Livraison locale" : "Local delivery"}
+                  </Link>
+                  <Link href="/faq#paiement">
+                    {language === "fr" ? "Paiement" : "Payment"}
+                  </Link>
                 </div>
                 <div className="cart-summary-actions">
                   <Link className="btn cart-checkout-btn" href="/checkout">

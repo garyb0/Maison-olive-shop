@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
 import { getDictionary } from "@/lib/i18n";
 import { getCurrentLanguage } from "@/lib/language";
+import { getOwnerTodaySnapshot } from "@/lib/owner-dashboard";
 import { prisma } from "@/lib/prisma";
 import { Navigation } from "@/components/Navigation";
 import { PwaDriverAccessCard } from "./pwa-driver-access-card";
@@ -39,8 +40,14 @@ type CustomerSnapshot = {
 
 type AdminSnapshot = {
   todayOrderCount: number;
+  ordersToPrepareCount: number;
+  deliveryOrderCount: number;
   waitingSupportCount: number;
   activeRunCount: number;
+  todaySalesCents: number;
+  lowStockCount: number;
+  backupStatus: "ok" | "warn" | "unknown";
+  backupAgeHours: number | null;
   latestRun: {
     dateKey: string;
     status: string;
@@ -166,17 +173,8 @@ async function getCustomerSnapshot(userId?: string): Promise<CustomerSnapshot | 
 
 async function getAdminSnapshot(): Promise<AdminSnapshot | null> {
   try {
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
-
-    const [todayOrderCount, waitingSupportCount, activeRunCount, latestRun] = await Promise.all([
-      prisma.order.count({ where: { createdAt: { gte: startOfDay } } }),
-      prisma.supportConversation.count({
-        where: { status: { in: ["WAITING", "OPEN", "ASSIGNED"] } },
-      }),
-      prisma.deliveryRun.count({
-        where: { status: { in: ["PUBLISHED", "IN_PROGRESS"] } },
-      }),
+    const [ownerSnapshot, latestRun] = await Promise.all([
+      getOwnerTodaySnapshot(),
       prisma.deliveryRun.findFirst({
         where: { status: { in: ["PUBLISHED", "IN_PROGRESS"] } },
         orderBy: { updatedAt: "desc" },
@@ -189,9 +187,15 @@ async function getAdminSnapshot(): Promise<AdminSnapshot | null> {
     ]);
 
     return {
-      todayOrderCount,
-      waitingSupportCount,
-      activeRunCount,
+      todayOrderCount: ownerSnapshot.todayOrderCount,
+      ordersToPrepareCount: ownerSnapshot.ordersToPrepareCount,
+      deliveryOrderCount: ownerSnapshot.deliveryOrderCount,
+      waitingSupportCount: ownerSnapshot.openSupportCount,
+      activeRunCount: ownerSnapshot.activeRunCount,
+      todaySalesCents: ownerSnapshot.todaySalesCents,
+      lowStockCount: ownerSnapshot.lowStockCount,
+      backupStatus: ownerSnapshot.backup.status,
+      backupAgeHours: ownerSnapshot.backup.ageHours,
       latestRun: latestRun
         ? {
             dateKey: latestRun.dateKey,
@@ -398,7 +402,11 @@ export default async function PwaAppPage() {
                 href="/admin/orders"
                 label={language === "fr" ? "Aujourd'hui" : "Today"}
                 value={String(adminSnapshot?.todayOrderCount ?? 0)}
-                help={language === "fr" ? "Commandes creees depuis ce matin." : "Orders created since this morning."}
+                help={
+                  language === "fr"
+                    ? `${formatCurrency(adminSnapshot?.todaySalesCents ?? 0, language)} ventes; ${adminSnapshot?.ordersToPrepareCount ?? 0} a preparer.`
+                    : `${formatCurrency(adminSnapshot?.todaySalesCents ?? 0, language)} sales; ${adminSnapshot?.ordersToPrepareCount ?? 0} to prepare.`
+                }
               />
               <StatCard
                 href="/admin/support"
@@ -418,6 +426,33 @@ export default async function PwaAppPage() {
                     : language === "fr"
                       ? "Aucune tournee active."
                       : "No active run."
+                }
+              />
+              <StatCard
+                href="/admin/products"
+                label={language === "fr" ? "Stock bas" : "Low stock"}
+                value={String(adminSnapshot?.lowStockCount ?? 0)}
+                help={language === "fr" ? "Produits actifs a surveiller." : "Active products to watch."}
+              />
+              <StatCard
+                href="/admin/delivery"
+                label={language === "fr" ? "Livraison" : "Delivery"}
+                value={String(adminSnapshot?.deliveryOrderCount ?? 0)}
+                help={language === "fr" ? "Commandes planifiees ou sur la route." : "Scheduled or out-for-delivery orders."}
+              />
+              <StatCard
+                label="Backup"
+                value={
+                  adminSnapshot?.backupAgeHours == null
+                    ? "-"
+                    : adminSnapshot.backupAgeHours < 1
+                      ? "<1h"
+                      : `${adminSnapshot.backupAgeHours.toFixed(1)}h`
+                }
+                help={
+                  adminSnapshot?.backupStatus === "ok"
+                    ? language === "fr" ? "Backup recent." : "Recent backup."
+                    : language === "fr" ? "Verifier npm run ops:status." : "Check npm run ops:status."
                 }
               />
             </div>

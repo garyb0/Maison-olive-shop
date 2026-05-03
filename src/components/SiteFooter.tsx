@@ -102,6 +102,21 @@ export function SiteFooter() {
                 <span>{business.shippingPolicy}</span>
               </div>
             </div>
+
+            <div className="site-footer__card site-footer__card--app">
+              <p className="site-footer__card-label">
+                {language === "fr" ? "App mobile" : "Mobile app"}
+              </p>
+              <div className="site-footer__meta">
+                <strong>{language === "fr" ? "Installer Chez Olive" : "Install Chez Olive"}</strong>
+                <span>
+                  {language === "fr"
+                    ? "Android: bouton Installer. iPhone: Partager > Sur l'ecran d'accueil."
+                    : "Android: Install button. iPhone: Share > Add to Home Screen."}
+                </span>
+                <Link href="/app">{language === "fr" ? "Ouvrir l'app" : "Open the app"}</Link>
+              </div>
+            </div>
           </div>
 
           <div className="site-footer__bottom">

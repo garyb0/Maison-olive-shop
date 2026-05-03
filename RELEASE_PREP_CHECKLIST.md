@@ -41,6 +41,7 @@ npm run validate:env:prod
 npm run db:backup -- release-check
 npm run db:backup:hourly
 npm run db:backup:health
+npm run ops:status
 npm run build
 npm run host:pm2:restart
 ```
@@ -51,7 +52,7 @@ npm run host:pm2:restart
 - Ne jamais mettre `SESSION_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `RESEND_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_MAPS_API_KEY` ou donnees privees de depot dans les `.env*` du repo.
 - Avant migration Prisma ou release sensible, lancer `npm run db:backup -- before-release`.
 - Garder `MaisonOlive-DB-Backup` actif pour le backup quotidien et `MaisonOlive-DB-Backup-Health` actif pour verifier les backups.
-- `MaisonOlive-DB-Backup-Hourly` est volontairement desactive temporairement pour eviter les fenetres CMD pendant les jeux. Le reactiver avec `Enable-ScheduledTask -TaskName "MaisonOlive-DB-Backup-Hourly"` quand le popup horaire sera corrige.
+- `MaisonOlive-DB-Backup-Hourly` doit utiliser `scripts/windows/db-backup-hourly-hidden.ps1` pour eviter les fenetres CMD visibles. Si la tache est desactivee temporairement, la reactiver avec `Enable-ScheduledTask -TaskName "MaisonOlive-DB-Backup-Hourly"` apres test manuel.
 - Lancer `npm run db:backup:health` apres les changements serveur pour verifier que le dernier backup s'ouvre et passe `PRAGMA integrity_check`.
 - Si un secret est affiche dans un log, le considerer compromis et le remplacer.
 - Les vrais secrets Stripe, OpenAI, email et session doivent rester serveur-only.

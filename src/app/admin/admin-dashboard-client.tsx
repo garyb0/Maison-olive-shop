@@ -18,6 +18,29 @@ type Props = {
     totalCustomers: number;
     taxTotal: string;
   };
+  todayCockpit: {
+    dateKey: string;
+    todayOrderCount: number;
+    ordersToPrepareCount: number;
+    deliveryOrderCount: number;
+    openSupportCount: number;
+    activeRunCount: number;
+    todaySalesLabel: string;
+    lowStockCount: number;
+    lowStockProducts: Array<{
+      id: string;
+      name: string;
+      slug: string;
+      stock: number;
+    }>;
+    backup: {
+      status: "ok" | "warn" | "unknown";
+      label: string;
+      latestName: string | null;
+      ageHours: number | null;
+    };
+    siteStatus: string;
+  };
   profitabilitySummary: {
     stockValueAtCostLabel: string;
     stockValueAtRetailLabel: string;
@@ -62,6 +85,7 @@ export function AdminDashboardClient({
   initialMaintenanceEnabled,
   initialMaintenanceOpenAt,
   stats,
+  todayCockpit,
   profitabilitySummary,
   profitabilityRows,
   recentOrders,
@@ -273,6 +297,14 @@ export function AdminDashboardClient({
     }
   };
 
+  const backupAgeLabel = todayCockpit.backup.ageHours === null
+    ? language === "fr" ? "Age inconnu" : "Unknown age"
+    : todayCockpit.backup.ageHours < 1
+      ? language === "fr" ? "Moins d'une heure" : "Less than one hour"
+      : language === "fr"
+        ? `${todayCockpit.backup.ageHours.toFixed(1)} h`
+        : `${todayCockpit.backup.ageHours.toFixed(1)}h`;
+
   return (
     <>
       <section className="section admin-page-header">
@@ -286,6 +318,71 @@ export function AdminDashboardClient({
               ? "Survole les opérations du jour, les alertes et les chiffres sensibles."
               : "Monitor daily operations, alerts, and sensitive figures."}
           </p>
+        </div>
+      </section>
+
+      <section className="section admin-today-cockpit" aria-label={language === "fr" ? "Cockpit aujourd'hui" : "Today cockpit"}>
+        <div className="admin-section-head">
+          <div>
+            <h2>{language === "fr" ? "Aujourd'hui" : "Today"}</h2>
+            <p className="small">
+              {language === "fr"
+                ? "Les signaux a regarder avant de preparer les commandes."
+                : "The signals to check before preparing orders."}
+            </p>
+          </div>
+          <Link className="btn btn-secondary" href="/app">
+            {language === "fr" ? "Vue mobile" : "Mobile view"}
+          </Link>
+        </div>
+
+        <div className="admin-today-grid">
+          <Link className="admin-today-card admin-today-card--primary" href="/admin/orders">
+            <span>{language === "fr" ? "Ventes du jour" : "Today sales"}</span>
+            <strong>{todayCockpit.todaySalesLabel}</strong>
+            <p>{todayCockpit.todayOrderCount} {language === "fr" ? "commande(s) creees" : "order(s) created"}</p>
+          </Link>
+          <Link className="admin-today-card" href="/admin/orders">
+            <span>{language === "fr" ? "A preparer" : "To prepare"}</span>
+            <strong>{todayCockpit.ordersToPrepareCount}</strong>
+            <p>{language === "fr" ? "Commandes en attente, payees ou en preparation." : "Pending, paid, or processing orders."}</p>
+          </Link>
+          <Link className="admin-today-card" href="/admin/delivery">
+            <span>{language === "fr" ? "Livraison" : "Delivery"}</span>
+            <strong>{todayCockpit.deliveryOrderCount}</strong>
+            <p>{language === "fr" ? "Commandes planifiees ou sur la route." : "Scheduled or out-for-delivery orders."}</p>
+          </Link>
+          <Link className="admin-today-card" href="/admin/support">
+            <span>Support</span>
+            <strong>{todayCockpit.openSupportCount}</strong>
+            <p>{language === "fr" ? "Conversations ouvertes ou en attente." : "Open or waiting conversations."}</p>
+          </Link>
+          <Link className="admin-today-card" href="/admin/delivery/runs">
+            <span>{language === "fr" ? "Tournees" : "Runs"}</span>
+            <strong>{todayCockpit.activeRunCount}</strong>
+            <p>{language === "fr" ? "Tournees publiees ou en cours." : "Published or in-progress runs."}</p>
+          </Link>
+          <Link className="admin-today-card" href="/admin/products">
+            <span>{language === "fr" ? "Stock bas" : "Low stock"}</span>
+            <strong>{todayCockpit.lowStockCount}</strong>
+            <p>
+              {todayCockpit.lowStockProducts.length > 0
+                ? todayCockpit.lowStockProducts.map((product) => `${product.name} (${product.stock})`).join(", ")
+                : language === "fr"
+                  ? "Aucun produit critique."
+                  : "No critical product."}
+            </p>
+          </Link>
+          <div className={`admin-today-card admin-today-card--${todayCockpit.backup.status}`}>
+            <span>{language === "fr" ? "Backup" : "Backup"}</span>
+            <strong>{backupAgeLabel}</strong>
+            <p>{todayCockpit.backup.latestName ?? todayCockpit.backup.label}</p>
+          </div>
+          <div className="admin-today-card">
+            <span>{language === "fr" ? "Sante site" : "Site health"}</span>
+            <strong>{todayCockpit.siteStatus}</strong>
+            <p>{language === "fr" ? "Voir aussi npm run ops:status." : "Also check npm run ops:status."}</p>
+          </div>
         </div>
       </section>
 

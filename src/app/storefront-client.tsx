@@ -951,6 +951,9 @@ export function StorefrontClient({
             <Link href="/faq#livraison">
               {language === "fr" ? "Livraison locale Rimouski" : "Local Rimouski delivery"}
             </Link>
+            <Link href="/faq#retours">
+              {language === "fr" ? "Retour ou probleme" : "Return or issue"}
+            </Link>
           </div>
 
           {/* Grille produits */}

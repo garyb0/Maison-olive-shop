@@ -36,6 +36,24 @@ describe("AdminDashboardClient mobile table labels", () => {
           totalCustomers: 1,
           taxTotal: "11,83 $",
         }}
+        todayCockpit={{
+          dateKey: "2026-05-03",
+          todayOrderCount: 2,
+          ordersToPrepareCount: 1,
+          deliveryOrderCount: 1,
+          openSupportCount: 1,
+          activeRunCount: 1,
+          todaySalesLabel: "90,81 $",
+          lowStockCount: 1,
+          lowStockProducts: [{ id: "prod_1", name: "Produit test", slug: "produit-test", stock: 3 }],
+          backup: {
+            status: "ok",
+            label: "Backup recent",
+            latestName: "hourly-test.db",
+            ageHours: 0.25,
+          },
+          siteStatus: "Site ouvert",
+        }}
         profitabilitySummary={{
           stockValueAtCostLabel: "10,00 $",
           stockValueAtRetailLabel: "20,00 $",
@@ -66,6 +84,8 @@ describe("AdminDashboardClient mobile table labels", () => {
       />,
     );
 
+    expect(screen.getByRole("heading", { name: "Aujourd'hui" })).toBeInTheDocument();
+    expect(screen.getByText("Backup")).toBeInTheDocument();
     expect(container.querySelectorAll(".admin-dashboard-table-wrap")).toHaveLength(2);
     expect(container.querySelectorAll(".admin-dashboard-table")).toHaveLength(2);
     expect(screen.getByText("Produit test").closest("td")).toHaveAttribute("data-label", "Produit");

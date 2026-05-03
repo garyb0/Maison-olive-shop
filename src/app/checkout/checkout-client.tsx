@@ -1068,6 +1068,7 @@ export function CheckoutClient({
           </span>
           <Link href="/faq#paiement">{language === "fr" ? "Paiement" : "Payment"}</Link>
           <Link href="/faq#livraison">{language === "fr" ? "Livraison" : "Delivery"}</Link>
+          <Link href="/faq#retours">{language === "fr" ? "Probleme" : "Issue"}</Link>
         </div>
       </section>
 

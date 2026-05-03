@@ -9,6 +9,7 @@ const prismaMock = vi.hoisted(() => ({
   order: {
     count: vi.fn(),
     findFirst: vi.fn(),
+    aggregate: vi.fn(),
   },
   dogProfile: {
     count: vi.fn(),
@@ -19,6 +20,10 @@ const prismaMock = vi.hoisted(() => ({
   deliveryRun: {
     count: vi.fn(),
     findFirst: vi.fn(),
+  },
+  product: {
+    count: vi.fn(),
+    findMany: vi.fn(),
   },
 }));
 
@@ -67,10 +72,13 @@ describe("PWA Chez Olive", () => {
     getCurrentUserMock.mockResolvedValue(null);
     prismaMock.order.count.mockResolvedValue(0);
     prismaMock.order.findFirst.mockResolvedValue(null);
+    prismaMock.order.aggregate.mockResolvedValue({ _sum: { totalCents: 0 } });
     prismaMock.dogProfile.count.mockResolvedValue(0);
     prismaMock.supportConversation.count.mockResolvedValue(0);
     prismaMock.deliveryRun.count.mockResolvedValue(0);
     prismaMock.deliveryRun.findFirst.mockResolvedValue(null);
+    prismaMock.product.count.mockResolvedValue(0);
+    prismaMock.product.findMany.mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -148,6 +156,9 @@ describe("PWA Chez Olive", () => {
     prismaMock.order.count.mockResolvedValue(3);
     prismaMock.supportConversation.count.mockResolvedValue(4);
     prismaMock.deliveryRun.count.mockResolvedValue(1);
+    prismaMock.order.aggregate.mockResolvedValue({ _sum: { totalCents: 12999 } });
+    prismaMock.product.count.mockResolvedValue(2);
+    prismaMock.product.findMany.mockResolvedValue([]);
     prismaMock.deliveryRun.findFirst.mockResolvedValue({
       dateKey: "2026-05-03",
       status: "IN_PROGRESS",
@@ -159,7 +170,9 @@ describe("PWA Chez Olive", () => {
     const hrefs = Array.from(container.querySelectorAll("a")).map((link) => link.getAttribute("href"));
 
     expect(screen.getByText("Admin leger")).toBeInTheDocument();
+    expect(screen.getByText("129,99 $ ventes; 3 a preparer.")).toBeInTheDocument();
     expect(screen.getByText("2026-05-03 - en cours - 7 arrets")).toBeInTheDocument();
+    expect(screen.getByText("Produits actifs a surveiller.")).toBeInTheDocument();
     expect(hrefs).toContain("/admin/orders");
     expect(hrefs).toContain("/admin/delivery");
     expect(hrefs).toContain("/admin/delivery/runs");
