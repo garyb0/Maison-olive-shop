@@ -945,14 +945,17 @@ export function StorefrontClient({
           </p>
 
           <div className="catalog-conversion-strip" aria-label={language === "fr" ? "Parcours d'achat" : "Purchase path"}>
-            <span><strong>1</strong>{language === "fr" ? "Ajouter" : "Add"}</span>
-            <span><strong>2</strong>{language === "fr" ? "Panier" : "Cart"}</span>
-            <span><strong>3</strong>Checkout</span>
+            <span><strong>1</strong>{language === "fr" ? "Ajouter un produit" : "Add a product"}</span>
+            <span><strong>2</strong>{language === "fr" ? "Vérifier le panier" : "Review cart"}</span>
+            <span><strong>3</strong>{language === "fr" ? "Finaliser" : "Checkout"}</span>
             <Link href="/faq#livraison">
               {language === "fr" ? "Livraison locale Rimouski" : "Local Rimouski delivery"}
             </Link>
+            <Link href="/faq#paiement">
+              {language === "fr" ? "Paiement carte/local" : "Card/local payment"}
+            </Link>
             <Link href="/faq#retours">
-              {language === "fr" ? "Retour ou probleme" : "Return or issue"}
+              {language === "fr" ? "Retour ou problème" : "Return or issue"}
             </Link>
           </div>
 
@@ -1004,6 +1007,15 @@ export function StorefrontClient({
                     <p className="catalog-product-rating" aria-label={language === "fr" ? "Note cinq etoiles" : "Five star rating"}>
                       <span aria-hidden="true">★★★★★</span>
                     </p>
+                    <p className="catalog-product-fast-note">
+                      {product.stock > 0
+                        ? language === "fr"
+                          ? "Livraison locale et suivi humain."
+                          : "Local delivery and human follow-up."
+                        : language === "fr"
+                          ? "Visible pour consultation; achat bloqué tant que le stock revient."
+                          : "Visible for reference; purchase is blocked until stock returns."}
+                    </p>
                   </div>
 
                   {/* Ajout au panier */}
@@ -1042,7 +1054,9 @@ export function StorefrontClient({
                             ? language === "fr"
                               ? "Ajouté"
                               : "Added"
-                            : t.addToCart}
+                            : language === "fr"
+                              ? "Ajouter au panier"
+                              : "Add to cart"}
                       </button>
                     </div>
                   </div>

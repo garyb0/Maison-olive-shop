@@ -434,6 +434,12 @@ export function CartClient({
                     ? "Estimation avant confirmation de livraison au checkout."
                     : "Estimate shown before delivery confirmation at checkout."}
                 </p>
+                <div className="cart-summary-next-steps" aria-label={language === "fr" ? "Prochaines étapes" : "Next steps"}>
+                  <strong>{language === "fr" ? "Ensuite au checkout" : "Next in checkout"}</strong>
+                  <span>{language === "fr" ? "Adresse locale" : "Local address"}</span>
+                  <span>{language === "fr" ? "Créneau de livraison" : "Delivery window"}</span>
+                  <span>{language === "fr" ? "Paiement final" : "Final payment"}</span>
+                </div>
                 <div className="cart-summary-trust">
                   <span>{language === "fr" ? "Livraison locale à Rimouski" : "Local delivery in Rimouski"}</span>
                   <span>

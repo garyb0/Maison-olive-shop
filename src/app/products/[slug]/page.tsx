@@ -163,7 +163,7 @@ export default async function ProductDetailsPage({ params, searchParams }: Produ
 
           <aside className="olive-product-purchase-card" aria-label={language === "fr" ? "Options d'achat" : "Purchase options"}>
             <div className="olive-product-purchase-head">
-              <p className="home-eyebrow">{language === "fr" ? "Prêt à commander" : "Ready to order"}</p>
+              <p className="home-eyebrow">{language === "fr" ? "Achat rapide" : "Quick purchase"}</p>
               <strong>{priceLabel}</strong>
               <span className={product.stock > 0 ? "olive-stock-pill olive-stock-pill--ok" : "olive-stock-pill olive-stock-pill--out"}>
                 {product.stock > 0
@@ -202,6 +202,20 @@ export default async function ProductDetailsPage({ params, searchParams }: Produ
               {language === "fr"
                 ? "Livraison locale à Rimouski et environs, avec suivi attentionné."
                 : "Local delivery in the Rimouski area, with thoughtful follow-up."}
+            </div>
+            <div className="olive-product-trust-grid" aria-label={language === "fr" ? "Informations rassurantes" : "Helpful purchase details"}>
+              <Link href="/faq#livraison">
+                <strong>{language === "fr" ? "Livraison locale" : "Local delivery"}</strong>
+                <span>{language === "fr" ? "Rimouski et environs." : "Rimouski area."}</span>
+              </Link>
+              <Link href="/faq#paiement">
+                <strong>{language === "fr" ? "Paiement sécurisé" : "Secure payment"}</strong>
+                <span>{language === "fr" ? "Carte ou local avec compte." : "Card or local with account."}</span>
+              </Link>
+              <Link href="/faq#retours">
+                <strong>{language === "fr" ? "Retour / problème" : "Return / issue"}</strong>
+                <span>{language === "fr" ? "On t'aide rapidement." : "We help quickly."}</span>
+              </Link>
             </div>
             <ProductSubscriptionInlineClient
               product={subscriptionProduct}

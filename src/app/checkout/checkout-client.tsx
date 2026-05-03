@@ -1047,10 +1047,10 @@ export function CheckoutClient({
           </div>
         </div>
         <div className="checkout-flow-strip" aria-label={language === "fr" ? "Étapes du checkout" : "Checkout steps"}>
-          <span><strong>1</strong>{language === "fr" ? "Panier" : "Cart"}</span>
-          <span><strong>2</strong>{language === "fr" ? "Adresse" : "Address"}</span>
-          <span><strong>3</strong>{language === "fr" ? "Livraison" : "Delivery"}</span>
-          <span><strong>4</strong>{language === "fr" ? "Paiement" : "Payment"}</span>
+          <span><strong>1</strong>{language === "fr" ? "Infos" : "Info"}</span>
+          <span><strong>2</strong>{language === "fr" ? "Livraison" : "Delivery"}</span>
+          <span><strong>3</strong>{language === "fr" ? "Paiement" : "Payment"}</span>
+          <span><strong>4</strong>{language === "fr" ? "Confirmation" : "Confirmation"}</span>
         </div>
         <div className="checkout-local-mini">
           <span aria-hidden="true">{"\u{1F4CD}"}</span>
@@ -2009,6 +2009,19 @@ export function CheckoutClient({
                       : "When you prepare payment, the card form opens directly inside the order summary."}
                 </p>
               ) : null}
+              <div className="checkout-payment-assurance" aria-label={language === "fr" ? "Aide paiement" : "Payment reassurance"}>
+                <span>{language === "fr" ? "Stripe sécurise les cartes." : "Stripe secures card payments."}</span>
+                <span>
+                  {language === "fr"
+                    ? user
+                      ? "Le paiement local est disponible pour ton compte."
+                      : "Le paiement local apparaît après connexion."
+                    : user
+                      ? "Local payment is available for your account."
+                      : "Local payment appears after sign-in."}
+                </span>
+                <Link href="/faq#paiement">{language === "fr" ? "Voir l'aide paiement" : "View payment help"}</Link>
+              </div>
             </section>
 
           </div>
@@ -2125,7 +2138,7 @@ export function CheckoutClient({
                   <ul>
                     <li>{language === "fr" ? "Le total inclut les taxes estimées." : "The total includes estimated taxes."}</li>
                     <li>{language === "fr" ? "Le créneau AM ou PM sert au suivi de livraison." : "The AM or PM window helps delivery tracking."}</li>
-                    <li>{language === "fr" ? "Le paiement par carte reste sécurisé par Stripe." : "Card payment stays secured by Stripe."}</li>
+                    <li>{language === "fr" ? "Le paiement reste sécurisé; l'équipe aide si quelque chose bloque." : "Payment stays secure; the team helps if anything gets stuck."}</li>
                   </ul>
                 </div>
 
@@ -2197,26 +2210,37 @@ export function CheckoutClient({
                   />
                 </div>
               ) : (
-                <button
-                  className="btn btn-full checkout-place-order-btn"
-                  disabled={loading}
-                  onClick={() => void submitOrder()}
-                  type="button"
-                  suppressHydrationWarning
-                >
-                  {loading ? (
-                    <span className="checkout-spinner">⟳</span>
-                  ) : (
-                    <>
-                      {paymentMethod === "STRIPE"
-                        ? language === "fr"
-                          ? "Préparer le paiement"
-                          : "Prepare payment"
-                        : t.placeOrder}{" "}
-                      {"\u2192"} {quote ? formatCad(quote.totalCents, language) : subtotalLabel}
-                    </>
-                  )}
-                </button>
+                <>
+                  <p className="checkout-final-action-note">
+                    {paymentMethod === "STRIPE"
+                      ? language === "fr"
+                        ? "Le prochain bouton prépare le paiement par carte sans quitter la page."
+                        : "The next button prepares card payment without leaving the page."
+                      : language === "fr"
+                        ? "La commande sera confirmée avec paiement local à la livraison."
+                        : "The order will be confirmed with local payment on delivery."}
+                  </p>
+                  <button
+                    className="btn btn-full checkout-place-order-btn"
+                    disabled={loading}
+                    onClick={() => void submitOrder()}
+                    type="button"
+                    suppressHydrationWarning
+                  >
+                    {loading ? (
+                      <span className="checkout-spinner">⟳</span>
+                    ) : (
+                      <>
+                        {paymentMethod === "STRIPE"
+                          ? language === "fr"
+                            ? "Préparer le paiement"
+                            : "Prepare payment"
+                          : t.placeOrder}{" "}
+                        {"\u2192"} {quote ? formatCad(quote.totalCents, language) : subtotalLabel}
+                      </>
+                    )}
+                  </button>
+                </>
               )}
 
               <Link className="checkout-back-link" href="/cart">

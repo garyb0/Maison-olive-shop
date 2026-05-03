@@ -208,6 +208,7 @@ test.describe("mobile public layout", () => {
 
     await page.goto("/boutique");
     await page.waitForLoadState("domcontentloaded");
+    await page.waitForLoadState("networkidle");
     await expectNoHorizontalOverflow(page);
 
     await expectMinTapSize(page.locator(".catalog-side-link").first(), "catalog category chip");
@@ -224,6 +225,15 @@ test.describe("mobile public layout", () => {
     await expect(availableCard).toBeVisible();
 
     await availableCard.locator(".catalog-product-add").click();
+    await expect.poll(() => page.evaluate(() => {
+      const raw = window.localStorage.getItem("chezolive_cart_v1");
+      if (!raw) return 0;
+      try {
+        return (JSON.parse(raw) as Array<{ quantity?: number }>).reduce((sum, line) => sum + (line.quantity ?? 0), 0);
+      } catch {
+        return 0;
+      }
+    })).toBeGreaterThan(0);
     await expect(page.locator(".nav-marketplace-mobile-actions .nav-cart-count")).toHaveText(/[1-9]/);
 
     if (unavailableProduct) {
@@ -253,6 +263,10 @@ test.describe("mobile public layout", () => {
     await page.waitForLoadState("domcontentloaded");
     await expectNoHorizontalOverflow(page);
     await expectMinTapSize(page.locator(".olive-product-add-btn").first(), "product add button");
+    await expectMinTapSize(page.locator(".olive-product-trust-grid a").first(), "product trust link");
+    await expect(page.locator(".olive-product-trust-grid")).toContainText(/Livraison locale|Local delivery/i);
+    await expect(page.locator(".olive-product-trust-grid")).toContainText(/Paiement sécurisé|Secure payment/i);
+    await expect(page.locator(".olive-product-trust-grid")).toContainText(/Retour \/ problème|Return \/ issue/i);
     await page.locator(".olive-product-add-btn").first().click();
     await expect(page.locator(".olive-product-add-btn").first()).toContainText(/Ajout|Added/i);
     await page.screenshot({ path: "test-results/mobile-product-step4.png", fullPage: true });
@@ -289,6 +303,8 @@ test.describe("mobile public layout", () => {
     await expectMinTapSize(page.locator(".cart-qty-btn").first(), "cart quantity button");
     await expectMinTapSize(page.locator(".cart-item-card .cart-remove-btn").first(), "cart remove button");
     await expectMinTapSize(page.locator(".cart-checkout-btn").first(), "cart checkout CTA");
+    await expect(page.locator(".cart-summary-next-steps")).toContainText(/Adresse locale|Local address/i);
+    await expect(page.locator(".cart-summary-next-steps")).toContainText(/Créneau de livraison|Delivery window/i);
     await expect(page.getByText(/Besoin d'aide avant de payer|Need help before paying/i)).toBeVisible();
 
     await page.screenshot({ path: "test-results/mobile-cart-step5.png", fullPage: true });
@@ -313,7 +329,10 @@ test.describe("mobile public layout", () => {
     await expect(page.locator(".checkout-step-card")).toHaveCount(4);
     await expectMinTapSize(page.locator(".checkout-flow-strip span").first(), "checkout step chip");
     await expectMinTapSize(page.locator(".checkout-help-strip a").first(), "checkout help link");
+    await expectMinTapSize(page.locator(".checkout-payment-assurance a").first(), "checkout payment help link");
     await expectMinTapSize(page.locator(".checkout-place-order-btn").first(), "checkout final CTA");
+    await expect(page.locator(".checkout-payment-assurance")).toContainText(/Stripe sécurise|Stripe secures/i);
+    await expect(page.locator(".checkout-final-action-note")).toContainText(/prépare le paiement|prepares card payment/i);
 
     const supportFloat = page.locator(".support-lite-float").first();
     if (await supportFloat.count()) {

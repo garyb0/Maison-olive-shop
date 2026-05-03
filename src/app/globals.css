@@ -5322,6 +5322,7 @@ tr:last-child td {
   text-decoration: none;
   font-size: 0.78rem;
   font-weight: 900;
+  line-height: 1.15;
 }
 
 .catalog-conversion-strip strong {
@@ -10866,6 +10867,39 @@ button.home-category-chip:hover,
   text-align: center;
 }
 
+.olive-product-trust-grid {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.olive-product-trust-grid a {
+  display: grid;
+  min-height: 44px;
+  gap: 0.18rem;
+  border: 1px solid rgba(84, 93, 46, 0.12);
+  border-radius: 0.9rem;
+  background: rgba(255, 253, 248, 0.92);
+  color: var(--olive-900);
+  padding: 0.68rem 0.78rem;
+  text-decoration: none;
+}
+
+.olive-product-trust-grid a:hover {
+  border-color: rgba(84, 93, 46, 0.28);
+  background: rgba(248, 251, 242, 0.86);
+}
+
+.olive-product-trust-grid strong {
+  font-size: 0.84rem;
+  line-height: 1.2;
+}
+
+.olive-product-trust-grid span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.3;
+}
+
 .cart-summary-trust {
   display: grid;
   gap: 0.45rem;
@@ -10873,6 +10907,38 @@ button.home-category-chip:hover,
   border-radius: 1rem;
   background: rgba(248, 251, 242, 0.76);
   padding: 0.9rem;
+}
+
+.cart-summary-next-steps {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.38rem;
+  border: 1px solid rgba(196, 149, 90, 0.16);
+  border-radius: 0.95rem;
+  background: rgba(255, 253, 248, 0.86);
+  padding: 0.82rem 0.9rem;
+}
+
+.cart-summary-next-steps strong {
+  color: var(--olive-900);
+  font-size: 0.84rem;
+}
+
+.cart-summary-next-steps span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.cart-summary-next-steps span::before {
+  content: "";
+  display: inline-block;
+  width: 0.42rem;
+  height: 0.42rem;
+  margin-right: 0.45rem;
+  border-radius: 999px;
+  background: var(--olive-700);
+  vertical-align: 0.08em;
 }
 
 .cart-summary-trust span {
@@ -10945,6 +11011,42 @@ button.home-category-chip:hover,
   font-weight: 900;
   text-decoration: underline;
   text-underline-offset: 0.18em;
+}
+
+.checkout-payment-assurance {
+  display: grid;
+  gap: 0.38rem;
+  margin-top: 0.85rem;
+  border: 1px solid rgba(84, 93, 46, 0.12);
+  border-radius: 0.95rem;
+  background: rgba(248, 251, 242, 0.74);
+  padding: 0.82rem 0.9rem;
+}
+
+.checkout-payment-assurance span {
+  color: var(--olive-900);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.checkout-payment-assurance a {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  color: var(--brand);
+  font-size: 0.84rem;
+  font-weight: 900;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+.checkout-final-action-note {
+  order: 4;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.42;
+  text-align: center;
 }
 
 .checkout-grid {
@@ -12640,16 +12742,19 @@ a.home-category-chip {
 .catalog-stock-pill--in {
   background: var(--sage);
   color: var(--olive-900);
+  border: 1px solid rgba(84, 93, 46, 0.14);
 }
 
 .catalog-stock-pill--low {
   background: rgba(196, 149, 90, 0.16);
   color: #7c5312;
+  border: 1px solid rgba(196, 149, 90, 0.2);
 }
 
 .catalog-stock-pill--out {
   background: rgba(180, 35, 24, 0.1);
   color: var(--danger);
+  border: 1px solid rgba(180, 35, 24, 0.16);
 }
 
 .catalog-product-copy {
@@ -12684,6 +12789,13 @@ a.home-category-chip {
   font-size: 0.82rem;
   letter-spacing: 0;
   line-height: 1;
+}
+
+.catalog-product-fast-note {
+  margin: 0.08rem 0 0;
+  color: var(--muted);
+  font-size: 0.77rem;
+  line-height: 1.35;
 }
 
 .catalog-product-footer {
@@ -12729,7 +12841,7 @@ a.home-category-chip {
   align-items: center;
   justify-content: center;
   min-width: 0;
-  min-height: 2.45rem;
+  min-height: 44px;
   border: 0;
   border-radius: 999px;
   background: var(--olive-700);
