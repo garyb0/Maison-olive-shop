@@ -53,6 +53,14 @@ export type OwnerTodaySnapshot = {
     stopCount: number;
   }>;
   todaySalesCents: number;
+  outOfStockCount: number;
+  outOfStockProducts: Array<{
+    id: string;
+    slug: string;
+    nameFr: string;
+    nameEn: string;
+    stock: number;
+  }>;
   lowStockCount: number;
   lowStockProducts: Array<{
     id: string;
@@ -107,6 +115,8 @@ export async function getOwnerTodaySnapshot(): Promise<OwnerTodaySnapshot> {
     activeRunCount,
     activeRuns,
     todaySales,
+    outOfStockCount,
+    outOfStockProducts,
     lowStockCount,
     lowStockProducts,
     conversion,
@@ -208,6 +218,21 @@ export async function getOwnerTodaySnapshot(): Promise<OwnerTodaySnapshot> {
       _sum: { totalCents: true },
     }),
     prisma.product.count({
+      where: { isActive: true, stock: { lte: 0 } },
+    }),
+    prisma.product.findMany({
+      where: { isActive: true, stock: { lte: 0 } },
+      orderBy: [{ stock: "asc" }, { updatedAt: "desc" }],
+      take: 5,
+      select: {
+        id: true,
+        slug: true,
+        nameFr: true,
+        nameEn: true,
+        stock: true,
+      },
+    }),
+    prisma.product.count({
       where: { isActive: true, stock: { lte: 3 } },
     }),
     prisma.product.findMany({
@@ -273,6 +298,8 @@ export async function getOwnerTodaySnapshot(): Promise<OwnerTodaySnapshot> {
       stopCount: run._count.stops,
     })),
     todaySalesCents: todaySales._sum.totalCents ?? 0,
+    outOfStockCount,
+    outOfStockProducts,
     lowStockCount,
     lowStockProducts,
     backup: readBackupSnapshot(),

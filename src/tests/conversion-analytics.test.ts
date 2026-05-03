@@ -64,26 +64,42 @@ describe("conversion analytics", () => {
     ]);
     const events = [
       { type: "SHOP_VIEW", sessionKey: "s1", productId: null, productSlug: null, quantity: null, createdAt: new Date() },
+      { type: "PRODUCT_VIEW", sessionKey: "s1", productId: "prod_1", productSlug: "lit-douillet", quantity: null, createdAt: new Date() },
       { type: "CART_ADD", sessionKey: "s1", productId: "prod_1", productSlug: "lit-douillet", quantity: 1, createdAt: new Date() },
       { type: "CHECKOUT_START", sessionKey: "s1", productId: null, productSlug: null, quantity: null, createdAt: new Date() },
       { type: "ORDER_CREATED", sessionKey: "s1", productId: null, productSlug: null, quantity: null, createdAt: new Date() },
       { type: "SHOP_VIEW", sessionKey: "s2", productId: null, productSlug: null, quantity: null, createdAt: new Date() },
+      { type: "PRODUCT_VIEW", sessionKey: "s2", productId: "prod_2", productSlug: "collier-qr", quantity: null, createdAt: new Date() },
       { type: "CART_ADD", sessionKey: "s2", productId: "prod_2", productSlug: "collier-qr", quantity: 2, createdAt: new Date() },
-      { type: "CHECKOUT_ERROR", sessionKey: "s2", productId: null, productSlug: null, quantity: null, createdAt: new Date() },
+      { type: "CHECKOUT_ERROR", sessionKey: "s2", productId: null, productSlug: null, quantity: null, metadataJson: JSON.stringify({ reason: "payment_declined" }), createdAt: new Date() },
+      { type: "SHOP_VIEW", sessionKey: "s3", productId: null, productSlug: null, quantity: null, createdAt: new Date() },
+      { type: "PRODUCT_VIEW", sessionKey: "s3", productId: "prod_1", productSlug: "lit-douillet", quantity: null, createdAt: new Date() },
     ] as const;
 
     const summary = summarizeConversionEvents([...events], productLabels);
 
-    expect(summary.shopVisitors).toBe(2);
+    expect(summary.shopVisitors).toBe(3);
+    expect(summary.productViews).toBe(3);
+    expect(summary.productViewSessions).toBe(3);
     expect(summary.cartAdds).toBe(2);
+    expect(summary.cartAddSessions).toBe(2);
     expect(summary.checkoutStarts).toBe(1);
     expect(summary.ordersCreated).toBe(1);
     expect(summary.checkoutErrors).toBe(1);
+    expect(summary.shopToCartRate).toBeCloseTo(2 / 3);
+    expect(summary.productToCartRate).toBeCloseTo(2 / 3);
     expect(summary.cartToCheckoutRate).toBe(0.5);
     expect(summary.checkoutToOrderRate).toBe(1);
+    expect(summary.productViewDropOffCount).toBe(1);
+    expect(summary.cartToCheckoutDropOffCount).toBe(1);
+    expect(summary.checkoutToOrderDropOffCount).toBe(0);
     expect(summary.topAddedProducts[0]).toEqual(expect.objectContaining({ nameFr: "Collier QR", quantity: 2 }));
     expect(summary.topAbandonedProducts).toEqual([
       expect.objectContaining({ nameFr: "Collier QR", quantity: 2 }),
     ]);
+    expect(summary.topViewedNotAddedProducts).toEqual([
+      expect.objectContaining({ nameFr: "Lit douillet", addCount: 1 }),
+    ]);
+    expect(summary.checkoutErrorReasons).toEqual([{ reason: "payment_declined", count: 1 }]);
   });
 });

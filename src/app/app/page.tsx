@@ -45,6 +45,7 @@ type AdminSnapshot = {
   waitingSupportCount: number;
   activeRunCount: number;
   todaySalesCents: number;
+  outOfStockCount: number;
   lowStockCount: number;
   backupStatus: "ok" | "warn" | "unknown";
   backupAgeHours: number | null;
@@ -231,7 +232,7 @@ async function getAdminSnapshot(): Promise<AdminSnapshot | null> {
     const nextOrder = ownerSnapshot.ordersToPrepare[0] ?? null;
     const nextDelivery = ownerSnapshot.deliveryOrders[0] ?? null;
     const nextSupport = ownerSnapshot.supportQueue[0] ?? null;
-    const criticalProduct = ownerSnapshot.lowStockProducts[0] ?? null;
+    const criticalProduct = ownerSnapshot.outOfStockProducts[0] ?? ownerSnapshot.lowStockProducts[0] ?? null;
 
     return {
       todayOrderCount: ownerSnapshot.todayOrderCount,
@@ -240,6 +241,7 @@ async function getAdminSnapshot(): Promise<AdminSnapshot | null> {
       waitingSupportCount: ownerSnapshot.openSupportCount,
       activeRunCount: ownerSnapshot.activeRunCount,
       todaySalesCents: ownerSnapshot.todaySalesCents,
+      outOfStockCount: ownerSnapshot.outOfStockCount,
       lowStockCount: ownerSnapshot.lowStockCount,
       backupStatus: ownerSnapshot.backup.status,
       backupAgeHours: ownerSnapshot.backup.ageHours,
@@ -530,8 +532,12 @@ export default async function PwaAppPage() {
               />
               <StatCard
                 href="/admin/products"
-                label={language === "fr" ? "Stock bas" : "Low stock"}
-                value={String(adminSnapshot?.lowStockCount ?? 0)}
+                label={language === "fr" ? "Stock critique" : "Critical stock"}
+                value={
+                  (adminSnapshot?.outOfStockCount ?? 0) > 0
+                    ? `${adminSnapshot?.outOfStockCount ?? 0}/${adminSnapshot?.lowStockCount ?? 0}`
+                    : String(adminSnapshot?.lowStockCount ?? 0)
+                }
                 help={
                   adminSnapshot?.criticalProduct
                     ? language === "fr"

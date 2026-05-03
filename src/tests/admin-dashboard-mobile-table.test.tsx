@@ -44,7 +44,9 @@ describe("AdminDashboardClient mobile table labels", () => {
           openSupportCount: 1,
           activeRunCount: 1,
           todaySalesLabel: "90,81 $",
-          lowStockCount: 1,
+          outOfStockCount: 1,
+          outOfStockProducts: [{ id: "prod_out", name: "Produit rupture", slug: "produit-rupture", stock: 0 }],
+          lowStockCount: 2,
           lowStockProducts: [{ id: "prod_1", name: "Produit test", slug: "produit-test", stock: 3 }],
           actionQueues: {
             ordersToPrepare: [
@@ -98,30 +100,50 @@ describe("AdminDashboardClient mobile table labels", () => {
             today: {
               shopVisitors: 12,
               productViews: 18,
+              productViewSessions: 10,
               cartAdds: 5,
+              cartAddSessions: 5,
               cartViews: 4,
               checkoutStarts: 3,
               ordersCreated: 2,
               checkoutErrors: 1,
+              shopToCartRateLabel: "42 %",
+              productToCartRateLabel: "50 %",
               cartToCheckoutRateLabel: "60 %",
               checkoutToOrderRateLabel: "67 %",
+              productViewDropOffCount: 5,
+              cartToCheckoutDropOffCount: 2,
+              checkoutToOrderDropOffCount: 1,
             },
             sevenDays: {
               shopVisitors: 40,
               productViews: 64,
+              productViewSessions: 30,
               cartAdds: 20,
+              cartAddSessions: 18,
               cartViews: 15,
               checkoutStarts: 10,
               ordersCreated: 6,
               checkoutErrors: 2,
+              shopToCartRateLabel: "45 %",
+              productToCartRateLabel: "60 %",
               cartToCheckoutRateLabel: "50 %",
               checkoutToOrderRateLabel: "60 %",
+              productViewDropOffCount: 12,
+              cartToCheckoutDropOffCount: 8,
+              checkoutToOrderDropOffCount: 4,
             },
             topAddedProducts: [
               { key: "prod_1", name: "Produit test", quantity: 8, addCount: 5 },
             ],
             topAbandonedProducts: [
               { key: "prod_2", name: "Produit abandonne", quantity: 3, addCount: 2 },
+            ],
+            topViewedNotAddedProducts: [
+              { key: "prod_3", name: "Produit regarde", quantity: 4, addCount: 4 },
+            ],
+            checkoutErrorReasons: [
+              { reason: "payment_declined", count: 2 },
             ],
           },
           siteStatus: "Site ouvert",
@@ -162,10 +184,15 @@ describe("AdminDashboardClient mobile table labels", () => {
     expect(screen.getByRole("link", { name: /Voir les commandes/ })).toHaveAttribute("href", "/admin/orders");
     expect(screen.getByRole("link", { name: /Ouvrir support/ })).toHaveAttribute("href", "/admin/support");
     expect(screen.getByText("Backup")).toBeInTheDocument();
+    expect(screen.getByText("Produit rupture")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Conversion" })).toBeInTheDocument();
     expect(screen.getAllByText("Visiteurs boutique").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Produit vers panier").length).toBeGreaterThan(0);
     expect(screen.getByText("Produits les plus ajoutés")).toBeInTheDocument();
     expect(screen.getByText("Produit abandonne")).toBeInTheDocument();
+    expect(screen.getByText("Produits vus sans ajout")).toBeInTheDocument();
+    expect(screen.getByText("Produit regarde")).toBeInTheDocument();
+    expect(screen.getByText("payment_declined")).toBeInTheDocument();
     expect(container.querySelectorAll(".admin-dashboard-table-wrap")).toHaveLength(2);
     expect(container.querySelectorAll(".admin-dashboard-table")).toHaveLength(2);
     const productTableCell = screen.getAllByText("Produit test").find((element) => element.closest("td"))?.closest("td");

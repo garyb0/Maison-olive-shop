@@ -42,6 +42,7 @@ type ConversionEventForSummary = {
   productId: string | null;
   productSlug: string | null;
   quantity: number | null;
+  metadataJson?: string | null;
   createdAt: Date;
 };
 
@@ -55,18 +56,32 @@ export type ConversionProductMetric = {
   quantity: number;
 };
 
+export type ConversionReasonMetric = {
+  reason: string;
+  count: number;
+};
+
 export type ConversionSummary = {
   shopVisitors: number;
   productViews: number;
+  productViewSessions: number;
   cartAdds: number;
+  cartAddSessions: number;
   cartViews: number;
   checkoutStarts: number;
   ordersCreated: number;
   checkoutErrors: number;
+  shopToCartRate: number | null;
+  productToCartRate: number | null;
   cartToCheckoutRate: number | null;
   checkoutToOrderRate: number | null;
+  productViewDropOffCount: number;
+  cartToCheckoutDropOffCount: number;
+  checkoutToOrderDropOffCount: number;
   topAddedProducts: ConversionProductMetric[];
   topAbandonedProducts: ConversionProductMetric[];
+  topViewedNotAddedProducts: ConversionProductMetric[];
+  checkoutErrorReasons: ConversionReasonMetric[];
 };
 
 export type ConversionDashboardSnapshot = {
@@ -78,15 +93,24 @@ export type ConversionDashboardSnapshot = {
 const EMPTY_SUMMARY: ConversionSummary = {
   shopVisitors: 0,
   productViews: 0,
+  productViewSessions: 0,
   cartAdds: 0,
+  cartAddSessions: 0,
   cartViews: 0,
   checkoutStarts: 0,
   ordersCreated: 0,
   checkoutErrors: 0,
+  shopToCartRate: null,
+  productToCartRate: null,
   cartToCheckoutRate: null,
   checkoutToOrderRate: null,
+  productViewDropOffCount: 0,
+  cartToCheckoutDropOffCount: 0,
+  checkoutToOrderDropOffCount: 0,
   topAddedProducts: [],
   topAbandonedProducts: [],
+  topViewedNotAddedProducts: [],
+  checkoutErrorReasons: [],
 };
 
 export function getEmptyConversionDashboardSnapshot(): ConversionDashboardSnapshot {
@@ -193,6 +217,11 @@ function productKey(event: Pick<ConversionEventForSummary, "productId" | "produc
   return event.productId ?? event.productSlug ?? null;
 }
 
+function productSessionKey(event: Pick<ConversionEventForSummary, "sessionKey" | "productId" | "productSlug">) {
+  const key = productKey(event);
+  return key ? `${event.sessionKey}:${key}` : null;
+}
+
 function upsertProductMetric(
   map: Map<string, ConversionProductMetric>,
   event: ConversionEventForSummary,
@@ -228,41 +257,95 @@ function topMetrics(map: Map<string, ConversionProductMetric>) {
     .slice(0, 5);
 }
 
+function safeCheckoutErrorReason(metadataJson: string | null | undefined) {
+  if (!metadataJson) return "unknown";
+
+  try {
+    const parsed = JSON.parse(metadataJson) as { reason?: unknown; code?: unknown; step?: unknown };
+    const reason = [parsed.reason, parsed.code, parsed.step].find((value) => typeof value === "string" && value.trim().length > 0);
+    return typeof reason === "string" ? reason.trim().slice(0, 60) : "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
+function topReasons(map: Map<string, number>) {
+  return Array.from(map.entries())
+    .map(([reason, count]) => ({ reason, count }))
+    .sort((left, right) => right.count - left.count || left.reason.localeCompare(right.reason))
+    .slice(0, 5);
+}
+
 export function summarizeConversionEvents(
   events: ConversionEventForSummary[],
   productLabels: Map<string, { nameFr: string; nameEn: string; slug: string }> = new Map(),
 ): ConversionSummary {
   const countByType = (type: ConversionEventType) => events.filter((event) => event.type === type).length;
-  const uniqueSessionsByType = (type: ConversionEventType) =>
-    new Set(events.filter((event) => event.type === type).map((event) => event.sessionKey)).size;
+  const sessionSetByType = (type: ConversionEventType) =>
+    new Set(events.filter((event) => event.type === type).map((event) => event.sessionKey));
 
+  const shopSessions = sessionSetByType("SHOP_VIEW");
+  const productViewSessions = sessionSetByType("PRODUCT_VIEW");
+  const cartAddSessions = sessionSetByType("CART_ADD");
+  const checkoutSessions = sessionSetByType("CHECKOUT_START");
+  const orderSessions = sessionSetByType("ORDER_CREATED");
+  const productViewToCartSessions = new Set(Array.from(productViewSessions).filter((session) => cartAddSessions.has(session)));
   const cartAdds = countByType("CART_ADD");
-  const checkoutStarts = uniqueSessionsByType("CHECKOUT_START");
+  const checkoutStarts = checkoutSessions.size;
   const ordersCreated = countByType("ORDER_CREATED");
-  const orderSessions = new Set(events.filter((event) => event.type === "ORDER_CREATED").map((event) => event.sessionKey));
   const addedProducts = new Map<string, ConversionProductMetric>();
   const abandonedProducts = new Map<string, ConversionProductMetric>();
+  const viewedNotAddedProducts = new Map<string, ConversionProductMetric>();
+  const cartProductSessionKeys = new Set(
+    events
+      .filter((event) => event.type === "CART_ADD")
+      .map((event) => productSessionKey(event))
+      .filter((key): key is string => Boolean(key)),
+  );
+  const checkoutErrorReasons = new Map<string, number>();
 
   for (const event of events) {
-    if (event.type !== "CART_ADD") continue;
-    upsertProductMetric(addedProducts, event, productLabels);
-    if (!orderSessions.has(event.sessionKey)) {
-      upsertProductMetric(abandonedProducts, event, productLabels);
+    if (event.type === "CART_ADD") {
+      upsertProductMetric(addedProducts, event, productLabels);
+      if (!orderSessions.has(event.sessionKey)) {
+        upsertProductMetric(abandonedProducts, event, productLabels);
+      }
+    }
+
+    if (event.type === "PRODUCT_VIEW") {
+      const key = productSessionKey(event);
+      if (key && !cartProductSessionKeys.has(key)) {
+        upsertProductMetric(viewedNotAddedProducts, { ...event, quantity: 1 }, productLabels);
+      }
+    }
+
+    if (event.type === "CHECKOUT_ERROR") {
+      const reason = safeCheckoutErrorReason(event.metadataJson);
+      checkoutErrorReasons.set(reason, (checkoutErrorReasons.get(reason) ?? 0) + 1);
     }
   }
 
   return {
-    shopVisitors: uniqueSessionsByType("SHOP_VIEW"),
+    shopVisitors: shopSessions.size,
     productViews: countByType("PRODUCT_VIEW"),
+    productViewSessions: productViewSessions.size,
     cartAdds,
-    cartViews: uniqueSessionsByType("CART_VIEW"),
+    cartAddSessions: cartAddSessions.size,
+    cartViews: sessionSetByType("CART_VIEW").size,
     checkoutStarts,
     ordersCreated,
     checkoutErrors: countByType("CHECKOUT_ERROR"),
-    cartToCheckoutRate: cartAdds > 0 ? checkoutStarts / cartAdds : null,
+    shopToCartRate: shopSessions.size > 0 ? cartAddSessions.size / shopSessions.size : null,
+    productToCartRate: productViewSessions.size > 0 ? productViewToCartSessions.size / productViewSessions.size : null,
+    cartToCheckoutRate: cartAddSessions.size > 0 ? checkoutStarts / cartAddSessions.size : null,
     checkoutToOrderRate: checkoutStarts > 0 ? ordersCreated / checkoutStarts : null,
+    productViewDropOffCount: Array.from(productViewSessions).filter((session) => !cartAddSessions.has(session)).length,
+    cartToCheckoutDropOffCount: Array.from(cartAddSessions).filter((session) => !checkoutSessions.has(session)).length,
+    checkoutToOrderDropOffCount: Array.from(checkoutSessions).filter((session) => !orderSessions.has(session)).length,
     topAddedProducts: topMetrics(addedProducts),
     topAbandonedProducts: topMetrics(abandonedProducts),
+    topViewedNotAddedProducts: topMetrics(viewedNotAddedProducts),
+    checkoutErrorReasons: topReasons(checkoutErrorReasons),
   };
 }
 
@@ -288,6 +371,7 @@ export async function getConversionDashboardSnapshot(): Promise<ConversionDashbo
       productId: true,
       productSlug: true,
       quantity: true,
+      metadataJson: true,
       createdAt: true,
     },
   });

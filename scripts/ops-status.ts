@@ -334,7 +334,7 @@ async function checkBusinessSignals(): Promise<Check> {
     `.catch(() => []);
     const hasConversionTable = conversionTables.length > 0;
 
-    const [lastOrder, recentOrderCount, criticalStockCount] = await Promise.all([
+    const [lastOrder, recentOrderCount, criticalStockCount, criticalProducts] = await Promise.all([
       prisma.order.findFirst({
         where: { status: { not: "CANCELLED" } },
         orderBy: { createdAt: "desc" },
@@ -347,6 +347,12 @@ async function checkBusinessSignals(): Promise<Check> {
         },
       }),
       prisma.product.count({ where: { isActive: true, stock: { lte: 0 } } }),
+      prisma.product.findMany({
+        where: { isActive: true, stock: { lte: 0 } },
+        orderBy: [{ stock: "asc" }, { updatedAt: "desc" }],
+        take: 3,
+        select: { slug: true, stock: true },
+      }),
     ]);
     const checkoutErrorCount = hasConversionTable
       ? await prisma.conversionEvent.count({
@@ -369,7 +375,8 @@ async function checkBusinessSignals(): Promise<Check> {
       warnings.push(`${checkoutErrorCount} checkout error(s) in ${checkoutErrorWarnHours}h`);
     }
     if (criticalStockCount > 0) {
-      warnings.push(`${criticalStockCount} active product(s) out of stock`);
+      const examples = criticalProducts.map((product) => `${product.slug}(${product.stock})`).join(", ");
+      warnings.push(`${criticalStockCount} active product(s) out of stock${examples ? `: ${examples}` : ""}`);
     }
 
     return {

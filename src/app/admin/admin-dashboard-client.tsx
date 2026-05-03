@@ -35,6 +35,13 @@ type Props = {
     openSupportCount: number;
     activeRunCount: number;
     todaySalesLabel: string;
+    outOfStockCount: number;
+    outOfStockProducts: Array<{
+      id: string;
+      name: string;
+      slug: string;
+      stock: number;
+    }>;
     lowStockCount: number;
     lowStockProducts: Array<{
       id: string;
@@ -59,6 +66,8 @@ type Props = {
       sevenDays: AdminConversionPeriod;
       topAddedProducts: AdminConversionProduct[];
       topAbandonedProducts: AdminConversionProduct[];
+      topViewedNotAddedProducts: AdminConversionProduct[];
+      checkoutErrorReasons: AdminConversionReason[];
     };
     siteStatus: string;
   };
@@ -90,13 +99,20 @@ type Props = {
 type AdminConversionPeriod = {
   shopVisitors: number;
   productViews: number;
+  productViewSessions: number;
   cartAdds: number;
+  cartAddSessions: number;
   cartViews: number;
   checkoutStarts: number;
   ordersCreated: number;
   checkoutErrors: number;
+  shopToCartRateLabel: string;
+  productToCartRateLabel: string;
   cartToCheckoutRateLabel: string;
   checkoutToOrderRateLabel: string;
+  productViewDropOffCount: number;
+  cartToCheckoutDropOffCount: number;
+  checkoutToOrderDropOffCount: number;
 };
 
 type AdminConversionProduct = {
@@ -104,6 +120,11 @@ type AdminConversionProduct = {
   name: string;
   quantity: number;
   addCount: number;
+};
+
+type AdminConversionReason = {
+  reason: string;
+  count: number;
 };
 
 const ORDER_STATUS_LABELS_FR: Record<string, string> = {
@@ -189,11 +210,17 @@ function ConversionMetricCard({
       </div>
       <div className="admin-conversion-metrics">
         <span>{language === "fr" ? "Visiteurs boutique" : "Shop visitors"} <strong>{period.shopVisitors}</strong></span>
+        <span>{language === "fr" ? "Vues produit" : "Product views"} <strong>{period.productViews}</strong></span>
         <span>{language === "fr" ? "Ajouts panier" : "Cart adds"} <strong>{period.cartAdds}</strong></span>
         <span>Checkout <strong>{period.checkoutStarts}</strong></span>
         <span>{language === "fr" ? "Commandes" : "Orders"} <strong>{period.ordersCreated}</strong></span>
+        <span>{language === "fr" ? "Boutique vers panier" : "Shop to cart"} <strong>{period.shopToCartRateLabel}</strong></span>
+        <span>{language === "fr" ? "Produit vers panier" : "Product to cart"} <strong>{period.productToCartRateLabel}</strong></span>
         <span>{language === "fr" ? "Panier vers checkout" : "Cart to checkout"} <strong>{period.cartToCheckoutRateLabel}</strong></span>
         <span>{language === "fr" ? "Checkout vers commande" : "Checkout to order"} <strong>{period.checkoutToOrderRateLabel}</strong></span>
+        <span>{language === "fr" ? "Produit sans panier" : "Product drop-off"} <strong>{period.productViewDropOffCount}</strong></span>
+        <span>{language === "fr" ? "Panier sans checkout" : "Cart drop-off"} <strong>{period.cartToCheckoutDropOffCount}</strong></span>
+        <span>{language === "fr" ? "Checkout sans commande" : "Checkout drop-off"} <strong>{period.checkoutToOrderDropOffCount}</strong></span>
         <span>{language === "fr" ? "Erreurs checkout" : "Checkout errors"} <strong>{period.checkoutErrors}</strong></span>
       </div>
     </article>
@@ -205,11 +232,13 @@ function ConversionProductList({
   title,
   emptyLabel,
   products,
+  mode = "add",
 }: {
   language: Language;
   title: string;
   emptyLabel: string;
   products: AdminConversionProduct[];
+  mode?: "add" | "view";
 }) {
   return (
     <article className="admin-conversion-card admin-conversion-card--list">
@@ -220,9 +249,47 @@ function ConversionProductList({
             <div className="admin-conversion-product" key={product.key}>
               <strong>{product.name}</strong>
               <span>
+                {mode === "view"
+                  ? language === "fr"
+                    ? `${product.addCount} vue(s) sans ajout`
+                    : `${product.addCount} view(s) without add`
+                  : language === "fr"
+                    ? `${product.quantity} unite(s), ${product.addCount} ajout(s)`
+                    : `${product.quantity} unit(s), ${product.addCount} add(s)`}
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="admin-action-empty">{emptyLabel}</p>
+      )}
+    </article>
+  );
+}
+
+function ConversionReasonList({
+  language,
+  title,
+  emptyLabel,
+  reasons,
+}: {
+  language: Language;
+  title: string;
+  emptyLabel: string;
+  reasons: AdminConversionReason[];
+}) {
+  return (
+    <article className="admin-conversion-card admin-conversion-card--list">
+      <h3>{title}</h3>
+      {reasons.length > 0 ? (
+        <div className="admin-conversion-product-list">
+          {reasons.map((reason) => (
+            <div className="admin-conversion-product" key={reason.reason}>
+              <strong>{reason.reason}</strong>
+              <span>
                 {language === "fr"
-                  ? `${product.quantity} unite(s), ${product.addCount} ajout(s)`
-                  : `${product.quantity} unit(s), ${product.addCount} add(s)`}
+                  ? `${reason.count} erreur(s)`
+                  : `${reason.count} error(s)`}
               </span>
             </div>
           ))}
@@ -460,7 +527,12 @@ export function AdminDashboardClient({
       : language === "fr"
         ? `${todayCockpit.backup.ageHours.toFixed(1)} h`
         : `${todayCockpit.backup.ageHours.toFixed(1)}h`;
-  const lowStockActionItems: AdminActionItem[] = todayCockpit.lowStockProducts.map((product) => ({
+  const outOfStockProductIds = new Set(todayCockpit.outOfStockProducts.map((product) => product.id));
+  const stockProducts = [
+    ...todayCockpit.outOfStockProducts,
+    ...todayCockpit.lowStockProducts.filter((product) => !outOfStockProductIds.has(product.id)),
+  ];
+  const lowStockActionItems: AdminActionItem[] = stockProducts.map((product) => ({
     id: product.id,
     href: "/admin/products",
     title: product.name,
@@ -471,6 +543,7 @@ export function AdminDashboardClient({
         : `${product.stock} unit(s) in stock`,
     badge: product.stock <= 0 ? (language === "fr" ? "Rupture" : "Out") : language === "fr" ? "Bas" : "Low",
   }));
+  const lowButAvailableCount = Math.max(0, todayCockpit.lowStockCount - todayCockpit.outOfStockCount);
   const healthActionItems: AdminActionItem[] = [
     {
       id: "site",
@@ -569,13 +642,17 @@ export function AdminDashboardClient({
           <AdminActionCard
             title={language === "fr" ? "Stock critique" : "Critical stock"}
             eyebrow={language === "fr" ? "Inventaire" : "Inventory"}
-            value={todayCockpit.lowStockCount}
-            summary={language === "fr" ? "Produits actifs à verifier avant de vendre." : "Active products to review before selling."}
+            value={todayCockpit.outOfStockCount > 0 ? `${todayCockpit.outOfStockCount}/${todayCockpit.lowStockCount}` : todayCockpit.lowStockCount}
+            summary={
+              language === "fr"
+                ? `${todayCockpit.outOfStockCount} rupture(s), ${lowButAvailableCount} bas stock.`
+                : `${todayCockpit.outOfStockCount} out, ${lowButAvailableCount} low stock.`
+            }
             href="/admin/products"
             actionLabel={language === "fr" ? "Ouvrir produits" : "Open products"}
             items={lowStockActionItems}
             emptyLabel={language === "fr" ? "Aucun produit critique." : "No critical product."}
-            tone={todayCockpit.lowStockCount > 0 ? "warn" : "default"}
+            tone={todayCockpit.lowStockCount > 0 || todayCockpit.outOfStockCount > 0 ? "warn" : "default"}
           />
           <AdminActionCard
             title={language === "fr" ? "Santé et backup" : "Health and backup"}
@@ -629,6 +706,19 @@ export function AdminDashboardClient({
             title={language === "fr" ? "Produits abandonnés" : "Abandoned products"}
             emptyLabel={language === "fr" ? "Aucun abandon mesuré." : "No abandonment measured."}
             products={todayCockpit.conversion.topAbandonedProducts}
+          />
+          <ConversionProductList
+            language={language}
+            title={language === "fr" ? "Produits vus sans ajout" : "Viewed without cart add"}
+            emptyLabel={language === "fr" ? "Aucun produit vu sans ajout." : "No product viewed without add."}
+            products={todayCockpit.conversion.topViewedNotAddedProducts}
+            mode="view"
+          />
+          <ConversionReasonList
+            language={language}
+            title={language === "fr" ? "Erreurs checkout" : "Checkout errors"}
+            emptyLabel={language === "fr" ? "Aucune erreur checkout récente." : "No recent checkout error."}
+            reasons={todayCockpit.conversion.checkoutErrorReasons}
           />
         </div>
       </section>
