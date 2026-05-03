@@ -39,4 +39,11 @@ describe("release audit", () => {
     expect(output).toContain("Release audit");
     expect(output).toContain("PASS worktree");
   });
+
+  it("passes release feature checks on a clean committed tree", () => {
+    const report = analyzeReleaseStatus("");
+
+    expect(report.items.find((item) => item.name === "pwa-v1")).toMatchObject({ level: "pass" });
+    expect(report.items.find((item) => item.name === "help-redirect-cleanup")).toMatchObject({ level: "pass" });
+  });
 });

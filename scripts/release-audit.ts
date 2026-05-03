@@ -1,4 +1,6 @@
 import { execSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
 
 export type ReleaseAuditLevel = "pass" | "warn" | "fail";
 
@@ -27,7 +29,19 @@ function isDeletion(line: string) {
   return line.startsWith(" D ") || line.startsWith("D  ") || line.startsWith("DD ");
 }
 
-export function analyzeReleaseStatus(statusText: string): ReleaseAuditReport {
+function fileExists(projectRoot: string, filePath: string) {
+  return fs.existsSync(path.join(projectRoot, filePath));
+}
+
+function fileTextIncludes(projectRoot: string, filePath: string, text: string) {
+  try {
+    return fs.readFileSync(path.join(projectRoot, filePath), "utf8").includes(text);
+  } catch {
+    return false;
+  }
+}
+
+export function analyzeReleaseStatus(statusText: string, projectRoot = process.cwd()): ReleaseAuditReport {
   const statusLines = statusText.split(/\r?\n/).map((line) => line.trimEnd()).filter(Boolean);
   const items: ReleaseAuditItem[] = [];
 
@@ -71,24 +85,41 @@ export function analyzeReleaseStatus(statusText: string): ReleaseAuditReport {
     details: sandboxCount > 0 ? `${sandboxCount} sandbox/smoke/demo path(s) need intentional review` : "no sandbox/smoke paths visible",
   });
 
-  const pwaReady =
+  const pwaChanged =
     hasPath(statusLines, (filePath) => filePath === "src/app/manifest.ts") &&
     hasPath(statusLines, (filePath) => filePath.startsWith("src/app/app/")) &&
     hasPath(statusLines, (filePath) => filePath === "src/e2e/pwa-app.spec.ts");
+  const pwaPresent =
+    fileExists(projectRoot, "src/app/manifest.ts") &&
+    fileExists(projectRoot, "src/app/app/page.tsx") &&
+    fileExists(projectRoot, "src/e2e/pwa-app.spec.ts");
+  const pwaReady = pwaChanged || pwaPresent;
   items.push({
     level: pwaReady ? "pass" : "warn",
     name: "pwa-v1",
     details: pwaReady
       ? "manifest, /app hub, and Playwright PWA spec are present"
-      : "PWA release paths were not all detected in git status",
+      : "PWA release paths are missing",
   });
 
-  const removedLegacyHelp = ["src/app/shipping/page.tsx", "src/app/returns/page.tsx", "src/app/terms/page.tsx"]
+  const legacyHelpPages = ["src/app/shipping/page.tsx", "src/app/returns/page.tsx", "src/app/terms/page.tsx"];
+  const removedLegacyHelpInStatus = legacyHelpPages
     .every((filePath) => statusLines.some((line) => line.startsWith(" D ") && pathFromStatusLine(line) === filePath));
+  const legacyHelpRemovedFromTree = legacyHelpPages.every((filePath) => !fileExists(projectRoot, filePath));
+  const redirectsPresent =
+    fileTextIncludes(projectRoot, "next.config.ts", 'source: "/shipping"') &&
+    fileTextIncludes(projectRoot, "next.config.ts", 'destination: "/faq#livraison"') &&
+    fileTextIncludes(projectRoot, "next.config.ts", 'source: "/returns"') &&
+    fileTextIncludes(projectRoot, "next.config.ts", 'destination: "/faq#retours"') &&
+    fileTextIncludes(projectRoot, "next.config.ts", 'source: "/terms"') &&
+    fileTextIncludes(projectRoot, "next.config.ts", 'destination: "/faq#conditions"');
+  const removedLegacyHelp = (removedLegacyHelpInStatus || legacyHelpRemovedFromTree) && redirectsPresent;
   items.push({
     level: removedLegacyHelp ? "pass" : "warn",
     name: "help-redirect-cleanup",
-    details: removedLegacyHelp ? "legacy help pages removed; redirects should remain in next.config.ts" : "legacy help page cleanup not detected",
+    details: removedLegacyHelp
+      ? "legacy help pages removed and redirects are present in next.config.ts"
+      : "legacy help cleanup or redirects are missing",
   });
 
   return { items, statusLines };
