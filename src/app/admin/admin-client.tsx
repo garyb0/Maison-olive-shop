@@ -817,7 +817,15 @@ export function AdminClient({ language, t, oliveMode, products, inventoryMovemen
                     </div>
                   </td>
                   <td>
-                    <span className="badge">{product.isActive ? "ACTIVE" : "INACTIVE"}</span>
+                    <span className={`badge ${product.isActive ? "" : "badge--inactive"}`}>
+                      {product.isActive
+                        ? language === "fr"
+                          ? "Actif"
+                          : "Active"
+                        : language === "fr"
+                          ? "Inactif"
+                          : "Inactive"}
+                    </span>
                   </td>
                   <td>{formatDateTime(product.createdAt)}</td>
                   <td>

@@ -84,8 +84,7 @@ export function AccountSidebar({ language }: Props) {
 
         <div className="account-sidebar__logout">
           <button
-            className="admin-nav-item"
-            style={{ width: "100%", textAlign: "left", background: "transparent", border: "none", cursor: "pointer" }}
+            className="admin-nav-item account-sidebar__logout-button"
             type="button"
             disabled={logoutLoading}
             onClick={() => void handleLogout()}

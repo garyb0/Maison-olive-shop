@@ -1,9 +1,9 @@
 import { spawnSync } from "node:child_process";
-import path from "node:path";
 import {
   createSqliteBackup,
   getPositionalScriptArgs,
   loadDatabaseEnvForTarget,
+  resolveBackupDirFromEnv,
   resolveEnvTargetFromArgs,
   resolveDatabaseFromEnv,
 } from "./db-utils";
@@ -20,7 +20,7 @@ if (db.kind === "missing") {
 }
 
 if (isSqlite) {
-  const backupDir = path.resolve(process.cwd(), "backups");
+  const backupDir = resolveBackupDirFromEnv();
   const backup = createSqliteBackup(db.dbPath, backupDir, "before-migrate");
 
   console.log("Pre-migration SQLite backup created:");

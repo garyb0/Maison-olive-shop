@@ -18,13 +18,12 @@ const PUBLIC_PROMO_ROUTE_PATTERNS = [
   /^\/products\/[^/]+$/,
   /^\/reset-password$/,
   /^\/returns$/,
-  /^\/sell$/,
   /^\/shipping$/,
   /^\/terms$/,
 ];
 
 export const PROMO_CTA_LINK_HELP_TEXT =
-  "Exemples valides: /, /boutique, /checkout, /faq, /shipping, /products/nom-du-produit";
+  "Exemples valides: /, /boutique, /checkout, /faq, /faq#livraison, /products/nom-du-produit";
 
 function extractPathname(rawValue: string): string | null {
   const trimmed = rawValue.trim();

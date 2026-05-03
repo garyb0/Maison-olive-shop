@@ -34,8 +34,8 @@ export function SiteFooter() {
         : "Monday to Friday, 9am to 5pm (Montreal time)",
     shippingPolicy:
       language === "fr"
-        ? "Livraison locale simple et claire, avec suivi dans ton espace client."
-        : "Simple local delivery, with follow-up in your customer account.",
+        ? "Livraison locale à Rimouski et environs. Les frais et le seuil gratuit sont confirmés au panier et au passage à la caisse."
+        : "Local delivery in Rimouski and nearby areas. Fees and the free-delivery threshold are confirmed in cart and checkout.",
   };
 
   if (pathname.startsWith("/admin")) {
@@ -56,13 +56,13 @@ export function SiteFooter() {
             </p>
             <h2 className="site-footer__title">
               {language === "fr"
-                ? "Le marché local pour les humains et leurs compagnons."
-                : "The local market for humans and their companions."}
+                ? "De notre famille à la vôtre."
+                : "From our family to yours."}
             </h2>
             <p className="site-footer__text">
               {language === "fr"
-                ? "Produits sélectionnés, livraison locale, aide et suivi dans une expérience simple, chaleureuse et cohérente."
-                : "Selected products, local delivery, support, and follow-up in one simple, warm, and consistent experience."}
+                ? "Des produits choisis avec soin, une livraison locale claire et un suivi humain pour prendre soin de vos compagnons."
+                : "Carefully chosen products, clear local delivery, and human follow-up to care for your companions."}
             </p>
           </div>
 
@@ -73,10 +73,10 @@ export function SiteFooter() {
               </p>
               <div className="site-footer__links">
                 <Link href={HOME_HREF}>{t.navHome}</Link>
+                <Link href="/app">{language === "fr" ? "Application" : "App"}</Link>
                 <Link href="/boutique">{language === "fr" ? "Boutique" : "Shop"}</Link>
                 <Link href="/faq">{language === "fr" ? "Centre d’aide" : "Help center"}</Link>
-                <Link href="/shipping">{language === "fr" ? "Livraison" : "Shipping"}</Link>
-                <Link href="/sell">{t.navSell}</Link>
+                <Link href="/faq#livraison">{language === "fr" ? "Livraison" : "Shipping"}</Link>
               </div>
             </div>
 
@@ -85,8 +85,8 @@ export function SiteFooter() {
                 {language === "fr" ? "Informations" : "Information"}
               </p>
               <div className="site-footer__links">
-                <Link href="/returns">{language === "fr" ? "Retours et remboursements" : "Returns and refunds"}</Link>
-                <Link href="/terms">{language === "fr" ? "Conditions de vente" : "Terms of sale"}</Link>
+                <Link href="/faq#retours">{language === "fr" ? "Retours et remboursements" : "Returns and refunds"}</Link>
+                <Link href="/faq#conditions">{language === "fr" ? "Conditions de vente" : "Terms of sale"}</Link>
                 <Link href="/account">{t.navAccount}</Link>
                 <a href={`mailto:${business.supportEmail}`}>{business.supportEmail}</a>
               </div>
@@ -110,8 +110,8 @@ export function SiteFooter() {
             </span>
             <span>
               {language === "fr"
-                ? "Boutique animalière locale"
-                : "Local pet boutique"}
+                ? "De notre famille à la vôtre"
+                : "From our family to yours"}
             </span>
           </div>
         </section>

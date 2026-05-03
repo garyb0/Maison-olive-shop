@@ -17,6 +17,9 @@ const REQUIRED_MODEL_DELEGATES = [
   "deliveryGpsSample",
   "geocodedAddressCache",
   "dogProfile",
+  "supportNotificationPreference",
+  "supportInternalNote",
+  "supportQuickReply",
   "rateLimitBucket",
 ] as const;
 

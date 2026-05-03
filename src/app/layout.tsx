@@ -1,5 +1,6 @@
 ﻿import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import type { Viewport } from "next";
 import { GlobalSupportChat } from "@/components/GlobalSupportChat";
 import { SiteFooter } from "@/components/SiteFooter";
 import { env } from "@/lib/env";
@@ -17,6 +18,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL(env.siteUrl),
+  manifest: "/manifest.webmanifest",
   title: {
     default: "Chez Olive — Boutique animalière",
     template: "%s | Chez Olive",
@@ -33,6 +35,18 @@ export const metadata: Metadata = {
   creator: "Chez Olive",
   publisher: "Chez Olive",
   category: "ecommerce",
+  appleWebApp: {
+    capable: true,
+    title: "Chez Olive",
+    statusBarStyle: "default",
+  },
+  icons: {
+    icon: [
+      { url: "/pwa-icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/pwa-icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
   robots: {
     index: true,
     follow: true,
@@ -62,6 +76,11 @@ export const metadata: Metadata = {
     description: "Boutique animalière bilingue, indépendante et fiable - Nourriture, jouets et accessoires premium pour animaux.",
     images: ["/olive-logo-2.png"],
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#545D2E",
+  colorScheme: "light",
 };
 
 export default function RootLayout({

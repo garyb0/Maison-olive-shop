@@ -23,12 +23,12 @@ type Props = {
   language: "fr" | "en";
 };
 
-const statusLabels: Record<string, { fr: string; en: string; color: string }> = {
-  ACTIVE: { fr: "Actif", en: "Active", color: "var(--success)" },
-  PAST_DUE: { fr: "Paiement en retard", en: "Payment overdue", color: "var(--warning)" },
-  CANCELED: { fr: "Annulé", en: "Canceled", color: "var(--muted)" },
-  PAUSED: { fr: "En pause", en: "Paused", color: "var(--muted)" },
-  EXPIRED: { fr: "Expiré", en: "Expired", color: "var(--muted)" },
+const statusLabels: Record<string, { fr: string; en: string; tone: "ok" | "warn" | "muted" }> = {
+  ACTIVE: { fr: "Actif", en: "Active", tone: "ok" },
+  PAST_DUE: { fr: "Paiement en retard", en: "Payment overdue", tone: "warn" },
+  CANCELED: { fr: "Annulé", en: "Canceled", tone: "muted" },
+  PAUSED: { fr: "En pause", en: "Paused", tone: "muted" },
+  EXPIRED: { fr: "Expiré", en: "Expired", tone: "muted" },
 };
 
 export default function UserSubscriptionsClient({ subscriptions, language }: Props) {
@@ -88,12 +88,12 @@ export default function UserSubscriptionsClient({ subscriptions, language }: Pro
         return (
           <article key={sub.id} className="account-order-card">
             <div className="account-order-card__head">
-              <div>
-                <p className="account-home-hero__eyebrow" style={{ marginBottom: 6 }}>
+              <div className="account-order-card__identity">
+                <p className="account-home-hero__eyebrow">
                   {language === "fr" ? "Abonnement" : "Subscription"}
                 </p>
-                <h3 style={{ margin: "0 0 4px", color: "#44321d" }}>{productName}</h3>
-                <span className="badge" style={{ background: status.color, color: "white" }}>
+                <h3 className="account-subscription-title">{productName}</h3>
+                <span className={`account-status-pill account-status-pill--${status.tone}`}>
                   {status[language]}
                 </span>
               </div>
@@ -103,19 +103,18 @@ export default function UserSubscriptionsClient({ subscriptions, language }: Pro
                   className="btn btn-danger"
                   disabled={loading === sub.id}
                   onClick={() => void cancelSubscription(sub.id)}
-                  style={{ fontSize: "0.9rem" }}
                   type="button"
                 >
                   {loading === sub.id ? "..." : language === "fr" ? "Annuler" : "Cancel"}
                 </button>
               ) : sub.cancelAtPeriodEnd ? (
-                <span className="badge" style={{ background: "var(--warning)" }}>
+                <span className="account-status-pill account-status-pill--warn">
                   {language === "fr" ? "Annulé à la fin de période" : "Canceled at period end"}
                 </span>
               ) : null}
             </div>
 
-            <div className="account-order-card__meta small" style={{ marginTop: 4 }}>
+            <div className="account-subscription-meta">
               <div className="account-order-card__meta-block">
                 <span className="account-order-card__meta-label">{language === "fr" ? "Début période" : "Period start"}</span>
                 <strong>{formatDate(sub.currentPeriodStart)}</strong>

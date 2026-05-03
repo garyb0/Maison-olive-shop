@@ -1,0 +1,54 @@
+{
+  "driver": {
+    "name": "Sandbox chauffeur Waze",
+    "phone": "4185550000"
+  },
+  "slot": {
+    "dateOffsetDays": 1,
+    "startHour": 10,
+    "endHour": 12,
+    "capacity": 8
+  },
+  "orders": [
+    {
+      "customerName": "Client Sandbox 1",
+      "address": "125 Rue des Pins, Rimouski, QC G5L 1A1, CA",
+      "coordinates": {
+        "lat": 48.4521,
+        "lng": -68.523
+      },
+      "phone": "4185550101",
+      "instructions": "Laisser a la porte avant si absent."
+    },
+    {
+      "customerName": "Client Sandbox 2",
+      "address": "280 Avenue de la Mer, Rimouski, QC G5L 7C3, CA",
+      "coordinates": {
+        "lat": 48.4535,
+        "lng": -68.516
+      },
+      "phone": "4185550102",
+      "instructions": "Sonner puis remettre en main propre."
+    },
+    {
+      "customerName": "Client Sandbox 3",
+      "address": "48 Rue du Fleuve, Rimouski, QC G5M 1B8, CA",
+      "coordinates": {
+        "lat": 48.4487,
+        "lng": -68.534
+      },
+      "phone": "4185550103",
+      "instructions": "Appeler 5 minutes avant l'arrivee."
+    },
+    {
+      "customerName": "Client Sandbox 4",
+      "address": "910 Boulevard Saint-Germain, Rimouski, QC G5L 8Y9, CA",
+      "coordinates": {
+        "lat": 48.459,
+        "lng": -68.506
+      },
+      "phone": "4185550104",
+      "instructions": "Depot cote garage."
+    }
+  ]
+}

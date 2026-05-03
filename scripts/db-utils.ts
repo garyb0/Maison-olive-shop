@@ -1,6 +1,27 @@
 import fs from "node:fs";
 import path from "node:path";
 
+const DEFAULT_DATA_ROOT_NAME = "maison-olive-data";
+const SQLITE_SIDECAR_SUFFIXES = ["-wal", "-shm", "-journal"];
+
+function readBackupManifestCreatedAtMs(dbBackupPath: string): number | null {
+  const manifestPath = `${dbBackupPath}.json`;
+  if (!fs.existsSync(manifestPath)) return null;
+
+  try {
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8")) as { createdAt?: unknown };
+    if (typeof manifest.createdAt !== "string") return null;
+    const createdAtMs = Date.parse(manifest.createdAt);
+    return Number.isFinite(createdAtMs) ? createdAtMs : null;
+  } catch {
+    return null;
+  }
+}
+
+function getBackupSortTimeMs(dbBackupPath: string, stats = fs.statSync(dbBackupPath)) {
+  return readBackupManifestCreatedAtMs(dbBackupPath) ?? stats.birthtimeMs ?? stats.mtimeMs;
+}
+
 export function loadEnvFileIfExists(fileName: string) {
   const fullPath = path.resolve(process.cwd(), fileName);
   if (!fs.existsSync(fullPath)) return;
@@ -54,18 +75,84 @@ export function resolveEnvTargetFromArgs(
 
 export function getEnvFilesForTarget(target: EnvTarget) {
   if (target === "production") {
-    return [".env.production.local", ".env.production", ".env"];
+    return [".env.production.local", ".env.local", ".env.production", ".env"];
   }
 
-  return [".env.local", ".env"];
+  return [".env.development.local", ".env.local", ".env.development", ".env"];
 }
 
-export function loadDatabaseEnvForTarget(target: EnvTarget) {
-  loadEnvFilesInOrder(getEnvFilesForTarget(target));
+export function loadExternalSecretEnvForTarget(target: EnvTarget) {
+  const explicit = process.env.CHEZOLIVE_SECRETS_FILE?.trim();
+  const defaultFileName =
+    target === "production" ? "chez-olive.production.env" : "chez-olive.development.env";
+  const defaultPath = path.join(resolveSecretsDirFromEnv(), defaultFileName);
+
+  if (explicit) {
+    loadEnvFileIfExists(explicit);
+    return;
+  }
+
+  loadEnvFileIfExists(defaultPath);
 }
+
+export function loadEnvForTarget(target: EnvTarget) {
+  loadEnvFilesInOrder(getEnvFilesForTarget(target));
+  loadExternalSecretEnvForTarget(target);
+}
+
+export const loadDatabaseEnvForTarget = loadEnvForTarget;
 
 export function getPositionalScriptArgs(args = process.argv) {
   return args.slice(2).filter((value) => !value.startsWith("--"));
+}
+
+export function resolveProjectPath(value: string) {
+  return path.isAbsolute(value) ? path.normalize(value) : path.resolve(process.cwd(), value);
+}
+
+export function resolveDataRootFromEnv() {
+  const configured = process.env.CHEZOLIVE_DATA_ROOT?.trim();
+  if (configured) {
+    return resolveProjectPath(configured);
+  }
+
+  return path.resolve(process.cwd(), "..", DEFAULT_DATA_ROOT_NAME);
+}
+
+export function resolveBackupDirFromEnv() {
+  const configured = process.env.CHEZOLIVE_BACKUP_DIR?.trim();
+  if (configured) {
+    return resolveProjectPath(configured);
+  }
+
+  return path.join(resolveDataRootFromEnv(), "backups");
+}
+
+export function resolveLogDirFromEnv() {
+  const configured = process.env.CHEZOLIVE_LOG_DIR?.trim();
+  if (configured) {
+    return resolveProjectPath(configured);
+  }
+
+  return path.join(resolveDataRootFromEnv(), "logs");
+}
+
+export function resolveSecretsDirFromEnv() {
+  const configured = process.env.CHEZOLIVE_SECRETS_DIR?.trim();
+  if (configured) {
+    return resolveProjectPath(configured);
+  }
+
+  return path.join(resolveDataRootFromEnv(), "secrets");
+}
+
+export function resolveExternalProdDbPath() {
+  const configured = process.env.CHEZOLIVE_PROD_DB_PATH?.trim();
+  if (configured) {
+    return resolveProjectPath(configured);
+  }
+
+  return path.join(resolveDataRootFromEnv(), "db", "prod.db");
 }
 
 const stripQueryAndHash = (value: string) => value.split(/[?#]/)[0];
@@ -137,8 +224,6 @@ const sanitizeLabel = (value: string) =>
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "") || "backup";
 
-const SQLITE_SIDECAR_SUFFIXES = ["-wal", "-shm", "-journal"];
-
 export type BackupResult = {
   dbBackupPath: string;
   sidecarBackupPaths: string[];
@@ -154,9 +239,11 @@ export function createSqliteBackup(dbPath: string, backupDir: string, label: str
 
   const safeLabel = sanitizeLabel(label);
   const stamp = timestampForFile();
+  const createdAt = new Date();
   const dbBackupPath = path.join(backupDir, `${safeLabel}-${stamp}.db`);
 
   fs.copyFileSync(dbPath, dbBackupPath);
+  fs.utimesSync(dbBackupPath, createdAt, createdAt);
 
   const sidecarBackupPaths: string[] = [];
   for (const suffix of SQLITE_SIDECAR_SUFFIXES) {
@@ -165,6 +252,7 @@ export function createSqliteBackup(dbPath: string, backupDir: string, label: str
 
     const sidecarDestination = `${dbBackupPath}${suffix}`;
     fs.copyFileSync(sidecarSource, sidecarDestination);
+    fs.utimesSync(sidecarDestination, createdAt, createdAt);
     sidecarBackupPaths.push(sidecarDestination);
   }
 
@@ -173,7 +261,7 @@ export function createSqliteBackup(dbPath: string, backupDir: string, label: str
     manifestPath,
     JSON.stringify(
       {
-        createdAt: new Date().toISOString(),
+        createdAt: createdAt.toISOString(),
         sourceDbPath: dbPath,
         dbBackupPath,
         sidecarBackupPaths,
@@ -188,6 +276,66 @@ export function createSqliteBackup(dbPath: string, backupDir: string, label: str
     dbBackupPath,
     sidecarBackupPaths,
     manifestPath,
+  };
+}
+
+export type SqliteCopyResult = {
+  copied: boolean;
+  targetDbPath: string;
+  sidecarTargetPaths: string[];
+  reason?: "target-exists" | "same-file";
+};
+
+const samePath = (a: string, b: string) => {
+  const left = path.resolve(a);
+  const right = path.resolve(b);
+  return process.platform === "win32" ? left.toLowerCase() === right.toLowerCase() : left === right;
+};
+
+export function copySqliteDatabaseWithSidecars(
+  sourceDbPath: string,
+  targetDbPath: string,
+  options: { overwrite?: boolean } = {},
+): SqliteCopyResult {
+  if (!fs.existsSync(sourceDbPath)) {
+    throw new Error(`DATABASE_FILE_NOT_FOUND: ${sourceDbPath}`);
+  }
+
+  if (samePath(sourceDbPath, targetDbPath)) {
+    return {
+      copied: false,
+      targetDbPath,
+      sidecarTargetPaths: [],
+      reason: "same-file",
+    };
+  }
+
+  if (fs.existsSync(targetDbPath) && !options.overwrite) {
+    return {
+      copied: false,
+      targetDbPath,
+      sidecarTargetPaths: [],
+      reason: "target-exists",
+    };
+  }
+
+  fs.mkdirSync(path.dirname(targetDbPath), { recursive: true });
+  fs.copyFileSync(sourceDbPath, targetDbPath);
+
+  const sidecarTargetPaths: string[] = [];
+  for (const suffix of SQLITE_SIDECAR_SUFFIXES) {
+    const sourceSidecar = `${sourceDbPath}${suffix}`;
+    if (!fs.existsSync(sourceSidecar)) continue;
+
+    const targetSidecar = `${targetDbPath}${suffix}`;
+    fs.copyFileSync(sourceSidecar, targetSidecar);
+    sidecarTargetPaths.push(targetSidecar);
+  }
+
+  return {
+    copied: true,
+    targetDbPath,
+    sidecarTargetPaths,
   };
 }
 
@@ -230,9 +378,9 @@ export function getLatestBackupDbPath(backupDir: string): string | null {
     .map((name) => {
       const fullPath = path.join(backupDir, name);
       const stats = fs.statSync(fullPath);
-      return { fullPath, mtime: stats.mtimeMs };
+      return { fullPath, sortTimeMs: getBackupSortTimeMs(fullPath, stats) };
     })
-    .sort((a, b) => b.mtime - a.mtime);
+    .sort((a, b) => b.sortTimeMs - a.sortTimeMs);
 
   return entries[0]?.fullPath ?? null;
 }

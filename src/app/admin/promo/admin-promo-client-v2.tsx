@@ -540,14 +540,20 @@ export function AdminPromoClient({ language, banners: initialBanners, freeShippi
                         </div>
                         {missingEnglish ? (
                           <span className="badge badge--inactive">
-                            {language === "fr" ? "ANGLAIS À COMPLÉTER" : "ENGLISH TO COMPLETE"}
+                            {language === "fr" ? "Anglais à compléter" : "English to complete"}
                           </span>
                         ) : null}
                       </div>
                     </td>
                     <td>
                       <span className={`badge ${banner.isActive ? "" : "badge--inactive"}`}>
-                        {banner.isActive ? "ACTIVE" : "INACTIVE"}
+                        {banner.isActive
+                          ? language === "fr"
+                            ? "Active"
+                            : "Active"
+                          : language === "fr"
+                            ? "Inactive"
+                            : "Inactive"}
                       </span>
                     </td>
                     <td>

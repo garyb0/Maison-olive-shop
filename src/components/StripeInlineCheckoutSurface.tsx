@@ -168,8 +168,8 @@ export function StripeInlineCheckout({
         <span>⚠️</span>{" "}
         {errorMessage ??
           (language === "fr"
-            ? "Stripe n'est pas prêt côté navigateur. Ajoute NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY."
-            : "Stripe is not ready in the browser. Add NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY.")}
+            ? "Le paiement par carte n'est pas disponible pour le moment. Réessaie dans quelques instants ou contacte le support."
+            : "Card payment is not available right now. Try again shortly or contact support.")}
       </div>
     );
   }

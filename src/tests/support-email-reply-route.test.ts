@@ -4,6 +4,7 @@ const verifyEmailReplyTokenMock = vi.fn()
 const createSupportMessageAsAdminMock = vi.fn()
 const logApiEventMock = vi.fn()
 const prismaUserFindUniqueMock = vi.fn()
+const applyRateLimitMock = vi.fn()
 
 vi.mock("@/lib/support-email", () => ({
   verifyEmailReplyToken: (...args: unknown[]) => verifyEmailReplyTokenMock(...args),
@@ -15,6 +16,10 @@ vi.mock("@/lib/support", () => ({
 
 vi.mock("@/lib/observability", () => ({
   logApiEvent: (...args: unknown[]) => logApiEventMock(...args),
+}))
+
+vi.mock("@/lib/rate-limit", () => ({
+  applyRateLimit: (...args: unknown[]) => applyRateLimitMock(...args),
 }))
 
 vi.mock("@/lib/prisma", () => ({
@@ -29,6 +34,7 @@ describe("POST /api/support/email-reply", () => {
   beforeEach(() => {
     vi.resetModules()
     vi.clearAllMocks()
+    applyRateLimitMock.mockResolvedValue({ ok: true, remaining: 19, retryAfterSeconds: 60 })
   })
 
   it("utilise l'email du token pour identifier l'admin", async () => {
@@ -78,5 +84,20 @@ describe("POST /api/support/email-reply", () => {
       "Bonjour support",
     )
   })
-})
 
+  it("respecte le rate limit public de reponse email", async () => {
+    applyRateLimitMock.mockResolvedValueOnce({ ok: false, remaining: 0, retryAfterSeconds: 60 })
+
+    const { POST } = await import("@/app/api/support/email-reply/route")
+    const req = new Request("http://localhost:3101/api/support/email-reply", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token: "token", content: "Bonjour" }),
+    })
+
+    const res = await POST(req as never)
+
+    expect(res.status).toBe(429)
+    expect(verifyEmailReplyTokenMock).not.toHaveBeenCalled()
+  })
+})

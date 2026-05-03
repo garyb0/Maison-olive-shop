@@ -35,20 +35,12 @@ type DragState = {
   stopId: string;
 } | null;
 
-const RUN_STATUS_COLORS: Record<string, string> = {
-  DRAFT: "#8b5cf6",
-  PUBLISHED: "#2563eb",
-  IN_PROGRESS: "#d97706",
-  COMPLETED: "#059669",
-  CANCELLED: "#b91c1c",
-};
-
 const RUN_STATUS_LABELS_FR: Record<string, string> = {
   DRAFT: "Brouillon",
-  PUBLISHED: "Publiee",
+  PUBLISHED: "Publiée",
   IN_PROGRESS: "En route",
-  COMPLETED: "Terminee",
-  CANCELLED: "Annulee",
+  COMPLETED: "Terminée",
+  CANCELLED: "Annulée",
 };
 
 const RUN_STATUS_LABELS_EN: Record<string, string> = {
@@ -60,9 +52,9 @@ const RUN_STATUS_LABELS_EN: Record<string, string> = {
 };
 
 const STOP_STATUS_LABELS_FR: Record<string, string> = {
-  PENDING: "A livrer",
-  DELIVERED: "Livree",
-  FAILED: "Probleme",
+  PENDING: "À livrer",
+  DELIVERED: "Livrée",
+  FAILED: "Problème",
 };
 
 const STOP_STATUS_LABELS_EN: Record<string, string> = {
@@ -72,12 +64,12 @@ const STOP_STATUS_LABELS_EN: Record<string, string> = {
 };
 
 function formatDistance(value: number | null, language: Language) {
-  if (value === null) return language === "fr" ? "Non calcule" : "Not calculated";
+  if (value === null) return language === "fr" ? "Non calculé" : "Not calculated";
   return `${value.toFixed(1)} km`;
 }
 
 function formatDuration(value: number | null, language: Language) {
-  if (value === null) return language === "fr" ? "Non calcule" : "Not calculated";
+  if (value === null) return language === "fr" ? "Non calculé" : "Not calculated";
   const hours = Math.floor(value / 3600);
   const minutes = Math.round((value % 3600) / 60);
   if (hours > 0) {
@@ -121,6 +113,21 @@ function formatRunStatus(status: string, language: Language) {
 function formatStopStatus(status: string, language: Language) {
   const labels = language === "fr" ? STOP_STATUS_LABELS_FR : STOP_STATUS_LABELS_EN;
   return labels[status] ?? status;
+}
+
+function getRunStatusClass(status: string) {
+  switch (status) {
+    case "PUBLISHED":
+      return "admin-run-status admin-run-status--published";
+    case "IN_PROGRESS":
+      return "admin-run-status admin-run-status--progress";
+    case "COMPLETED":
+      return "admin-run-status admin-run-status--completed";
+    case "CANCELLED":
+      return "admin-run-status admin-run-status--cancelled";
+    default:
+      return "admin-run-status";
+  }
 }
 
 export function AdminDeliveryRunsClient({
@@ -271,7 +278,7 @@ export function AdminDeliveryRunsClient({
         ),
       );
       setSelectedDriverId(createdDriver.id);
-      setMessage(language === "fr" ? "Chauffeur ajoute." : "Driver added.");
+      setMessage(language === "fr" ? "Chauffeur ajouté." : "Driver added.");
     });
   };
 
@@ -294,10 +301,10 @@ export function AdminDeliveryRunsClient({
       setMessage(
         payload.reusedExisting
           ? language === "fr"
-            ? "Une tournee existait deja pour ce creneau."
+            ? "Une tournée existait déjà pour ce créneau."
             : "An existing run already exists for this slot."
           : language === "fr"
-            ? "Tournee creee."
+            ? "Tournée créée."
             : "Run created.",
       );
     });
@@ -346,28 +353,37 @@ export function AdminDeliveryRunsClient({
 
   return (
     <section className="section delivery-runs-shell">
-      <div className="delivery-runs-hero">
+      <div className="delivery-runs-hero admin-page-header">
         <div>
-          <h1>{language === "fr" ? "Tournees chauffeur" : "Driver runs"}</h1>
+          <span className="admin-page-header__eyebrow">
+            {language === "fr" ? "Livraison" : "Delivery"}
+          </span>
+          <h1>{language === "fr" ? "Tournées chauffeur" : "Driver runs"}</h1>
           <p className="small">
             {language === "fr"
-              ? "Planifie les tournees par bloc interne, publie le lien chauffeur et garde une reference KM fiable."
+              ? "Planifie les tournées par bloc interne, publie le lien chauffeur et garde une référence KM fiable."
               : "Plan runs by internal slot, publish driver links, and keep reliable distance references."}
           </p>
         </div>
         <div className="delivery-runs-flags">
-          <span className={`badge ${featureEnabled ? "badge--ok" : "badge--warn"}`}>Runs {featureEnabled ? "ON" : "OFF"}</span>
-          <span className={`badge ${gpsTrackingEnabled ? "badge--ok" : "badge--warn"}`}>GPS {gpsTrackingEnabled ? "ON" : "OFF"}</span>
-          <span className={`badge ${googlePlanningReady ? "badge--ok" : "badge--warn"}`}>Google {googlePlanningReady ? "READY" : "PENDING"}</span>
+          <span className={`badge ${featureEnabled ? "badge--ok" : "badge--warn"}`}>
+            {language === "fr" ? "Tournées" : "Runs"} {featureEnabled ? (language === "fr" ? "actives" : "on") : language === "fr" ? "désactivées" : "off"}
+          </span>
+          <span className={`badge ${gpsTrackingEnabled ? "badge--ok" : "badge--warn"}`}>
+            GPS {gpsTrackingEnabled ? (language === "fr" ? "actif" : "on") : language === "fr" ? "désactivé" : "off"}
+          </span>
+          <span className={`badge ${googlePlanningReady ? "badge--ok" : "badge--warn"}`}>
+            Google {googlePlanningReady ? (language === "fr" ? "prêt" : "ready") : language === "fr" ? "en attente" : "pending"}
+          </span>
         </div>
       </div>
 
       {!schemaAvailable ? <div className="admin-callout admin-callout--warn">{"Prisma n'a pas encore les tables DeliveryRun. Lance la migration avant d'utiliser cette page."}</div> : null}
-      {!featureEnabled ? <div className="admin-callout admin-callout--warn">{"Le module est desactive par flag. Rien n'impacte le site live tant que `DELIVERY_EXPERIMENTAL_ROUTING_ENABLED=false`."}</div> : null}
+      {!featureEnabled ? <div className="admin-callout admin-callout--warn">{"Le module est désactivé par flag. Rien n'impacte le site live tant que `DELIVERY_EXPERIMENTAL_ROUTING_ENABLED=false`."}</div> : null}
       {activeDrivers.length === 0 ? (
         <div className="admin-callout admin-callout--warn">
           {language === "fr"
-            ? "Aucun chauffeur actif: cree ou reactive un chauffeur avant de creer une tournee."
+            ? "Aucun chauffeur actif: crée ou réactive un chauffeur avant de créer une tournée."
             : "No active driver: create or reactivate a driver before creating a run."}
         </div>
       ) : null}
@@ -377,20 +393,20 @@ export function AdminDeliveryRunsClient({
       <div className="delivery-runs-grid">
         <aside className="delivery-runs-sidebar">
           <div className="admin-card">
-            <h2>{language === "fr" ? "Creer un chauffeur" : "Create driver"}</h2>
+            <h2>{language === "fr" ? "Créer un chauffeur" : "Create driver"}</h2>
             <input className="input" placeholder={language === "fr" ? "Nom du chauffeur" : "Driver name"} value={driverName} onChange={(event) => setDriverName(event.target.value)} />
-            <input className="input" placeholder={language === "fr" ? "Telephone" : "Phone"} value={driverPhone} onChange={(event) => setDriverPhone(event.target.value)} />
+            <input className="input" placeholder={language === "fr" ? "Téléphone" : "Phone"} value={driverPhone} onChange={(event) => setDriverPhone(event.target.value)} />
             <button className="btn" onClick={() => void createDriver()} disabled={busy || !featureEnabled || !driverName.trim()}>Ajouter</button>
           </div>
 
           <div className="admin-card">
-            <h2>{language === "fr" ? "Creer une tournee" : "Create run"}</h2>
+            <h2>{language === "fr" ? "Créer une tournée" : "Create run"}</h2>
             <label className="small">{language === "fr" ? "Date de consultation" : "View date"}</label>
             <input className="input" type="date" value={selectedDateKey} onChange={(event) => selectDateKey(event.target.value)} />
-            <label className="small">{language === "fr" ? "Creneau" : "Delivery slot"}</label>
+            <label className="small">{language === "fr" ? "Créneau" : "Delivery slot"}</label>
             <select className="input" value={selectedSlotId} onChange={(event) => setSelectedSlotId(event.target.value)}>
               {slotOptions.length === 0 ? (
-                <option value="">{language === "fr" ? "Aucun creneau pour cette date" : "No slot for this date"}</option>
+                <option value="">{language === "fr" ? "Aucun créneau pour cette date" : "No slot for this date"}</option>
               ) : null}
               {slotOptions.map((slot) => (
                 <option key={slot.id} value={slot.id}>
@@ -405,9 +421,9 @@ export function AdminDeliveryRunsClient({
                 <option key={driver.id} value={driver.id}>{driver.name}</option>
               ))}
             </select>
-            <label className="check"><input type="checkbox" checked={includeReturn} onChange={(event) => setIncludeReturn(event.target.checked)} /> {language === "fr" ? "Inclure le retour depot" : "Include depot return"}</label>
-            <button className="btn" onClick={() => void createRun()} disabled={busy || !featureEnabled || !selectedSlotId || !selectedDriverId}>Creer la tournee</button>
-            <button className="btn btn-secondary" onClick={() => void runAction(() => refreshRuns())} disabled={busy}>Rafraichir cette date</button>
+            <label className="check"><input type="checkbox" checked={includeReturn} onChange={(event) => setIncludeReturn(event.target.checked)} /> {language === "fr" ? "Inclure le retour dépôt" : "Include depot return"}</label>
+            <button className="btn" onClick={() => void createRun()} disabled={busy || !featureEnabled || !selectedSlotId || !selectedDriverId}>{language === "fr" ? "Créer la tournée" : "Create run"}</button>
+            <button className="btn btn-secondary" onClick={() => void runAction(() => refreshRuns())} disabled={busy}>{language === "fr" ? "Rafraîchir cette date" : "Refresh this date"}</button>
           </div>
 
           <div className="admin-card">
@@ -421,25 +437,25 @@ export function AdminDeliveryRunsClient({
           <div className="admin-card">
             <div className="delivery-runs-list-header">
               <div>
-                <h2>{language === "fr" ? "Tournees du" : "Runs for"} {formatDateLabel(selectedDateKey, language)}</h2>
-                <p className="small" style={{ marginTop: 4 }}>
-                  {runs.length} {language === "fr" ? "tournee(s) creee(s) pour cette date." : "run(s) created for this date."}
+                <h2>{language === "fr" ? "Tournées du" : "Runs for"} {formatDateLabel(selectedDateKey, language)}</h2>
+                <p className="small admin-tight-copy">
+                  {runs.length} {language === "fr" ? "tournée(s) créée(s) pour cette date." : "run(s) created for this date."}
                 </p>
               </div>
-              <button className="btn btn-secondary" onClick={() => void runAction(() => refreshDrivers())} disabled={busy}>{language === "fr" ? "Rafraichir les chauffeurs" : "Refresh drivers"}</button>
+              <button className="btn btn-secondary" onClick={() => void runAction(() => refreshDrivers())} disabled={busy}>{language === "fr" ? "Rafraîchir les chauffeurs" : "Refresh drivers"}</button>
             </div>
 
             <div className="delivery-runs-list">
-              {runs.length === 0 ? <p className="small">{language === "fr" ? "Aucune tournee pour cette date." : "No delivery runs for this date."}</p> : null}
+              {runs.length === 0 ? <p className="small">{language === "fr" ? "Aucune tournée pour cette date." : "No delivery runs for this date."}</p> : null}
               {runs.map((run) => (
                 <button key={run.id} className={`delivery-run-card ${selectedRun?.id === run.id ? "active" : ""}`} onClick={() => setSelectedRunId(run.id)}>
                   <div className="delivery-run-card__top">
                     <strong>{run.driver.name}</strong>
-                    <span className="badge" style={{ backgroundColor: RUN_STATUS_COLORS[run.status] ?? "#334155" }}>{formatRunStatus(run.status, language)}</span>
+                    <span className={getRunStatusClass(run.status)}>{formatRunStatus(run.status, language)}</span>
                   </div>
                   <div className="small">{formatRunSlotLabel(run)}</div>
                   <div className="small">
-                    {run.stopCounts.total} {language === "fr" ? "arret(s)" : "stop(s)"} · {formatDistance(run.actualKmFinal ?? run.plannedKm, language)}
+                    {run.stopCounts.total} {language === "fr" ? "arrêt(s)" : "stop(s)"} · {formatDistance(run.actualKmFinal ?? run.plannedKm, language)}
                   </div>
                 </button>
               ))}
@@ -461,15 +477,15 @@ export function AdminDeliveryRunsClient({
               </div>
 
               <div className="delivery-run-metrics">
-                <div><span className="small">{language === "fr" ? "Planifie" : "Planned"}</span><strong>{formatDistance(selectedRun.plannedKm, language)}</strong></div>
-                <div><span className="small">{language === "fr" ? "Reel" : "Actual"}</span><strong>{formatDistance(selectedRun.actualKmFinal, language)}</strong></div>
-                <div><span className="small">{language === "fr" ? "Duree" : "Duration"}</span><strong>{formatDuration(selectedRun.plannedDurationSec, language)}</strong></div>
+                <div><span className="small">{language === "fr" ? "Planifié" : "Planned"}</span><strong>{formatDistance(selectedRun.plannedKm, language)}</strong></div>
+                <div><span className="small">{language === "fr" ? "Réel" : "Actual"}</span><strong>{formatDistance(selectedRun.actualKmFinal, language)}</strong></div>
+                <div><span className="small">{language === "fr" ? "Durée" : "Duration"}</span><strong>{formatDuration(selectedRun.plannedDurationSec, language)}</strong></div>
                 <div><span className="small">Source</span><strong>{selectedRun.actualKmSource ?? "-"}</strong></div>
               </div>
 
               <div className="delivery-run-admin-complete">
                 <input className="input" placeholder={language === "fr" ? "KM manuel admin" : "Manual admin KM"} value={manualActualKmFinal} onChange={(event) => setManualActualKmFinal(event.target.value)} />
-                <button className="btn btn-secondary" onClick={() => void runAction(async () => { await postRunCommand(`/api/admin/delivery/runs/${selectedRun.id}/complete`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ manualActualKmFinal: manualActualKmFinal ? Number(manualActualKmFinal) : undefined }) }); setMessage(language === "fr" ? "Tournee cloturee." : "Run completed."); })} disabled={busy || !featureEnabled}>Cloturer admin</button>
+                <button className="btn btn-secondary" onClick={() => void runAction(async () => { await postRunCommand(`/api/admin/delivery/runs/${selectedRun.id}/complete`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ manualActualKmFinal: manualActualKmFinal ? Number(manualActualKmFinal) : undefined }) }); setMessage(language === "fr" ? "Tournée clôturée." : "Run completed."); })} disabled={busy || !featureEnabled}>{language === "fr" ? "Clôturer admin" : "Admin complete"}</button>
               </div>
 
               <div className="delivery-run-stop-list">
@@ -490,8 +506,20 @@ export function AdminDeliveryRunsClient({
                     <div className="small">{formatDistance(stop.plannedLegKm, language)} · {formatDistance(stop.actualCumulativeKmAtStop, language)}</div>
                     <div className="delivery-run-stop__links">
                       <a href={stop.mapsHref} target="_blank" rel="noreferrer">Maps</a>
+                      {stop.hasProofPhoto && stop.proofPhotoUrl ? (
+                        <a href={stop.proofPhotoUrl} target="_blank" rel="noreferrer">
+                          {language === "fr" ? "Preuve photo" : "Photo proof"}
+                        </a>
+                      ) : null}
                       {stop.deliveryPhone ? <a href={`tel:${stop.deliveryPhone.replace(/[^\d+]/g, "")}`}>{language === "fr" ? "Appeler" : "Call"}</a> : null}
                     </div>
+                    {stop.hasProofPhoto && stop.proofPhotoUrl ? (
+                      <img
+                        className="delivery-run-proof-thumb"
+                        src={stop.proofPhotoUrl}
+                        alt={language === "fr" ? "Preuve de livraison" : "Delivery proof"}
+                      />
+                    ) : null}
                   </div>
                 ))}
               </div>

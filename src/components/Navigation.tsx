@@ -201,7 +201,7 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
 
   if (useMarketplaceHeader) {
     return (
-      <header className={`nav-marketplace${isShopRoute ? " nav-marketplace--shop" : " nav-marketplace--light"}`}>
+      <div className={`nav-marketplace${isShopRoute ? " nav-marketplace--shop" : " nav-marketplace--light"}`}>
         <div className="nav-marketplace-main">
           <Link href={HOME_HREF} className="nav-marketplace-brand">
             <Image
@@ -410,6 +410,15 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
                 <span>{language === "fr" ? "Livraison locale Rimouski" : "Local delivery Rimouski"}</span>
               </Link>
 
+              <Link
+                className="nav-drawer-app-chip"
+                href="/app"
+                onClick={() => setMenuOpen(false)}
+              >
+                <span className="nav-drawer-app-chip-mark" aria-hidden="true">APP</span>
+                <span>{language === "fr" ? "Ouvrir l'app Chez Olive" : "Open Chez Olive app"}</span>
+              </Link>
+
               <div className="nav-drawer-links">
                 <Link className={`nav-drawer-link${isActive("/") ? " nav-drawer-link--active" : ""}`} href={HOME_HREF} onClick={() => setMenuOpen(false)}>
                   <span className="nav-drawer-link-icon" aria-hidden="true">🏠</span>
@@ -447,17 +456,24 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
                     <span>{item.label}</span>
                   </Link>
                 ))}
-                <div className="nav-drawer-divider" aria-hidden="true" />
-                <Link className={`nav-drawer-link nav-drawer-link--sell${isActive("/sell") ? " nav-drawer-link--active" : ""}`} href="/sell" onClick={() => setMenuOpen(false)}>
-                  <span className="nav-drawer-link-icon" aria-hidden="true">🌿</span>
-                  <span>{t.navSell}</span>
-                </Link>
-                <Link className={`nav-drawer-link nav-drawer-link--cart${isActive("/cart") ? " nav-drawer-link--active" : ""}`} href="/cart" onClick={() => setMenuOpen(false)}>
+                <Link
+                  className={`nav-drawer-link nav-drawer-link--cart${isActive("/cart") ? " nav-drawer-link--active" : ""}`}
+                  href="/cart"
+                  aria-label={
+                    language === "fr"
+                      ? `Panier — ${cartCount} article${cartCount !== 1 ? "s" : ""}`
+                      : `Cart — ${cartCount} item${cartCount !== 1 ? "s" : ""}`
+                  }
+                  onClick={() => setMenuOpen(false)}
+                >
                   <span className="nav-drawer-link-icon" aria-hidden="true">🛒</span>
                   <span>
                     {language === "fr" ? "Panier" : "Cart"}
                     {cartCount > 0 && (
-                      <span className="nav-drawer-cart-badge">{cartCount}</span>
+                      <>
+                        {" "}
+                        <span className="nav-drawer-cart-badge" aria-hidden="true">{cartCount}</span>
+                      </>
                     )}
                   </span>
                 </Link>
@@ -496,12 +512,12 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
             </nav>
           </>
         )}
-      </header>
+      </div>
     );
   }
 
   return (
-    <header className="nav-header glow-border">
+    <div className="nav-header glow-border">
       {/* ── Marque / Logo ── */}
       <Link href={HOME_HREF} className="nav-brand">
         <Image
@@ -523,9 +539,6 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
           </Link>
           <Link className={`pill-link pill-link--shop${isActive("/boutique") ? " pill-link--active" : ""}`} href="/boutique">
             {language === "fr" ? "Boutique" : "Shop"}
-          </Link>
-          <Link className={`pill-link pill-link--sell${isActive("/sell") ? " pill-link--active" : ""}`} href="/sell">
-            {language === "fr" ? "Vendre" : "Sell"}
           </Link>
         </nav>
 
@@ -723,6 +736,15 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
               <span>{language === "fr" ? "Livraison locale Rimouski" : "Local delivery Rimouski"}</span>
             </Link>
 
+            <Link
+              className="nav-drawer-app-chip"
+              href="/app"
+              onClick={() => setMenuOpen(false)}
+            >
+              <span className="nav-drawer-app-chip-mark" aria-hidden="true">APP</span>
+              <span>{language === "fr" ? "Ouvrir l'app Chez Olive" : "Open Chez Olive app"}</span>
+            </Link>
+
             <div className="nav-drawer-links">
               <Link
                 className={`nav-drawer-link${isActive("/") ? " nav-drawer-link--active" : ""}`}
@@ -769,17 +791,6 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
               >
                 <span className="nav-drawer-link-icon" aria-hidden="true">❓</span>
                 <span>{t.navFaq}</span>
-              </Link>
-
-              <div className="nav-drawer-divider" aria-hidden="true" />
-
-              <Link
-                className={`nav-drawer-link nav-drawer-link--sell${isActive("/sell") ? " nav-drawer-link--active" : ""}`}
-                href="/sell"
-                onClick={() => setMenuOpen(false)}
-              >
-                <span className="nav-drawer-link-icon" aria-hidden="true">🌿</span>
-                <span>{t.navSell}</span>
               </Link>
 
               <Link
@@ -831,6 +842,6 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
           </nav>
         </>
       )}
-    </header>
+    </div>
   );
 }

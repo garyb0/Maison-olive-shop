@@ -130,7 +130,7 @@ const getDeliveryPeriod = (slot: DeliverySlotOption): DeliveryPeriodKey => {
   return slot.periodKey;
 };
 
-const formatDeliveryPeriodLabel = (period: DeliveryPeriodKey, language: Language) => {
+const formatDeliveryPeriodLabel = (period: DeliveryPeriodKey) => {
   if (period === "AM") return "AM";
   return "PM";
 };
@@ -282,8 +282,6 @@ export function CheckoutClient({
   user,
   productIndex,
   initialDeliveryAddresses,
-  shippingFlatCents: _shippingFlatCents,
-  shippingFreeThresholdCents: _shippingFreeThresholdCents,
   initialConfirmation,
   initialPaymentMode,
   initialStripeNotice,
@@ -404,6 +402,7 @@ export function CheckoutClient({
   }), [cart, language, productIndex]);
 
   const subtotalCents = cartRows.reduce((acc, row) => acc + row.lineSubtotalCents, 0);
+  const summaryItemCount = cartRows.reduce((acc, row) => acc + row.quantity, 0);
   const beforeTaxCents = Math.max(0, subtotalCents - (quote?.discountCents ?? 0)) + (quote?.shippingCents ?? 0);
   const subtotalLabel = formatCad(subtotalCents, language);
   const trimmedPromoCode = promoCode.trim().toUpperCase();
@@ -487,7 +486,7 @@ export function CheckoutClient({
         if (!periodSlots.length) {
           return {
             period,
-            label: formatDeliveryPeriodLabel(period, language),
+            label: formatDeliveryPeriodLabel(period),
             statusText: language === "fr" ? "Indisponible" : "Unavailable",
             tone: "full",
             slot: null,
@@ -509,7 +508,7 @@ export function CheckoutClient({
 
         return {
           period,
-          label: formatDeliveryPeriodLabel(period, language),
+          label: formatDeliveryPeriodLabel(period),
           statusText,
           tone,
           slot: periodSlots[0],
@@ -583,6 +582,7 @@ export function CheckoutClient({
     shippingLine1,
     shippingPostal,
     shippingRegion,
+    shippingCountry,
     user,
     prefersNewDeliveryAddress,
   ]);
@@ -788,35 +788,11 @@ export function CheckoutClient({
     }
   }, [selectedDateKey, selectedDayPeriods, selectedDeliveryPeriod, selectedDeliverySlotId]);
 
-  const formatDeliverySlotLabel = (slot: DeliverySlotOption) => {
-    const startAt = new Date(slot.startAt);
-    const endAt = new Date(slot.endAt);
-    const locale = language === "fr" ? "fr-CA" : "en-CA";
-
-    const dateLabel = new Intl.DateTimeFormat(locale, {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-    }).format(startAt);
-
-    const startLabel = new Intl.DateTimeFormat(locale, {
-      hour: "2-digit",
-      minute: "2-digit",
-    }).format(startAt);
-
-    const endLabel = new Intl.DateTimeFormat(locale, {
-      hour: "2-digit",
-      minute: "2-digit",
-    }).format(endAt);
-
-    return `${dateLabel} \u00b7 ${startLabel} - ${endLabel}`;
-  };
-
   const submitOrder = async () => {
     if (!user && paymentMethod !== "STRIPE") {
       setError(
         language === "fr"
-          ? "Le paiement manuel nécessite un compte. Utilisez le paiement par carte en invité ou connectez-vous."
+          ? "Le paiement local/manuel nécessite un compte. Utilisez le paiement par carte en invité ou connectez-vous."
           : "Pay on delivery requires an account. Use guest card checkout or sign in.",
       );
       return;
@@ -853,8 +829,8 @@ export function CheckoutClient({
     if (paymentMethod === "STRIPE" && quote && quote.totalCents < STRIPE_MINIMUM_TOTAL_CENTS) {
       setError(
         language === "fr"
-          ? "Stripe exige un total d'au moins 0,50 $ CAD. Augmente légèrement le montant ou retire le rabais de test."
-          : "Stripe requires a total of at least C$0.50. Increase the amount slightly or remove the test discount.",
+          ? "Le paiement par carte exige un total d'au moins 0,50 $ CAD. Augmente légèrement le montant ou retire le rabais de test."
+          : "Card payment requires a total of at least C$0.50. Increase the amount slightly or remove the test discount.",
       );
       return;
     }
@@ -1045,31 +1021,53 @@ export function CheckoutClient({
 
       {/* Page header */}
       <section className="section checkout-page-header">
-        <div className="checkout-page-title-row">
-          <span className="checkout-page-icon">{"\u{1F6D2}"}</span>
-          <div>
-            <h1 className="checkout-page-title">{t.checkoutTitle}</h1>
-            <p className="checkout-page-subtitle">{t.checkoutSubtitle}</p>
+        <div className="checkout-page-hero">
+          <div className="checkout-page-title-row">
+            <span className="checkout-page-icon">{"\u{1F6D2}"}</span>
+            <div className="checkout-page-copy">
+              <h1 className="checkout-page-title">{t.checkoutTitle}</h1>
+              <p className="checkout-page-subtitle">
+                {language === "fr"
+                  ? user
+                    ? t.checkoutSubtitle
+                    : "Livraison locale (Rimouski) — paiement par carte en invité; paiement local avec compte."
+                  : user
+                    ? t.checkoutSubtitle
+                    : "Local delivery (Rimouski) — guest card checkout; local payment with an account."}
+              </p>
+            </div>
+          </div>
+          <div className="checkout-local-reassurance">
+            <strong>{language === "fr" ? "Checkout local, clair et complet" : "Clear local checkout"}</strong>
+            <span>
+              {language === "fr"
+                ? "Adresse, livraison, paiement et total restent faciles à vérifier avant la confirmation."
+                : "Address, delivery, payment, and total stay easy to review before confirmation."}
+            </span>
           </div>
         </div>
         <div className="checkout-flow-strip" aria-label={language === "fr" ? "Étapes du checkout" : "Checkout steps"}>
-          <span>{language === "fr" ? "Panier vérifié" : "Cart checked"}</span>
-          <span>{language === "fr" ? "Adresse locale" : "Local address"}</span>
-          <span>{language === "fr" ? "AM ou PM" : "AM or PM"}</span>
-          <span>{language === "fr" ? "Paiement sécurisé" : "Secure payment"}</span>
+          <span><strong>1</strong>{language === "fr" ? "Panier" : "Cart"}</span>
+          <span><strong>2</strong>{language === "fr" ? "Adresse" : "Address"}</span>
+          <span><strong>3</strong>{language === "fr" ? "Livraison" : "Delivery"}</span>
+          <span><strong>4</strong>{language === "fr" ? "Paiement" : "Payment"}</span>
         </div>
-        <div className="checkout-local-reassurance">
-          <strong>{language === "fr" ? "Checkout local, clair et complet" : "Clear local checkout"}</strong>
+        <div className="checkout-local-mini">
+          <span aria-hidden="true">{"\u{1F4CD}"}</span>
           <span>
-            {language === "fr"
-              ? "Le résumé, la livraison et le paiement restent visibles jusqu'à la confirmation."
-              : "Summary, delivery, and payment stay visible until confirmation."}
-          </span>
-          <small>
             {language === "fr"
               ? "Zone servie: Rimouski et environs selon le code postal."
               : "Delivery area: Rimouski and nearby, based on postal code."}
-          </small>
+          </span>
+        </div>
+        <div className="checkout-help-strip" aria-label={language === "fr" ? "Aide checkout" : "Checkout help"}>
+          <span>
+            {language === "fr"
+              ? "Carte en invite, paiement local avec compte, et support si quelque chose bloque."
+              : "Guest card payment, local payment with an account, and support if anything gets stuck."}
+          </span>
+          <Link href="/faq#paiement">{language === "fr" ? "Paiement" : "Payment"}</Link>
+          <Link href="/faq#livraison">{language === "fr" ? "Livraison" : "Delivery"}</Link>
         </div>
       </section>
 
@@ -1182,24 +1180,14 @@ export function CheckoutClient({
               </div>
 
               {!user ? (
-                <div
-                  style={{
-                    marginBottom: 18,
-                    padding: "1rem 1.05rem",
-                    borderRadius: "1.1rem",
-                    border: "1px solid rgba(92, 107, 64, 0.16)",
-                    background: "linear-gradient(180deg, rgba(248, 251, 242, 1) 0%, rgba(255, 253, 247, 0.96) 100%)",
-                    display: "grid",
-                    gap: 12,
-                  }}
-                >
-                  <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+                <div className="checkout-guest-card">
+                  <div className="checkout-inline-head">
                     <AddressGlyph />
-                    <div style={{ minWidth: 0, flex: "1 1 280px" }}>
-                      <strong style={{ color: "#44321d" }}>
+                    <div className="checkout-inline-copy">
+                      <strong>
                         {language === "fr" ? "Commande en invité" : "Guest checkout"}
                       </strong>
-                      <p className="small" style={{ margin: "6px 0 0", color: "#6f624d" }}>
+                      <p className="small">
                         {language === "fr"
                           ? "Tu peux commander sans compte avec Visa ou Mastercard. Le paiement manuel reste réservé aux clients connectés."
                           : "You can place your order without an account using Visa or Mastercard. Pay on delivery stays reserved for signed-in customers."}
@@ -1238,7 +1226,7 @@ export function CheckoutClient({
                           suppressHydrationWarning
                         />
                       </div>
-                      <p className="small" style={{ marginTop: 6, marginBottom: 0 }}>
+                      <p className="small checkout-field-hint">
                         {language === "fr"
                           ? "Le reçu et le suivi de paiement seront envoyés à cette adresse."
                           : "Your receipt and payment follow-up will be sent to this address."}
@@ -1834,7 +1822,7 @@ export function CheckoutClient({
                           {selectedSlot ? (
                             <>
                               <strong>
-                                {formatDeliveryDayLabel(selectedSlot.dateKey, language)} - {formatDeliveryPeriodLabel(getDeliveryPeriod(selectedSlot), language)}
+                                {formatDeliveryDayLabel(selectedSlot.dateKey, language)} - {formatDeliveryPeriodLabel(getDeliveryPeriod(selectedSlot))}
                               </strong>
                               <span>
                                 {language === "fr"
@@ -1970,10 +1958,10 @@ export function CheckoutClient({
                       {language === "fr"
                         ? user
                           ? "Paiement comptant au moment de la livraison. Livraison locale uniquement (région de Rimouski)."
-                          : "Connexion requise pour utiliser le paiement manuel et faciliter le suivi de la commande."
+                          : "Connecte-toi pour payer localement à la livraison; sinon utilise le paiement par carte en invité."
                         : user
                           ? "Cash payment at the time of delivery. Local delivery only (Rimouski area)."
-                          : "Sign in is required to use manual payment and keep delivery follow-up clear."}
+                          : "Sign in to use local pay-on-delivery; otherwise use guest card checkout."}
                     </span>
                   </div>
                   {paymentMethod === "MANUAL" && <span className="checkout-payment-check">✓</span>}
@@ -2004,8 +1992,8 @@ export function CheckoutClient({
               {!user ? (
                 <p className="small" style={{ marginTop: 10, marginBottom: 0, color: "#6f624d" }}>
                   {language === "fr"
-                    ? "En invité, le paiement par carte est l’option recommandée. Ton paiement est confirmé immédiatement et ton courriel sert au reçu."
-                    : "As a guest, card payment is the recommended option. Your payment is confirmed immediately and your email is used for the receipt."}
+                    ? "En invité, seul le paiement par carte est disponible. Ton paiement est confirmé immédiatement et ton courriel sert au reçu."
+                    : "As a guest, only card payment is available. Your payment is confirmed immediately and your email is used for the receipt."}
                 </p>
               ) : null}
 
@@ -2027,11 +2015,23 @@ export function CheckoutClient({
           {/* Colonne résumé */}
           <div className="checkout-sidebar">
             <div className="checkout-summary-card">
-              <div className="checkout-summary-title">
-                {language === "fr" ? "Résumé de la commande" : "Order total"}
+              <div className="checkout-summary-head">
+                <div>
+                  <div className="checkout-summary-title">
+                    {language === "fr" ? "Résumé de la commande" : "Order total"}
+                  </div>
+                  <p className="checkout-summary-kicker">
+                    {language === "fr"
+                      ? "Dernière vérification avant confirmation"
+                      : "Final review before confirming"}
+                  </p>
+                </div>
+                <span className="checkout-summary-count">
+                  {summaryItemCount} {language === "fr" ? "article" : "item"}{summaryItemCount > 1 ? "s" : ""}
+                </span>
               </div>
 
-              <div className="field" style={{ marginBottom: 0 }}>
+              <div className="field checkout-summary-promo">
                 <label>{language === "fr" ? "Code promo" : "Promo code"}</label>
                 <input
                   className="input"
@@ -2048,58 +2048,62 @@ export function CheckoutClient({
                 )}
               </div>
 
-              <div className="checkout-summary-lines">
-                {cartRows.map((row) => (
-                  <div key={row.productId} className="checkout-summary-line">
-                    <span className="checkout-summary-line-name">
-                      {row.name} <span className="checkout-summary-line-qty">{"\u00d7"}{row.quantity}</span>
-                    </span>
-                    <span className="checkout-summary-line-price">{row.lineSubtotalLabel}</span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="checkout-summary-divider" />
-
-              <div className="checkout-summary-row">
-                <span>{language === "fr" ? "Sous-total" : "Subtotal"}</span>
-                <span>{quote ? formatCad(quote.subtotalCents, language) : subtotalLabel}</span>
-              </div>
-              {quote && quote.discountCents > 0 && (
-                <div className="checkout-summary-row">
-                  <span>{language === "fr" ? "Rabais promo" : "Promo discount"}</span>
-                  <span>-{formatCad(quote.discountCents, language)}</span>
+              <div className="checkout-summary-panel checkout-summary-panel--items">
+                <div className="checkout-summary-panel-title">
+                  <span>{language === "fr" ? "Articles" : "Items"}</span>
+                  <span>{summaryItemCount}</span>
                 </div>
-              )}
-              <div className="checkout-summary-row checkout-summary-row--shipping">
-                <span>{language === "fr" ? "Livraison" : "Shipping"}</span>
-                <span className="checkout-summary-free">
-                  {quote
-                    ? formatCad(quote.shippingCents, language)
-                    : language === "fr"
-                      ? "Calcul..."
-                      : "Calculating..."}
-                </span>
+                <div className="checkout-summary-lines">
+                  {cartRows.map((row) => (
+                    <div key={row.productId} className="checkout-summary-line">
+                      <span className="checkout-summary-line-name">
+                        {row.name} <span className="checkout-summary-line-qty">{"\u00d7"}{row.quantity}</span>
+                      </span>
+                      <span className="checkout-summary-line-price">{row.lineSubtotalLabel}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div className="checkout-summary-divider" />
-              <div className="checkout-summary-row">
-                <span>{language === "fr" ? "Total avant taxes" : "Total before taxes"}</span>
-                <span>{quote ? formatCad(beforeTaxCents, language) : subtotalLabel}</span>
-              </div>
+
+              <div className="checkout-summary-panel checkout-summary-panel--totals">
+                <div className="checkout-summary-row">
+                  <span>{language === "fr" ? "Sous-total" : "Subtotal"}</span>
+                  <span>{quote ? formatCad(quote.subtotalCents, language) : subtotalLabel}</span>
+                </div>
+                {quote && quote.discountCents > 0 && (
+                  <div className="checkout-summary-row">
+                    <span>{language === "fr" ? "Rabais promo" : "Promo discount"}</span>
+                    <span>-{formatCad(quote.discountCents, language)}</span>
+                  </div>
+                )}
+                <div className="checkout-summary-row checkout-summary-row--shipping">
+                  <span>{language === "fr" ? "Livraison" : "Shipping"}</span>
+                  <span className="checkout-summary-free">
+                    {quote
+                      ? formatCad(quote.shippingCents, language)
+                      : language === "fr"
+                        ? "Calcul..."
+                        : "Calculating..."}
+                  </span>
+                </div>
+                <div className="checkout-summary-divider" />
+                <div className="checkout-summary-row">
+                  <span>{language === "fr" ? "Total avant taxes" : "Total before taxes"}</span>
+                  <span>{quote ? formatCad(beforeTaxCents, language) : subtotalLabel}</span>
+                </div>
                 <div className="checkout-summary-row">
                   <span>{language === "fr" ? "TPS (5%)" : "GST (5%)"}</span>
-                <span>{quote ? formatCad(quote.gstCents, language) : language === "fr" ? "Calcul..." : "Calculating..."}</span>
+                  <span>{quote ? formatCad(quote.gstCents, language) : language === "fr" ? "Calcul..." : "Calculating..."}</span>
                 </div>
                 <div className="checkout-summary-row">
                   <span>{language === "fr" ? "TVQ (9,975%)" : "QST (9.975%)"}</span>
-                <span>{quote ? formatCad(quote.qstCents, language) : language === "fr" ? "Calcul..." : "Calculating..."}</span>
+                  <span>{quote ? formatCad(quote.qstCents, language) : language === "fr" ? "Calcul..." : "Calculating..."}</span>
                 </div>
                 <div className="checkout-summary-row">
                   <span>{language === "fr" ? "Taxes totales" : "Total taxes"}</span>
-                <span>{quote ? formatCad(quote.gstCents + quote.qstCents, language) : language === "fr" ? "Calcul..." : "Calculating..."}</span>
+                  <span>{quote ? formatCad(quote.gstCents + quote.qstCents, language) : language === "fr" ? "Calcul..." : "Calculating..."}</span>
                 </div>
-
-              <div className="checkout-summary-divider" />
+              </div>
 
               <div className="checkout-summary-total-row">
                 <span>{language === "fr" ? "Total" : "Total"}</span>
@@ -2154,8 +2158,8 @@ export function CheckoutClient({
               ) : null}
 
               {paymentMethod === "STRIPE" && stripeSession ? (
-                <div style={{ display: "grid", gap: 12 }}>
-                  <div className="auth-alert auth-alert--ok" style={{ marginTop: 0 }}>
+                <div className="checkout-stripe-panel">
+                  <div className="auth-alert auth-alert--ok checkout-inline-alert">
                     <span>✓</span>{" "}
                     {language === "fr"
                       ? "Ton paiement est prêt ici. Vérifie la carte ci-dessous et confirme-la sans quitter la page."

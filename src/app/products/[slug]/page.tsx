@@ -182,6 +182,13 @@ export default async function ProductDetailsPage({ params, searchParams }: Produ
               disabled={product.stock <= 0}
               maxQuantity={product.stock}
             />
+            {product.stock <= 0 ? (
+              <p className="olive-product-unavailable-note">
+                {language === "fr"
+                  ? "Ce produit reste visible pour consultation, mais il ne peut pas être ajouté au panier tant que le stock n'est pas revenu."
+                  : "This product remains visible for reference, but it cannot be added to cart until stock returns."}
+              </p>
+            ) : null}
             <div className="olive-product-purchase-links">
               <Link className="btn btn-secondary" href="/cart">
                 {language === "fr" ? "Voir le panier" : "View cart"}

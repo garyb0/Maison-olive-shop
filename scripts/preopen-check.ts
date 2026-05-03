@@ -1,6 +1,6 @@
-import { loadEnvFilesInOrder } from "./db-utils";
+import { loadEnvForTarget } from "./db-utils";
 
-loadEnvFilesInOrder([".env.production.local", ".env.production", ".env"]);
+loadEnvForTarget("production");
 
 type CheckLevel = "pass" | "warn" | "fail";
 

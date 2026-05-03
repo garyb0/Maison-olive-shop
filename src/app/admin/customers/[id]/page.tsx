@@ -33,6 +33,43 @@ function getAssignedAdminLabel(
   return fullName || assignedAdmin.email;
 }
 
+function getOrderStatusLabel(status: string, language: "fr" | "en") {
+  const labels: Record<string, { fr: string; en: string }> = {
+    PENDING: { fr: "À vérifier", en: "Pending" },
+    PAID: { fr: "Payée", en: "Paid" },
+    PROCESSING: { fr: "En préparation", en: "Processing" },
+    SHIPPED: { fr: "Expédiée", en: "Shipped" },
+    DELIVERED: { fr: "Livrée", en: "Delivered" },
+    CANCELLED: { fr: "Annulée", en: "Cancelled" },
+  };
+
+  return labels[status]?.[language] ?? status;
+}
+
+function getPaymentStatusLabel(status: string, language: "fr" | "en") {
+  const labels: Record<string, { fr: string; en: string }> = {
+    PENDING: { fr: "À confirmer", en: "Pending" },
+    PAID: { fr: "Payé", en: "Paid" },
+    FAILED: { fr: "Échec", en: "Failed" },
+    REFUNDED: { fr: "Remboursé", en: "Refunded" },
+  };
+
+  return labels[status]?.[language] ?? status;
+}
+
+function getDeliveryStatusLabel(status: string, language: "fr" | "en") {
+  const labels: Record<string, { fr: string; en: string }> = {
+    UNSCHEDULED: { fr: "Appel client requis", en: "Call customer" },
+    SCHEDULED: { fr: "Planifiée", en: "Scheduled" },
+    OUT_FOR_DELIVERY: { fr: "En livraison", en: "Out for delivery" },
+    DELIVERED: { fr: "Livrée", en: "Delivered" },
+    FAILED: { fr: "Échouée", en: "Failed" },
+    RESCHEDULED: { fr: "Replanifiée", en: "Rescheduled" },
+  };
+
+  return labels[status]?.[language] ?? status;
+}
+
 export default async function AdminCustomerDetailsPage({ params }: AdminCustomerDetailsPageProps) {
   const { id } = await params;
   const [language, adminUser, customer] = await Promise.all([
@@ -191,8 +228,8 @@ export default async function AdminCustomerDetailsPage({ params }: AdminCustomer
             {language === "fr" ? "Aucune commande pour ce client." : "No orders for this customer."}
           </p>
         ) : (
-          <div className="table-wrap">
-            <table>
+          <div className="table-wrap admin-mobile-table-wrap">
+            <table className="admin-mobile-table">
               <thead>
                 <tr>
                   <th>{language === "fr" ? "Commande" : "Order"}</th>
@@ -207,13 +244,13 @@ export default async function AdminCustomerDetailsPage({ params }: AdminCustomer
               <tbody>
                 {customer.orders.map((order) => (
                   <tr key={order.id}>
-                    <td>#{order.orderNumber}</td>
-                    <td><span className="badge">{order.status}</span></td>
-                    <td><span className="badge">{order.paymentStatus}</span></td>
-                    <td><span className="badge">{order.deliveryStatus}</span></td>
-                    <td>{formatCurrency(order.totalCents, order.currency, locale)}</td>
-                    <td>{formatDate(order.createdAt, locale)}</td>
-                    <td>
+                    <td data-label={language === "fr" ? "Commande" : "Order"}>#{order.orderNumber}</td>
+                    <td data-label={language === "fr" ? "Statut" : "Status"}><span className="badge">{getOrderStatusLabel(order.status, language)}</span></td>
+                    <td data-label={language === "fr" ? "Paiement" : "Payment"}><span className="badge">{getPaymentStatusLabel(order.paymentStatus, language)}</span></td>
+                    <td data-label={language === "fr" ? "Livraison" : "Delivery"}><span className="badge">{getDeliveryStatusLabel(order.deliveryStatus, language)}</span></td>
+                    <td data-label={language === "fr" ? "Total" : "Total"}>{formatCurrency(order.totalCents, order.currency, locale)}</td>
+                    <td data-label={language === "fr" ? "Créée" : "Created"}>{formatDate(order.createdAt, locale)}</td>
+                    <td className="admin-mobile-actions-cell" data-label={language === "fr" ? "Action" : "Action"}>
                       <Link className="btn btn-secondary" href={`/admin/orders/${order.id}`}>
                         {language === "fr" ? "Voir la commande" : "View order"}
                       </Link>

@@ -22,6 +22,22 @@ const ORDER_STATUS_OPTIONS = [
 
 const PAYMENT_STATUS_OPTIONS = ["PENDING", "PAID", "FAILED", "REFUNDED"] as const;
 
+const ORDER_STATUS_LABELS: Record<string, { fr: string; en: string }> = {
+  PENDING: { fr: "À vérifier", en: "Pending" },
+  PAID: { fr: "Payée", en: "Paid" },
+  PROCESSING: { fr: "En préparation", en: "Processing" },
+  SHIPPED: { fr: "Expédiée", en: "Shipped" },
+  DELIVERED: { fr: "Livrée", en: "Delivered" },
+  CANCELLED: { fr: "Annulée", en: "Cancelled" },
+};
+
+const PAYMENT_STATUS_LABELS: Record<string, { fr: string; en: string }> = {
+  PENDING: { fr: "À confirmer", en: "Pending" },
+  PAID: { fr: "Payé", en: "Paid" },
+  FAILED: { fr: "Échec", en: "Failed" },
+  REFUNDED: { fr: "Remboursé", en: "Refunded" },
+};
+
 const DELIVERY_STATUS_OPTIONS = [
   "UNSCHEDULED",
   "SCHEDULED",
@@ -102,7 +118,7 @@ export function AdminOrderActions({
 
       setSuccessMessage(
         language === "fr"
-          ? "Commande mise à jour. Rafraichissement de la fiche..."
+          ? "Commande mise à jour. Rafraîchissement de la fiche..."
           : "Order updated. Refreshing details...",
       );
       startTransition(() => {
@@ -122,13 +138,6 @@ export function AdminOrderActions({
     }
   };
 
-  const selectStyle = (field: "status" | "paymentStatus" | "deliveryStatus") => ({
-    fontSize: "0.9rem",
-    padding: "6px 8px",
-    maxWidth: 220,
-    opacity: loadingField === field ? 0.5 : 1,
-  });
-
   return (
     <section className="section">
       <h2>{language === "fr" ? "Actions rapides" : "Quick actions"}</h2>
@@ -139,8 +148,8 @@ export function AdminOrderActions({
       </p>
       {successMessage ? <p className="ok small">{successMessage}</p> : null}
       {errorMessage ? <p className="err small">{errorMessage}</p> : null}
-      <div className="row" style={{ gap: 20, flexWrap: "wrap", alignItems: "flex-start" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <div className="admin-toolbar admin-toolbar--bottom">
+        <div className="admin-status-control">
           <label className="small" htmlFor="admin-order-status">
             {language === "fr" ? "Statut commande" : "Order status"}
           </label>
@@ -150,16 +159,15 @@ export function AdminOrderActions({
             value={status}
             disabled={loadingField !== null}
             onChange={(event) => void updateOrder("status", event.target.value)}
-            style={selectStyle("status")}
           >
             {ORDER_STATUS_OPTIONS.map((option) => (
               <option key={option} value={option}>
-                {option}
+                {ORDER_STATUS_LABELS[option][language]}
               </option>
             ))}
           </select>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <div className="admin-status-control">
           <label className="small" htmlFor="admin-order-payment-status">
             {language === "fr" ? "Paiement" : "Payment"}
           </label>
@@ -169,16 +177,15 @@ export function AdminOrderActions({
             value={paymentStatus}
             disabled={loadingField !== null}
             onChange={(event) => void updateOrder("paymentStatus", event.target.value)}
-            style={selectStyle("paymentStatus")}
           >
             {PAYMENT_STATUS_OPTIONS.map((option) => (
               <option key={option} value={option}>
-                {option}
+                {PAYMENT_STATUS_LABELS[option][language]}
               </option>
             ))}
           </select>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <div className="admin-status-control">
           <label className="small" htmlFor="admin-order-delivery-status">
             {language === "fr" ? "Livraison" : "Delivery"}
           </label>
@@ -188,7 +195,6 @@ export function AdminOrderActions({
             value={deliveryStatus}
             disabled={loadingField !== null}
             onChange={(event) => void updateOrder("deliveryStatus", event.target.value)}
-            style={selectStyle("deliveryStatus")}
           >
             {DELIVERY_STATUS_OPTIONS.map((option) => (
               <option key={option} value={option}>

@@ -98,23 +98,14 @@ function ProfileSection({
   children: ReactNode;
 }) {
   return (
-    <section
-      style={{
-        gridColumn: "1 / -1",
-        border: "1px solid rgba(94, 119, 69, 0.14)",
-        borderRadius: 26,
-        padding: 18,
-        background: "linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(250, 247, 240, 0.96) 100%)",
-        boxShadow: "0 12px 30px rgba(80, 67, 36, 0.06)",
-      }}
-    >
-      <div style={{ marginBottom: 16 }}>
-        <p className="account-home-hero__eyebrow" style={{ marginBottom: 8 }}>
+    <section className="dog-profile-section">
+      <div className="dog-profile-section__head">
+        <p className="account-home-hero__eyebrow">
           {eyebrow}
         </p>
-        <h3 style={{ margin: 0, color: "#44321d" }}>{title}</h3>
+        <h3>{title}</h3>
         {hint ? (
-          <p className="small" style={{ marginTop: 8, marginBottom: 0 }}>
+          <p className="small account-section-copy">
             {hint}
           </p>
         ) : null}
@@ -147,36 +138,19 @@ function EditorTabs({
   ];
 
   return (
-    <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-        gap: 10,
-        marginBottom: 18,
-      }}
-    >
+    <div className="dog-editor-tabs">
       {tabs.map((tab) => {
         const active = tab.id === value;
         return (
           <button
             key={tab.id}
-            className="btn btn-secondary"
+            className={`dog-editor-tab${active ? " dog-editor-tab--active" : ""}`}
             onClick={() => onChange(tab.id)}
-            style={{
-              justifyContent: "flex-start",
-              padding: "14px 16px",
-              borderRadius: 20,
-              border: active ? "1px solid rgba(94, 119, 69, 0.38)" : "1px solid rgba(94, 119, 69, 0.14)",
-              background: active
-                ? "linear-gradient(135deg, rgba(248,251,242,0.98) 0%, rgba(255,249,239,0.98) 100%)"
-                : "rgba(255,255,255,0.78)",
-              boxShadow: active ? "0 10px 26px rgba(80, 67, 36, 0.08)" : "none",
-            }}
             type="button"
           >
-            <span style={{ display: "grid", gap: 2, textAlign: "left" }}>
-              <strong style={{ color: "#44321d" }}>{tab.label}</strong>
-              <span className="small" style={{ margin: 0 }}>
+            <span className="dog-editor-tab__copy">
+              <strong>{tab.label}</strong>
+              <span className="small">
                 {tab.hint}
               </span>
             </span>
@@ -201,22 +175,11 @@ function VisibilityGroup({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <label
-      style={{
-        display: "grid",
-        gridTemplateColumns: "auto 1fr",
-        gap: 12,
-        alignItems: "start",
-        padding: 14,
-        borderRadius: 18,
-        border: "1px solid rgba(94, 119, 69, 0.1)",
-        background: "rgba(255,255,255,0.78)",
-      }}
-    >
+    <label className="dog-visibility-option">
       <input checked={checked} disabled={disabled} onChange={(event) => onChange(event.target.checked)} type="checkbox" />
-      <span style={{ display: "grid", gap: 4 }}>
-        <strong style={{ color: "#44321d" }}>{title}</strong>
-        <span className="small" style={{ margin: 0 }}>
+      <span className="dog-visibility-option__copy">
+        <strong>{title}</strong>
+        <span className="small">
           {description}
         </span>
       </span>
@@ -248,100 +211,40 @@ function VisibilityControls({
           : "Think of this as your dog's mini public profile. You decide exactly what appears when someone scans the QR code."
       }
     >
-      <div style={{ display: "grid", gap: 16 }}>
-        <div
-          style={{
-            display: "grid",
-            gap: 14,
-            padding: 16,
-            borderRadius: 24,
-            background: "linear-gradient(135deg, rgba(248,251,242,0.95) 0%, rgba(255,249,239,0.95) 100%)",
-            border: "1px solid rgba(94, 119, 69, 0.14)",
-          }}
-        >
-          <span className="small" style={{ margin: 0, color: "#7b6b54" }}>
+      <div className="dog-visibility-stack">
+        <div className="dog-public-preview-shell">
+          <span className="small dog-public-preview-label">
             {language === "fr" ? "Aperçu public en direct" : "Live public preview"}
           </span>
 
-          <div
-            style={{
-              display: "grid",
-              gap: 18,
-              padding: 18,
-              borderRadius: 24,
-              background: "rgba(255,255,255,0.92)",
-              border: "1px solid rgba(94, 119, 69, 0.1)",
-              boxShadow: "0 16px 36px rgba(80, 67, 36, 0.08)",
-            }}
-          >
-            <div style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: 16, alignItems: "center" }}>
+          <div className="dog-public-preview-card">
+            <div className="dog-public-preview-card__head">
               {showPhoto ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   alt={form.name || (language === "fr" ? "Photo du chien" : "Dog photo")}
                   src={form.photoUrl}
-                  style={{
-                    width: 120,
-                    height: 120,
-                    objectFit: "cover",
-                    borderRadius: 24,
-                    boxShadow: "0 14px 30px rgba(80, 67, 36, 0.12)",
-                  }}
+                  className="dog-public-preview-photo"
                 />
               ) : (
-                <div
-                  style={{
-                    width: 120,
-                    height: 120,
-                    borderRadius: 24,
-                    display: "grid",
-                    placeItems: "center",
-                    background: "linear-gradient(180deg, rgba(255,249,239,1), rgba(243,248,235,1))",
-                    color: "#7a705b",
-                    fontWeight: 700,
-                    letterSpacing: "0.12em",
-                    boxShadow: "0 14px 30px rgba(80, 67, 36, 0.08)",
-                  }}
-                >
+                <div className="dog-public-preview-photo dog-public-preview-photo--placeholder">
                   OLIVE
                 </div>
               )}
 
-              <div style={{ display: "grid", gap: 8 }}>
-                <span
-                  style={{
-                    display: "inline-flex",
-                    width: "fit-content",
-                    padding: "6px 12px",
-                    borderRadius: 999,
-                    background: "#eef4e3",
-                    color: "#4f6b36",
-                    fontSize: 13,
-                    fontWeight: 600,
-                  }}
-                >
+              <div className="dog-public-preview-copy">
+                <span className="dog-public-preview-pill dog-public-preview-pill--green">
                   {language === "fr" ? "Si tu m'as trouvé..." : "If you found me..."}
                 </span>
-                <strong style={{ color: "#44321d", fontSize: 28, lineHeight: 1.1 }}>
+                <strong className="dog-public-preview-name">
                   {form.name || (language === "fr" ? "Nom du chien" : "Dog name")}
                 </strong>
                 {showAge ? (
-                  <span
-                    style={{
-                      display: "inline-flex",
-                      width: "fit-content",
-                      padding: "6px 12px",
-                      borderRadius: 999,
-                      background: "#fff7e8",
-                      color: "#9a7042",
-                      fontSize: 13,
-                      fontWeight: 600,
-                    }}
-                  >
+                  <span className="dog-public-preview-pill dog-public-preview-pill--sand">
                     {form.ageLabel}
                   </span>
                 ) : null}
-                <span className="small" style={{ margin: 0 }}>
+                <span className="small account-section-copy">
                   {language === "fr"
                     ? "Merci de m'aider à retrouver ma famille."
                     : "Thank you for helping me get back to my family."}
@@ -349,55 +252,30 @@ function VisibilityControls({
               </div>
             </div>
 
-            <div style={{ display: "grid", gap: 10 }}>
+            <div className="dog-public-preview-details">
               {showCall ? (
-                <div
-                  style={{
-                    padding: "13px 16px",
-                    borderRadius: 18,
-                    background: "#5e7745",
-                    color: "#fff",
-                    fontWeight: 700,
-                    textAlign: "center",
-                  }}
-                >
+                <div className="dog-public-preview-call">
                   {language === "fr" ? "Bouton Appeler mon parent" : "Call my human button"}
                 </div>
               ) : null}
 
               {showNotes ? (
-                <div
-                  style={{
-                    padding: "14px 16px",
-                    borderRadius: 18,
-                    background: "#f8fbf2",
-                    border: "1px solid rgba(94, 119, 69, 0.12)",
-                    color: "#4b463e",
-                  }}
-                >
-                  <strong style={{ display: "block", marginBottom: 6, color: "#5e7745" }}>
+                <div className="dog-public-preview-note dog-public-preview-note--green">
+                  <strong>
                     {language === "fr" ? "Notes importantes" : "Important notes"}
                   </strong>
-                  <span className="small" style={{ margin: 0 }}>
+                  <span className="small">
                     {form.importantNotes}
                   </span>
                 </div>
               ) : null}
 
               {!showCall && !showNotes ? (
-                <div
-                  style={{
-                    padding: "14px 16px",
-                    borderRadius: 18,
-                    background: "#fff9ef",
-                    border: "1px solid rgba(239, 227, 203, 0.92)",
-                    color: "#6f624d",
-                  }}
-                >
-                  <strong style={{ display: "block", marginBottom: 6, color: "#9a7042" }}>
+                <div className="dog-public-preview-note dog-public-preview-note--sand">
+                  <strong>
                     {language === "fr" ? "Confidentialité" : "Privacy"}
                   </strong>
-                  <span className="small" style={{ margin: 0 }}>
+                  <span className="small">
                     {language === "fr"
                       ? "Les informations de contact sont privées pour le moment."
                       : "Contact details are private for now."}
@@ -407,12 +285,12 @@ function VisibilityControls({
             </div>
           </div>
 
-          <span className="small" style={{ margin: 0 }}>
+          <span className="small account-section-copy">
             {summarizeVisibility(form, language)}
           </span>
         </div>
 
-        <label style={{ display: "flex", alignItems: "center", gap: 10, fontWeight: 600, padding: "6px 0" }}>
+        <label className="dog-checkbox-row dog-checkbox-row--strong">
           <input
             checked={form.publicProfileEnabled}
             onChange={(event) => onChange({ publicProfileEnabled: event.target.checked })}
@@ -421,7 +299,7 @@ function VisibilityControls({
           <span>{language === "fr" ? "Activer le profil public" : "Enable the public profile"}</span>
         </label>
 
-        <div style={{ display: "grid", gap: 12, opacity: form.publicProfileEnabled ? 1 : 0.62 }}>
+        <div className="dog-visibility-options" data-disabled={form.publicProfileEnabled ? "false" : "true"}>
           <VisibilityGroup
             checked={form.showPhotoPublic || form.showAgePublic}
             description={
@@ -457,19 +335,10 @@ function VisibilityControls({
           />
         </div>
 
-        <div
-          style={{
-            display: "grid",
-            gap: 10,
-            padding: 16,
-            borderRadius: 18,
-            background: "rgba(255, 249, 239, 0.92)",
-            border: "1px solid rgba(239, 227, 203, 0.92)",
-          }}
-        >
-          <strong style={{ color: "#44321d" }}>{language === "fr" ? "Réglages détaillés" : "Detailed controls"}</strong>
-          <div style={{ display: "grid", gap: 10 }}>
-            <label style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div className="dog-detail-controls">
+          <strong>{language === "fr" ? "Réglages détaillés" : "Detailed controls"}</strong>
+          <div className="dog-checkbox-list">
+            <label className="dog-checkbox-row">
               <input
                 checked={form.showPhotoPublic}
                 disabled={!form.publicProfileEnabled}
@@ -478,7 +347,7 @@ function VisibilityControls({
               />
               <span>{language === "fr" ? "Afficher la photo du profil" : "Show the profile photo"}</span>
             </label>
-            <label style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <label className="dog-checkbox-row">
               <input
                 checked={form.showAgePublic}
                 disabled={!form.publicProfileEnabled}
@@ -487,7 +356,7 @@ function VisibilityControls({
               />
               <span>{language === "fr" ? "Afficher l'âge ou le descriptif" : "Show age or short label"}</span>
             </label>
-            <label style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <label className="dog-checkbox-row">
               <input
                 checked={form.showPhonePublic}
                 disabled={!form.publicProfileEnabled}
@@ -496,7 +365,7 @@ function VisibilityControls({
               />
               <span>{language === "fr" ? "Afficher le bouton d'appel" : "Show the call button"}</span>
             </label>
-            <label style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <label className="dog-checkbox-row">
               <input
                 checked={form.showNotesPublic}
                 disabled={!form.publicProfileEnabled}
@@ -519,6 +388,7 @@ export function DogsClient({ language, initialDogs }: Props) {
   const [editingTab, setEditingTab] = useState<EditorTab>("profile");
   const [claimForm, setClaimForm] = useState(emptyClaimState);
   const [claimTab, setClaimTab] = useState<EditorTab>("profile");
+  const [claimPanelOpen, setClaimPanelOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -526,6 +396,12 @@ export function DogsClient({ language, initialDogs }: Props) {
   const resetFeedback = () => {
     setMessage("");
     setError("");
+  };
+
+  const openClaimPanel = () => {
+    resetFeedback();
+    setClaimPanelOpen(true);
+    setClaimTab("profile");
   };
 
   const claimDog = async () => {
@@ -563,6 +439,8 @@ export function DogsClient({ language, initialDogs }: Props) {
 
       setDogs((current) => [payload.dog!, ...current.filter((dog) => dog.id !== payload.dog!.id)]);
       setClaimForm(emptyClaimState());
+      setClaimTab("profile");
+      setClaimPanelOpen(false);
       setMessage(
         language === "fr"
           ? "Collier activé. Les réglages de visibilité privée sont enregistrés."
@@ -608,131 +486,55 @@ export function DogsClient({ language, initialDogs }: Props) {
   return (
     <>
       {message ? <p className="small ok">{message}</p> : null}
-      {error ? <p className="small" style={{ color: "#8f3b2e" }}>{error}</p> : null}
-
-      <section className="section" style={{ background: "linear-gradient(135deg, rgba(255, 252, 246, 1) 0%, rgba(244, 237, 224, 0.88) 100%)" }}>
-        <div className="card olive-product-benefit-card" style={{ padding: 24 }}>
-          <p className="account-home-hero__eyebrow" style={{ marginBottom: 8 }}>
-            {language === "fr" ? "Activation" : "Activation"}
-          </p>
-          <h2>{language === "fr" ? "Créer le profil du chien" : "Create the dog's profile"}</h2>
-          <p className="small" style={{ marginTop: 8, marginBottom: 20 }}>
-            {language === "fr"
-              ? "Commence par l'identité du chien, ajoute les infos utiles, puis décide ce que son profil public peut montrer."
-              : "Start with your dog's identity, add useful details, then decide what the public profile can show."}
-          </p>
-
-          <EditorTabs language={language} onChange={setClaimTab} value={claimTab} />
-
-          <div className="two-col">
-            {claimTab === "profile" ? (
-              <>
-                <ProfileSection
-                  eyebrow={language === "fr" ? "Identité" : "Identity"}
-                  title={language === "fr" ? "Les bases du profil" : "Profile basics"}
-                  hint={
-                    language === "fr"
-                      ? "Le nom, la photo et un petit descriptif forment la carte d'identité du chien."
-                      : "Name, photo and a short description form the dog's identity card."
-                  }
-                >
-                  <div className="two-col">
-                    <div className="field">
-                      <label>{language === "fr" ? "Token QR" : "QR token"}</label>
-                      <input
-                        className="input"
-                        value={claimForm.publicToken}
-                        onChange={(event) => setClaimForm((current) => ({ ...current, publicToken: event.target.value }))}
-                      />
-                    </div>
-                    <div className="field">
-                      <label>{language === "fr" ? "Nom du chien" : "Dog name"}</label>
-                      <input
-                        className="input"
-                        value={claimForm.name}
-                        onChange={(event) => setClaimForm((current) => ({ ...current, name: event.target.value }))}
-                      />
-                    </div>
-                    <div className="field">
-                      <label>{language === "fr" ? "\u00c2ge ou descriptif" : "Age or short label"}</label>
-                      <input
-                        className="input"
-                        value={claimForm.ageLabel}
-                        onChange={(event) => setClaimForm((current) => ({ ...current, ageLabel: event.target.value }))}
-                      />
-                    </div>
-                    <DogPhotoUpload
-                      language={language}
-                      value={claimForm.photoUrl}
-                      onChange={(url) => setClaimForm((current) => ({ ...current, photoUrl: url }))}
-                    />
-                  </div>
-                </ProfileSection>
-
-                <ProfileSection
-                  eyebrow={language === "fr" ? "Sécurité" : "Safety"}
-                  title={language === "fr" ? "Contact et informations utiles" : "Contact and useful information"}
-                  hint={
-                    language === "fr"
-                      ? "Ces infos t'aident à retrouver ton chien rapidement. Elles peuvent rester privées si tu préfères."
-                      : "These details help recover your dog quickly. They can stay private if you prefer."
-                  }
-                >
-                  <div className="two-col">
-                    <div className="field">
-                      <label>{language === "fr" ? "Téléphone du parent" : "Owner phone"}</label>
-                      <input
-                        className="input"
-                        value={claimForm.ownerPhone}
-                        onChange={(event) => setClaimForm((current) => ({ ...current, ownerPhone: event.target.value }))}
-                      />
-                    </div>
-                    <div className="field" style={{ gridColumn: "1 / -1" }}>
-                      <label>{language === "fr" ? "Notes importantes" : "Important notes"}</label>
-                      <textarea
-                        className="textarea"
-                        rows={3}
-                        value={claimForm.importantNotes}
-                        onChange={(event) => setClaimForm((current) => ({ ...current, importantNotes: event.target.value }))}
-                      />
-                    </div>
-                  </div>
-                </ProfileSection>
-              </>
-            ) : (
-              <VisibilityControls
-                language={language}
-                form={claimForm}
-                onChange={(patch) => setClaimForm((current) => ({ ...current, ...patch }))}
-              />
-            )}
-          </div>
-
-          <button className="btn" disabled={saving} onClick={() => void claimDog()} style={{ marginTop: 14 }} type="button">
-            {saving
-              ? language === "fr"
-                ? "Activation..."
-                : "Activating..."
-              : language === "fr"
-                ? "Activer ce collier"
-                : "Activate this collar"}
-          </button>
-        </div>
-      </section>
+      {error ? <p className="small account-error-text">{error}</p> : null}
 
       <section className="section">
-        <h2>{language === "fr" ? "Mes chiens" : "My dogs"}</h2>
-        <p className="small" style={{ marginBottom: 20 }}>
-          {language === "fr"
-            ? "Chaque fiche QR peut rester active tout en gardant la majorité des informations privées."
-            : "Each QR profile can stay active while keeping most information private."}
-        </p>
+        <div className="account-section-head">
+          <div>
+            <p className="account-home-hero__eyebrow">{language === "fr" ? "Chiens" : "Dogs"}</p>
+            <h2>{language === "fr" ? "Mes chiens" : "My dogs"}</h2>
+            <p className="small account-section-copy">
+              {language === "fr"
+                ? "Chaque fiche QR peut rester active tout en gardant la majorité des informations privées."
+                : "Each QR profile can stay active while keeping most information private."}
+            </p>
+          </div>
+          {dogs.length > 0 ? (
+            <button
+              aria-controls="dog-claim-panel"
+              aria-expanded={claimPanelOpen}
+              className="btn btn-secondary"
+              onClick={() => {
+                if (claimPanelOpen) {
+                  setClaimPanelOpen(false);
+                  return;
+                }
+
+                openClaimPanel();
+              }}
+              type="button"
+            >
+              {claimPanelOpen
+                ? language === "fr"
+                  ? "Masquer l'ajout"
+                  : "Hide add form"
+                : language === "fr"
+                  ? "Ajouter un collier QR"
+                  : "Add a QR collar"}
+            </button>
+          ) : null}
+        </div>
 
         {dogs.length === 0 ? (
-          <div className="support-lite-card" style={{ padding: 24 }}>
+          <div className="support-lite-card account-empty-card">
             <p className="small">
               {language === "fr" ? "Aucun chien actif pour le moment." : "No activated dogs yet."}
             </p>
+            <div className="dog-empty-actions">
+              <button className="btn" onClick={openClaimPanel} type="button">
+                {language === "fr" ? "Activer mon premier collier" : "Activate my first collar"}
+              </button>
+            </div>
           </div>
         ) : (
           <div className="account-orders-grid">
@@ -741,27 +543,35 @@ export function DogsClient({ language, initialDogs }: Props) {
               return (
                 <article className="account-order-card" key={dog.id}>
                   <div className="account-order-card__head">
-                    <div>
-                      <p className="account-home-hero__eyebrow" style={{ marginBottom: 6 }}>
+                    <div className="account-order-card__identity">
+                      <p className="account-home-hero__eyebrow">
                         {language === "fr" ? "Fiche canine" : "Dog profile"}
                       </p>
-                      <h3 style={{ marginBottom: 6, color: "#44321d" }}>{dog.name ?? (language === "fr" ? "Sans nom" : "Unnamed")}</h3>
+                      <h3 className="account-subscription-title">{dog.name ?? (language === "fr" ? "Sans nom" : "Unnamed")}</h3>
                       <p className="small">QR: {dog.publicToken}</p>
-                      <div className="row" style={{ gap: 8, flexWrap: "wrap", marginTop: 8 }}>
-                        <span className="badge">{dog.isActive ? "ACTIVE" : "PAUSED"}</span>
-                        <span className="badge">
+                      <div className="account-pill-row">
+                        <span className={`account-status-pill account-status-pill--${dog.isActive ? "ok" : "muted"}`}>
+                          {dog.isActive
+                            ? language === "fr"
+                              ? "Actif"
+                              : "Active"
+                            : language === "fr"
+                              ? "En pause"
+                              : "Paused"}
+                        </span>
+                        <span className={`account-status-pill account-status-pill--${dog.publicProfileEnabled ? "info" : "muted"}`}>
                           {dog.publicProfileEnabled
                             ? language === "fr"
-                              ? "VISIBLE"
-                              : "VISIBLE"
+                              ? "Visible"
+                              : "Visible"
                             : language === "fr"
                               ? "PRIVÉ"
-                              : "PRIVATE"}
+                              : "Private"}
                         </span>
-                        {dog.ageLabel ? <span className="badge">{dog.ageLabel}</span> : null}
+                        {dog.ageLabel ? <span className="account-status-pill account-status-pill--muted">{dog.ageLabel}</span> : null}
                       </div>
                     </div>
-                    <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+                    <div className="account-action-row account-action-row--end">
                       <Link className="btn btn-secondary" href={`/dog/${dog.publicToken}`} target="_blank">
                         {language === "fr" ? "Voir page QR" : "View QR page"}
                       </Link>
@@ -781,7 +591,7 @@ export function DogsClient({ language, initialDogs }: Props) {
                   </div>
 
                   {editing ? (
-                    <div style={{ marginTop: 18 }}>
+                    <div className="dog-edit-panel">
                       <EditorTabs language={language} onChange={setEditingTab} value={editingTab} />
                       <div className="two-col">
                         {editingTab === "profile" ? (
@@ -802,7 +612,7 @@ export function DogsClient({ language, initialDogs }: Props) {
                                   />
                                 </div>
                                 <div className="field">
-                                  <label>{language === "fr" ? "\u00c2ge ou descriptif" : "Age or short label"}</label>
+                                  <label>{language === "fr" ? "Âge ou descriptif" : "Age or short label"}</label>
                                   <input
                                     className="input"
                                     value={editing.ageLabel}
@@ -836,7 +646,7 @@ export function DogsClient({ language, initialDogs }: Props) {
                                     }
                                   />
                                 </div>
-                                <div className="field" style={{ gridColumn: "1 / -1" }}>
+                                <div className="field account-field-full">
                                   <label>{language === "fr" ? "Notes importantes" : "Important notes"}</label>
                                   <textarea
                                     className="textarea"
@@ -849,8 +659,8 @@ export function DogsClient({ language, initialDogs }: Props) {
                                     }
                                   />
                                 </div>
-                                <div className="field" style={{ gridColumn: "1 / -1" }}>
-                                  <label style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                <div className="field account-field-full">
+                                  <label className="dog-checkbox-row">
                                     <input
                                       checked={editing.isActive}
                                       onChange={(event) =>
@@ -877,7 +687,7 @@ export function DogsClient({ language, initialDogs }: Props) {
                         )}
                       </div>
 
-                      <div className="row" style={{ gap: 10, marginTop: 14, flexWrap: "wrap" }}>
+                      <div className="account-action-row">
                         <button className="btn" disabled={saving} onClick={() => void saveDog()} type="button">
                           {language === "fr" ? "Enregistrer" : "Save"}
                         </button>
@@ -894,12 +704,12 @@ export function DogsClient({ language, initialDogs }: Props) {
                       </div>
                     </div>
                   ) : (
-                    <div className="account-order-card__meta" style={{ marginTop: 4 }}>
+                    <div className="account-subscription-meta">
                       <div className="account-order-card__meta-block">
                         <span className="account-order-card__meta-label">
                           {language === "fr" ? "Contact enregistré" : "Stored contact"}
                         </span>
-                        <p className="small" style={{ margin: 0, color: "#6f624d" }}>
+                        <p className="small account-section-copy">
                           {dog.ownerPhone ?? "-"}
                         </p>
                       </div>
@@ -907,7 +717,7 @@ export function DogsClient({ language, initialDogs }: Props) {
                         <span className="account-order-card__meta-label">
                           {language === "fr" ? "Aperçu visibilité" : "Visibility summary"}
                         </span>
-                        <p className="small" style={{ margin: 0, color: "#6f624d" }}>
+                        <p className="small account-section-copy">
                           {summarizeVisibility(dog, language)}
                         </p>
                       </div>
@@ -919,6 +729,130 @@ export function DogsClient({ language, initialDogs }: Props) {
           </div>
         )}
       </section>
+
+      {claimPanelOpen ? (
+        <section className="section dog-activation-section" id="dog-claim-panel">
+          <div className="account-form-card dog-activation-card">
+            <div className="account-section-head dog-activation-card__head">
+              <div>
+                <p className="account-home-hero__eyebrow">
+                  {language === "fr" ? "Activation" : "Activation"}
+                </p>
+                <h2>{language === "fr" ? "Ajouter un collier QR" : "Add a QR collar"}</h2>
+                <p className="small account-section-copy">
+                  {language === "fr"
+                    ? "Entre le token du collier, crée la fiche du chien, puis choisis ce que le profil public peut montrer."
+                    : "Enter the collar token, create the dog's profile, then choose what the public profile can show."}
+                </p>
+              </div>
+              <button className="btn btn-secondary" onClick={() => setClaimPanelOpen(false)} type="button">
+                {language === "fr" ? "Fermer" : "Close"}
+              </button>
+            </div>
+
+            <EditorTabs language={language} onChange={setClaimTab} value={claimTab} />
+
+            <div className="two-col">
+              {claimTab === "profile" ? (
+                <>
+                  <ProfileSection
+                    eyebrow={language === "fr" ? "Identité" : "Identity"}
+                    title={language === "fr" ? "Les bases du profil" : "Profile basics"}
+                    hint={
+                      language === "fr"
+                        ? "Le nom, la photo et un petit descriptif forment la carte d'identité du chien."
+                        : "Name, photo and a short description form the dog's identity card."
+                    }
+                  >
+                    <div className="two-col">
+                      <div className="field">
+                        <label>{language === "fr" ? "Token QR" : "QR token"}</label>
+                        <input
+                          className="input"
+                          value={claimForm.publicToken}
+                          onChange={(event) => setClaimForm((current) => ({ ...current, publicToken: event.target.value }))}
+                        />
+                        <p className="small account-field-hint">
+                          {language === "fr"
+                            ? "Entre le code indiqué sur le collier ou colle le token du lien QR."
+                            : "Enter the code printed on the collar or paste the token from the QR link."}
+                        </p>
+                      </div>
+                      <div className="field">
+                        <label>{language === "fr" ? "Nom du chien" : "Dog name"}</label>
+                        <input
+                          className="input"
+                          value={claimForm.name}
+                          onChange={(event) => setClaimForm((current) => ({ ...current, name: event.target.value }))}
+                        />
+                      </div>
+                      <div className="field">
+                        <label>{language === "fr" ? "Âge ou descriptif" : "Age or short label"}</label>
+                        <input
+                          className="input"
+                          value={claimForm.ageLabel}
+                          onChange={(event) => setClaimForm((current) => ({ ...current, ageLabel: event.target.value }))}
+                        />
+                      </div>
+                      <DogPhotoUpload
+                        language={language}
+                        value={claimForm.photoUrl}
+                        onChange={(url) => setClaimForm((current) => ({ ...current, photoUrl: url }))}
+                      />
+                    </div>
+                  </ProfileSection>
+
+                  <ProfileSection
+                    eyebrow={language === "fr" ? "Sécurité" : "Safety"}
+                    title={language === "fr" ? "Contact et informations utiles" : "Contact and useful information"}
+                    hint={
+                      language === "fr"
+                        ? "Ces infos t'aident à retrouver ton chien rapidement. Elles peuvent rester privées si tu préfères."
+                        : "These details help recover your dog quickly. They can stay private if you prefer."
+                    }
+                  >
+                    <div className="two-col">
+                      <div className="field">
+                        <label>{language === "fr" ? "Téléphone du parent" : "Owner phone"}</label>
+                        <input
+                          className="input"
+                          value={claimForm.ownerPhone}
+                          onChange={(event) => setClaimForm((current) => ({ ...current, ownerPhone: event.target.value }))}
+                        />
+                      </div>
+                      <div className="field account-field-full">
+                        <label>{language === "fr" ? "Notes importantes" : "Important notes"}</label>
+                        <textarea
+                          className="textarea"
+                          rows={3}
+                          value={claimForm.importantNotes}
+                          onChange={(event) => setClaimForm((current) => ({ ...current, importantNotes: event.target.value }))}
+                        />
+                      </div>
+                    </div>
+                  </ProfileSection>
+                </>
+              ) : (
+                <VisibilityControls
+                  language={language}
+                  form={claimForm}
+                  onChange={(patch) => setClaimForm((current) => ({ ...current, ...patch }))}
+                />
+              )}
+            </div>
+
+            <button className="btn dog-primary-action" disabled={saving} onClick={() => void claimDog()} type="button">
+              {saving
+                ? language === "fr"
+                  ? "Activation..."
+                  : "Activating..."
+                : language === "fr"
+                  ? "Activer ce collier"
+                  : "Activate this collar"}
+            </button>
+          </div>
+        </section>
+      ) : null}
     </>
   );
 }

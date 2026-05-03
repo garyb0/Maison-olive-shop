@@ -234,8 +234,8 @@ export function ProductSubscriptionInlineClient({
           headline={language === 'fr' ? 'Finaliser dans Chez Olive' : 'Finish inside Chez Olive'}
           description={
             language === 'fr'
-              ? `Ton abonnement ${selectedIntervalLabel.toLowerCase()} à ${productName} se confirme ici, sans quitter la page sauf si Stripe l’exige.`
-              : `Your ${selectedIntervalLabel.toLowerCase()} ${productName} subscription is confirmed here, without leaving the page unless Stripe requires it.`
+              ? `Ton abonnement ${selectedIntervalLabel.toLowerCase()} à ${productName} se confirme ici, sans quitter la page sauf si la banque l’exige.`
+              : `Your ${selectedIntervalLabel.toLowerCase()} ${productName} subscription is confirmed here, without leaving the page unless the bank requires it.`
           }
           errorMessage={error || undefined}
           onSuccess={handleStripeSuccess}

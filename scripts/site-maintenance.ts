@@ -1,7 +1,7 @@
-import { loadEnvFilesInOrder } from "./db-utils";
+import { loadEnvForTarget } from "./db-utils";
 import { getMaintenanceState, setMaintenanceState } from "../src/lib/maintenance";
 
-loadEnvFilesInOrder([".env.production.local", ".env.production", ".env.local", ".env"]);
+loadEnvForTarget("production");
 
 type Command = "status" | "open" | "close";
 

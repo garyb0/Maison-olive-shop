@@ -58,7 +58,12 @@ interface EmailNotificationData {
   isReply?: boolean;
 }
 
-function buildEmailHtml(data: EmailNotificationData, isReply: boolean = false): string {
+type SupportEmailKind = "newConversation" | "newMessage" | "assigned";
+
+function buildEmailHtml(data: EmailNotificationData, kind: SupportEmailKind = "newConversation"): string {
+  const isReply = kind === "newMessage";
+  const isAssigned = kind === "assigned";
+  const currentYear = new Date().getFullYear();
   const replyToken = data.adminEmail ? createReplyToken(data.conversationId, data.adminEmail) : '';
   const replyToUrl = data.adminEmail 
     ? `${env.siteUrl}/api/support/email-reply?token=${encodeURIComponent(replyToken)}`
@@ -66,6 +71,8 @@ function buildEmailHtml(data: EmailNotificationData, isReply: boolean = false): 
 
   const subject = isReply
     ? `💬 Nouveau message de ${data.customerName} - Chez Olive`
+    : isAssigned
+      ? `📋 Conversation assignée - ${data.customerName} - Chez Olive`
     : `🔔 Nouvelle conversation de ${data.customerName} - Chez Olive`;
 
   const previewText = data.messageContent.length > 100 
@@ -223,11 +230,11 @@ function buildEmailHtml(data: EmailNotificationData, isReply: boolean = false): 
     
     <div class="body">
       <span class="notification-badge">
-        ${isReply ? '💬 Nouveau message' : '🔔 Nouvelle conversation'}
+        ${isReply ? '💬 Nouveau message' : isAssigned ? '📋 Conversation assignée' : '🔔 Nouvelle conversation'}
       </span>
       
       <h2 style="margin: 0 0 16px; font-size: 22px; color: #1f2937;">
-        ${isReply ? 'Un client vous a répondu' : 'Nouvelle conversation de support'}
+        ${isReply ? 'Un client vous a répondu' : isAssigned ? 'Une conversation vous est assignée' : 'Nouvelle conversation de support'}
       </h2>
       
       <div class="customer-info">
@@ -238,8 +245,10 @@ function buildEmailHtml(data: EmailNotificationData, isReply: boolean = false): 
       
       <p style="margin: 16px 0; font-size: 15px;">
         ${isReply 
-          ? 'Un client a répondu à une conversation que vous suivez.' 
-          : 'Un client vient de démarrer une nouvelle conversation de support.'}
+          ? 'Un client a répondu à une conversation que vous suivez.'
+          : isAssigned
+            ? 'Une conversation de support vient de vous être assignée.'
+            : 'Un client vient de démarrer une nouvelle conversation de support.'}
       </p>
       
       <div class="message-preview">
@@ -248,7 +257,7 @@ function buildEmailHtml(data: EmailNotificationData, isReply: boolean = false): 
       
       <div class="button-container">
         <a href="${env.siteUrl}/admin/support" class="button">
-          ${isReply ? 'Voir la conversation' : 'Prendre en charge'}
+          ${isReply || isAssigned ? 'Voir la conversation' : 'Prendre en charge'}
         </a>
       </div>
       
@@ -263,7 +272,7 @@ function buildEmailHtml(data: EmailNotificationData, isReply: boolean = false): 
     </div>
     
     <div class="footer">
-      <p>© 2024 Chez Olive — Rimouski, QC</p>
+      <p>© ${currentYear} Chez Olive — Rimouski, QC</p>
       <p>Cet email a été envoyé à ${data.adminEmail || 'votre adresse'}</p>
       <p style="margin-top: 8px;">
         <a href="${env.siteUrl}/admin/support/settings" style="color: #6b7280;">Gérer les notifications</a>
@@ -298,7 +307,7 @@ export async function sendNewConversationEmail(data: {
     customerName: data.customerName,
     customerEmail: data.customerEmail,
     messageContent: data.messageContent,
-  }, false);
+  }, "newConversation");
 
   const subject = `🔔 Nouvelle conversation de ${data.customerName} - Chez Olive`;
 
@@ -342,9 +351,39 @@ export async function sendNewMessageEmail(data: {
     adminEmail: data.adminEmail,
     adminName: data.adminName,
     isReply: true,
-  }, true);
+  }, "newMessage");
 
   const subject = `💬 Nouveau message de ${data.customerName} - Chez Olive`;
+
+  await sendEmail({
+    to: data.adminEmail,
+    subject,
+    html,
+  });
+}
+
+export async function sendConversationAssignedEmail(data: {
+  conversationId: string;
+  customerName: string;
+  customerEmail: string;
+  messageContent: string;
+  adminEmail: string;
+  adminName?: string;
+}): Promise<void> {
+  if (!env.resendApiKey && !env.smtpHost) {
+    return;
+  }
+
+  const html = buildEmailHtml({
+    conversationId: data.conversationId,
+    customerName: data.customerName,
+    customerEmail: data.customerEmail,
+    messageContent: data.messageContent,
+    adminEmail: data.adminEmail,
+    adminName: data.adminName,
+  }, "assigned");
+
+  const subject = `📋 Conversation assignée - ${data.customerName} - Chez Olive`;
 
   await sendEmail({
     to: data.adminEmail,
@@ -362,6 +401,7 @@ export async function sendConversationClosedEmail(data: {
   if (!env.resendApiKey && !env.smtpHost) {
     return;
   }
+  const currentYear = new Date().getFullYear();
 
   const html = `
 <!DOCTYPE html>
@@ -437,7 +477,7 @@ export async function sendConversationClosedEmail(data: {
       </div>
     </div>
     <div class="footer">
-      <p>© 2024 Chez Olive — Rimouski, QC</p>
+      <p>© ${currentYear} Chez Olive — Rimouski, QC</p>
     </div>
   </div>
 </body>

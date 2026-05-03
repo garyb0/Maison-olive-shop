@@ -1,0 +1,14 @@
+ALTER TABLE "DeliveryStop" ADD COLUMN "arrivedLat" REAL;
+ALTER TABLE "DeliveryStop" ADD COLUMN "arrivedLng" REAL;
+ALTER TABLE "DeliveryStop" ADD COLUMN "arrivedAccuracyMeters" REAL;
+ALTER TABLE "DeliveryStop" ADD COLUMN "arrivedDistanceMeters" REAL;
+ALTER TABLE "DeliveryStop" ADD COLUMN "proofPhotoPath" TEXT;
+ALTER TABLE "DeliveryStop" ADD COLUMN "proofPhotoMime" TEXT;
+ALTER TABLE "DeliveryStop" ADD COLUMN "proofPhotoSizeBytes" INTEGER;
+ALTER TABLE "DeliveryStop" ADD COLUMN "proofPhotoUploadedAt" DATETIME;
+ALTER TABLE "DeliveryStop" ADD COLUMN "proofPhotoLat" REAL;
+ALTER TABLE "DeliveryStop" ADD COLUMN "proofPhotoLng" REAL;
+ALTER TABLE "DeliveryStop" ADD COLUMN "proofPhotoAccuracyMeters" REAL;
+ALTER TABLE "DeliveryStop" ADD COLUMN "geocodedLat" REAL;
+ALTER TABLE "DeliveryStop" ADD COLUMN "geocodedLng" REAL;
+ALTER TABLE "DeliveryStop" ADD COLUMN "geocodedAt" DATETIME;

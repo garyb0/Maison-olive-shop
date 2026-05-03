@@ -1,5 +1,7 @@
 import { jsonError, jsonOk } from "@/lib/http";
+import { logApiEvent } from "@/lib/observability";
 import { requireAdmin } from "@/lib/permissions";
+import { bufferMatchesImageMime } from "@/lib/image-validation";
 import { promises as fs } from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
@@ -41,7 +43,12 @@ export async function GET() {
     if (error instanceof Error && error.message === "UNAUTHORIZED") {
       return jsonError("Unauthorized", 401);
     }
-    console.error("Erreur lors de la lecture des images:", error);
+    logApiEvent({
+      level: "ERROR",
+      route: "/api/admin/images",
+      event: "ADMIN_IMAGES_LIST_FAILED",
+      details: { error },
+    });
     return jsonError("Failed to list images", 500);
   }
 }
@@ -113,8 +120,12 @@ export async function POST(request: Request) {
       // file does not exist, we can keep the current filename
     }
 
-    // Écrire le fichier
     const buffer = Buffer.from(await file.arrayBuffer());
+    if (!bufferMatchesImageMime(buffer, file.type)) {
+      return jsonError("Le contenu du fichier ne correspond pas a une image valide.", 400);
+    }
+
+    // Écrire le fichier
     await fs.writeFile(filePath, buffer);
 
     return jsonOk({
@@ -128,7 +139,12 @@ export async function POST(request: Request) {
     if (error instanceof Error && error.message === "UNAUTHORIZED") {
       return jsonError("Unauthorized", 401);
     }
-    console.error("Erreur lors de l'upload de l'image:", error);
+    logApiEvent({
+      level: "ERROR",
+      route: "/api/admin/images",
+      event: "ADMIN_IMAGE_UPLOAD_FAILED",
+      details: { error },
+    });
     return jsonError("Failed to upload image", 500);
   }
 }

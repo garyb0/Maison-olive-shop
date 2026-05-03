@@ -32,6 +32,8 @@
 # maintenance lock file (état dynamique, ne pas versionner)
 .maintenance-lock
 logs/
+.delivery-sandbox/
+storage/
 
 # debug
 npm-debug.log*

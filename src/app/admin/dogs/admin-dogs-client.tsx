@@ -232,20 +232,25 @@ export function AdminDogsClient({ language, siteUrl, dogs: initialDogs }: Props)
 
   return (
     <>
-      <section className="section">
-        <h1>{language === "fr" ? "Chiens QR" : "Dog QR"}</h1>
-        <p className="small">
-          {language === "fr"
-            ? "Pilotez les tokens QR des médailles, voyez quels colliers sont réclamés et intervenez vite au besoin."
-            : "Manage dog QR medal tokens, see which collars are claimed, and step in quickly when needed."}
-        </p>
-        <p className="small">
-          {dogs.length} tokens · {claimedCount} {language === "fr" ? "réclamés" : "claimed"} · {activeCount}{" "}
-          {language === "fr" ? "actifs" : "active"}
-        </p>
-        <p className="small">
-          {language === "fr" ? "Domaine QR configure:" : "Configured QR domain:"} <code>{configuredSiteUrl}</code>
-        </p>
+      <section className="section admin-page-header">
+        <div className="admin-page-header__copy">
+          <span className="admin-page-header__eyebrow">QR</span>
+          <h1>{language === "fr" ? "Chiens QR" : "Dog QR"}</h1>
+          <p className="small">
+            {language === "fr"
+              ? "Pilote les tokens QR des médailles, les réclamations et les exports vendeur."
+              : "Manage dog QR medal tokens, claims, and vendor exports."}
+          </p>
+        </div>
+        <div className="admin-page-header__summary">
+          <span>{dogs.length} tokens</span>
+          <span>{claimedCount} {language === "fr" ? "réclamés" : "claimed"}</span>
+          <span>{activeCount} {language === "fr" ? "actifs" : "active"}</span>
+        </div>
+        <div className="admin-note admin-note--info">
+          <span>{language === "fr" ? "Domaine QR configuré" : "Configured QR domain"}</span>
+          <code>{configuredSiteUrl}</code>
+        </div>
         {usingLocalhost ? (
           <p className="err small">
             {language === "fr"
@@ -256,12 +261,12 @@ export function AdminDogsClient({ language, siteUrl, dogs: initialDogs }: Props)
       </section>
 
       <section className="section">
-        <div className="row" style={{ marginBottom: 12, gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
-          <div>
+        <div className="admin-toolbar admin-toolbar--bottom">
+          <div className="admin-field-inline">
             <label className="small" htmlFor="dog-batch-count">
               {language === "fr" ? "Créer un lot de tokens" : "Create token batch"}
             </label>
-            <div className="row" style={{ gap: 8, marginTop: 6 }}>
+            <div className="admin-action-row">
               <input
                 id="dog-batch-count"
                 className="input"
@@ -270,20 +275,19 @@ export function AdminDogsClient({ language, siteUrl, dogs: initialDogs }: Props)
                 max={500}
                 value={batchCount}
                 onChange={(event) => setBatchCount(event.target.value)}
-                style={{ width: 110 }}
               />
               <button className="btn" disabled={creatingBatch} onClick={() => void createBatch()} type="button">
                 {creatingBatch
                   ? language === "fr"
-                    ? "Creation..."
+                    ? "Création..."
                     : "Creating..."
                   : language === "fr"
-                    ? "Generer"
-                    : "Generate"}
+                    ? "Générer"
+                : "Generate"}
               </button>
             </div>
           </div>
-          <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+          <div className="admin-action-row">
             <button className="btn btn-secondary" onClick={() => downloadCsv(filteredDogs)} type="button">
               {language === "fr" ? "Exporter filtres CSV" : "Export filtered CSV"}
             </button>
@@ -313,26 +317,24 @@ export function AdminDogsClient({ language, siteUrl, dogs: initialDogs }: Props)
           </div>
         </div>
 
-        <div className="row" style={{ marginBottom: 10, gap: 8, flexWrap: "wrap" }}>
+        <div className="admin-toolbar">
           <input
-            className="input"
+            className="input admin-filter-control"
             placeholder={language === "fr" ? "Recherche token, chien, email" : "Search token, dog, email"}
             value={search}
             onChange={(event) => {
               setSearch(event.target.value);
               setPage(1);
             }}
-            style={{ maxWidth: 280 }}
           />
 
           <select
-            className="select"
+            className="select admin-filter-control"
             value={claimFilter}
             onChange={(event) => {
               setClaimFilter(event.target.value as typeof claimFilter);
               setPage(1);
             }}
-            style={{ maxWidth: 160 }}
           >
             <option value="ALL">{language === "fr" ? "Tous statuts" : "All claim states"}</option>
             <option value="CLAIMED">{language === "fr" ? "Réclamés" : "Claimed"}</option>
@@ -340,13 +342,12 @@ export function AdminDogsClient({ language, siteUrl, dogs: initialDogs }: Props)
           </select>
 
           <select
-            className="select"
+            className="select admin-filter-control"
             value={activeFilter}
             onChange={(event) => {
               setActiveFilter(event.target.value as typeof activeFilter);
               setPage(1);
             }}
-            style={{ maxWidth: 160 }}
           >
             <option value="ALL">{language === "fr" ? "Tous états" : "All states"}</option>
             <option value="ACTIVE">{language === "fr" ? "Actifs" : "Active"}</option>
@@ -354,13 +355,12 @@ export function AdminDogsClient({ language, siteUrl, dogs: initialDogs }: Props)
           </select>
 
           <select
-            className="select"
+            className="select admin-filter-control admin-filter-control--short"
             value={String(pageSize)}
             onChange={(event) => {
               setPageSize(Number(event.target.value));
               setPage(1);
             }}
-            style={{ maxWidth: 120 }}
           >
             <option value="20">20</option>
             <option value="50">50</option>
@@ -372,7 +372,7 @@ export function AdminDogsClient({ language, siteUrl, dogs: initialDogs }: Props)
           </button>
         </div>
 
-        <div className="row" style={{ marginBottom: 10, gap: 8 }}>
+        <div className="admin-pagination">
           <button className="btn" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={safePage <= 1}>
             {language === "fr" ? "Précédent" : "Previous"}
           </button>
@@ -392,8 +392,8 @@ export function AdminDogsClient({ language, siteUrl, dogs: initialDogs }: Props)
         {message ? <p className="small ok">{message}</p> : null}
         {error ? <p className="small err">{error}</p> : null}
 
-        <div className="table-wrap">
-          <table>
+        <div className="table-wrap admin-mobile-table-wrap">
+          <table className="admin-mobile-table">
             <thead>
               <tr>
                 <th>QR</th>
@@ -412,14 +412,14 @@ export function AdminDogsClient({ language, siteUrl, dogs: initialDogs }: Props)
 
                 return (
                   <tr key={dog.id}>
-                    <td>
+                    <td data-label="QR">
                       <code>{dog.publicToken}</code>
                     </td>
-                    <td>
+                    <td data-label={language === "fr" ? "Chien" : "Dog"}>
                       <strong>{dog.name ?? (language === "fr" ? "Non renseigné" : "Not filled yet")}</strong>
                       {dog.ownerPhone ? <div className="small">{dog.ownerPhone}</div> : null}
                     </td>
-                    <td>
+                    <td data-label={language === "fr" ? "Propriétaire" : "Owner"}>
                       {dog.ownerName ? <div>{dog.ownerName}</div> : null}
                       {dog.ownerEmail ? (
                         <div className="small">{dog.ownerEmail}</div>
@@ -427,12 +427,12 @@ export function AdminDogsClient({ language, siteUrl, dogs: initialDogs }: Props)
                         <span className="small">{language === "fr" ? "Aucun compte" : "No account"}</span>
                       )}
                     </td>
-                    <td>
+                    <td data-label={language === "fr" ? "État" : "State"}>
                       <span className="small">
                         {dog.isActive ? (language === "fr" ? "Actif" : "Active") : language === "fr" ? "Inactif" : "Inactive"}
                       </span>
                     </td>
-                    <td>
+                    <td data-label="Claim">
                       <span className="small">
                         {isClaimed
                           ? `${language === "fr" ? "Réclamé" : "Claimed"}${dog.claimedAtLabel ? ` · ${dog.claimedAtLabel}` : ""}`
@@ -441,10 +441,10 @@ export function AdminDogsClient({ language, siteUrl, dogs: initialDogs }: Props)
                             : "Unclaimed"}
                       </span>
                     </td>
-                    <td>{dog.createdAtLabel}</td>
-                    <td>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 6, minWidth: 220 }}>
-                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    <td data-label={language === "fr" ? "Créé" : "Created"}>{dog.createdAtLabel}</td>
+                    <td className="admin-mobile-actions-cell" data-label={language === "fr" ? "Actions" : "Actions"}>
+                      <div className="admin-action-stack">
+                        <div className="admin-action-row">
                           <a className="btn btn-secondary" href={publicUrl(dog.publicToken)} rel="noreferrer" target="_blank">
                             {language === "fr" ? "Ouvrir" : "Open"}
                           </a>
@@ -452,7 +452,7 @@ export function AdminDogsClient({ language, siteUrl, dogs: initialDogs }: Props)
                             {language === "fr" ? "Copier lien" : "Copy link"}
                           </button>
                         </div>
-                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        <div className="admin-action-row">
                           <button
                             className="btn"
                             disabled={isBusy}
@@ -474,7 +474,7 @@ export function AdminDogsClient({ language, siteUrl, dogs: initialDogs }: Props)
                               onClick={() => {
                                 const confirmed = window.confirm(
                                   language === "fr"
-                                    ? "Liberer ce token et effacer la fiche chien associee ?"
+                                    ? "Libérer ce token et effacer la fiche chien associée ?"
                                     : "Release this token and clear the linked dog profile?",
                                 );
                                 if (confirmed) {
@@ -483,7 +483,7 @@ export function AdminDogsClient({ language, siteUrl, dogs: initialDogs }: Props)
                               }}
                               type="button"
                             >
-                              {language === "fr" ? "Liberer token" : "Release token"}
+                              {language === "fr" ? "Libérer token" : "Release token"}
                             </button>
                           ) : null}
                         </div>

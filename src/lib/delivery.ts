@@ -682,10 +682,11 @@ export function computeCapacityPerBlock(settings: DeliveryScheduleSettings, acti
   return Math.max(0, deliveriesPerDriver) * activeDriverCount;
 }
 
-export async function getActiveDeliveryDriverCount() {
+export async function getActiveDeliveryDriverCount(prismaLike?: PrismaLike) {
   try {
-    if (!(await hasDeliverySchemaTables())) return 0;
-    return prisma.driver.count({
+    if (!prismaLike && !(await hasDeliverySchemaTables())) return 0;
+    const client = prismaLike ?? prisma;
+    return client.driver.count({
       where: { isActive: true },
     });
   } catch {
@@ -693,13 +694,14 @@ export async function getActiveDeliveryDriverCount() {
   }
 }
 
-export async function getDeliveryScheduleSettings() {
-  if (!(await hasDeliveryScheduleSettingsTable())) {
+export async function getDeliveryScheduleSettings(prismaLike?: PrismaLike) {
+  if (!prismaLike && !(await hasDeliveryScheduleSettingsTable())) {
     return getDefaultDeliveryScheduleSettings();
   }
 
   try {
-    const existing = await prisma.deliveryScheduleSettings.findUnique({
+    const client = prismaLike ?? prisma;
+    const existing = await client.deliveryScheduleSettings.findUnique({
       where: { id: DELIVERY_SCHEDULE_SETTINGS_ID },
     });
     return normalizeScheduleSettings(existing);
@@ -1007,8 +1009,8 @@ export async function resolveDeliverySelectionForOrder(
     const windowStart = new Date(input.deliveryWindowStartAt);
     const windowEnd = new Date(input.deliveryWindowEndAt);
     const [settings, activeDriverCount] = await Promise.all([
-      getDeliveryScheduleSettings(),
-      getActiveDeliveryDriverCount(),
+      getDeliveryScheduleSettings(prismaLike),
+      getActiveDeliveryDriverCount(prismaLike),
     ]);
 
     // Vérifier que la fenêtre est dans le futur

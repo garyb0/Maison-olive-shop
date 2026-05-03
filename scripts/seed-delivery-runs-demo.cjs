@@ -6,6 +6,7 @@ const DATABASE_URL = process.env.DATABASE_URL || "file:./delivery-dev.db";
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3103";
 const DEMO_DRIVER_NAME = "Demo chauffeur local";
 const DEMO_SLOT_NOTE_PREFIX = "Delivery runs demo";
+const DEMO_DRIVER_IS_ACTIVE = process.env.DELIVERY_DEMO_DRIVER_ACTIVE === "true";
 
 const adapter = new PrismaLibSql({ url: DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
@@ -73,22 +74,12 @@ async function ensureDemoDriver() {
       where: { name: DEMO_DRIVER_NAME },
     });
 
-    await tx.driver.updateMany({
-      where: existing
-        ? {
-            isActive: true,
-            id: { not: existing.id },
-          }
-        : { isActive: true },
-      data: { isActive: false },
-    });
-
     if (existing) {
       return tx.driver.update({
         where: { id: existing.id },
         data: {
           phone: "4185550000",
-          isActive: true,
+          isActive: DEMO_DRIVER_IS_ACTIVE,
         },
       });
     }
@@ -97,7 +88,7 @@ async function ensureDemoDriver() {
       data: {
         name: DEMO_DRIVER_NAME,
         phone: "4185550000",
-        isActive: true,
+        isActive: DEMO_DRIVER_IS_ACTIVE,
       },
     });
   });
@@ -207,10 +198,35 @@ async function ensureDemoRun(slot, driver, orders) {
     });
   }
 
-  const existingStopOrderIds = new Set(run.stops.map((stop) => stop.orderId));
+  const existingStopsByOrderId = new Map(run.stops.map((stop) => [stop.orderId, stop]));
 
   for (const [index, order] of orders.entries()) {
-    if (existingStopOrderIds.has(order.id)) {
+    const existingStop = existingStopsByOrderId.get(order.id);
+    if (existingStop) {
+      await prisma.deliveryStop.update({
+        where: { id: existingStop.id },
+        data: {
+          plannedSequence: index + 1,
+          manualSequence: null,
+          finalSequence: index + 1,
+          status: "PENDING",
+          actualCumulativeKmAtStop: null,
+          arrivedAt: null,
+          arrivedLat: null,
+          arrivedLng: null,
+          arrivedAccuracyMeters: null,
+          arrivedDistanceMeters: null,
+          completedAt: null,
+          note: null,
+          proofPhotoPath: null,
+          proofPhotoMime: null,
+          proofPhotoSizeBytes: null,
+          proofPhotoUploadedAt: null,
+          proofPhotoLat: null,
+          proofPhotoLng: null,
+          proofPhotoAccuracyMeters: null,
+        },
+      });
       continue;
     }
 
@@ -240,6 +256,10 @@ async function publishRun(run, slot) {
   const expiresAt = addHours(slot.endAt, 12);
 
   await prisma.$transaction(async (tx) => {
+    await tx.deliveryGpsSample.deleteMany({
+      where: { runId: run.id },
+    });
+
     await tx.deliveryRunAccessToken.updateMany({
       where: {
         runId: run.id,

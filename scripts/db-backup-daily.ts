@@ -1,7 +1,7 @@
-import path from "node:path";
 import {
   createSqliteBackup,
   loadDatabaseEnvForTarget,
+  resolveBackupDirFromEnv,
   resolveEnvTargetFromArgs,
   resolveDatabaseFromEnv,
 } from "./db-utils";
@@ -9,7 +9,7 @@ import {
 const envTarget = resolveEnvTargetFromArgs(undefined, "production");
 loadDatabaseEnvForTarget(envTarget);
 
-const backupDir = path.resolve(process.cwd(), "backups");
+const backupDir = resolveBackupDirFromEnv();
 
 const db = resolveDatabaseFromEnv();
 

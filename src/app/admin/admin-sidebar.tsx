@@ -50,6 +50,9 @@ const navItems: NavItem[] = [
 export function AdminSidebar({ language }: Props) {
   const pathname = usePathname();
   const [expandedItems, setExpandedItems] = useState<string[]>(() => {
+    if (pathname.startsWith("/admin/delivery")) {
+      return ["/admin/delivery"];
+    }
     if (pathname.startsWith("/admin/support")) {
       return ["/admin/support"];
     }

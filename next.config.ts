@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
+import { loadExternalSecretEnvForTarget } from "./scripts/db-utils";
 
 const isProd = process.env.NODE_ENV === "production";
+loadExternalSecretEnvForTarget(isProd ? "production" : "development");
 
 const contentSecurityPolicy = [
   "default-src 'self'",
@@ -20,6 +22,26 @@ const contentSecurityPolicy = [
 const nextConfig: NextConfig = {
   // Autoriser l'accès par IP locale en développement
   allowedDevOrigins: ['192.168.1.96', 'localhost:3101'],
+
+  async redirects() {
+    return [
+      {
+        source: "/shipping",
+        destination: "/faq#livraison",
+        permanent: true,
+      },
+      {
+        source: "/returns",
+        destination: "/faq#retours",
+        permanent: true,
+      },
+      {
+        source: "/terms",
+        destination: "/faq#conditions",
+        permanent: true,
+      },
+    ];
+  },
 
   async headers() {
     return [

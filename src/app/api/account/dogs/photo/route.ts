@@ -2,6 +2,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
 import { jsonError, jsonOk } from "@/lib/http";
+import { bufferMatchesImageMime } from "@/lib/image-validation";
 import { requireUser } from "@/lib/permissions";
 
 const DOG_IMAGES_DIR = path.join(process.cwd(), "public", "dogs");
@@ -39,6 +40,10 @@ export async function POST(request: Request) {
     const filePath = path.join(DOG_IMAGES_DIR, fileName);
 
     const buffer = Buffer.from(await file.arrayBuffer());
+    if (!bufferMatchesImageMime(buffer, file.type)) {
+      return jsonError("Invalid image content", 400);
+    }
+
     await fs.writeFile(filePath, buffer);
 
     return jsonOk({

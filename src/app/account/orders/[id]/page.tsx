@@ -74,6 +74,13 @@ function formatAddress(parts: Array<string | null | undefined>) {
   return parts.map((part) => part?.trim()).filter(Boolean).join(", ");
 }
 
+function getStatusTone(status: string) {
+  if (["PAID", "DELIVERED"].includes(status)) return "ok";
+  if (["FAILED", "CANCELLED"].includes(status)) return "err";
+  if (["OUT_FOR_DELIVERY", "SHIPPED", "RESCHEDULED", "PROCESSING"].includes(status)) return "info";
+  return "warn";
+}
+
 export default async function AccountOrderDetailsPage({ params }: AccountOrderDetailsPageProps) {
   const { id } = await params;
   const [user, language] = await Promise.all([getCurrentUser(), getCurrentLanguage()]);
@@ -114,21 +121,25 @@ export default async function AccountOrderDetailsPage({ params }: AccountOrderDe
     order.shippingPostal,
     order.shippingCountry,
   ]);
+  const totalItemCount = order.items.reduce((sum, item) => sum + item.quantity, 0);
   const statusItems = [
     {
       label: language === "fr" ? "Statut de commande" : "Order status",
       value: orderStatusLabel,
       kind: "badge" as const,
+      tone: getStatusTone(order.status),
     },
     {
       label: language === "fr" ? "Paiement" : "Payment",
       value: paymentStatusLabel,
       kind: "badge" as const,
+      tone: getStatusTone(order.paymentStatus),
     },
     {
       label: language === "fr" ? "Livraison" : "Delivery",
       value: deliveryStatusLabel,
       kind: "badge" as const,
+      tone: getStatusTone(order.deliveryStatus),
     },
     {
       label: language === "fr" ? "Mode de paiement" : "Payment method",
@@ -191,10 +202,10 @@ export default async function AccountOrderDetailsPage({ params }: AccountOrderDe
 
   return (
     <>
-      <section className="section">
-        <div className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+      <section className="section account-order-detail-hero">
+        <div className="account-order-detail-hero__copy">
           <div>
-            <p className="small" style={{ margin: 0, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700 }}>
+            <p className="account-home-hero__eyebrow">
               {language === "fr" ? "Facture client" : "Customer invoice"}
             </p>
             <h1>{language === "fr" ? `Commande #${order.orderNumber}` : `Order #${order.orderNumber}`}</h1>
@@ -204,18 +215,24 @@ export default async function AccountOrderDetailsPage({ params }: AccountOrderDe
                 : `Placed on ${formatDate(order.createdAt, locale)}`}
             </p>
           </div>
-          <Link className="btn btn-secondary" href="/account/orders">
+        </div>
+        <div className="account-order-detail-hero__actions">
+          <Link className="btn btn-secondary account-order-detail-back" href="/account/orders">
             {language === "fr" ? "Retour à mes commandes" : "Back to my orders"}
           </Link>
         </div>
       </section>
 
-      <section className="section">
-        <div className="invoice-overview-grid">
+      <section className="section invoice-overview-section">
+        <div className="invoice-overview-grid invoice-overview-grid--detail">
           {statusItems.map((item) => (
             <div key={item.label} className={`invoice-overview-item${item.kind === "total" ? " invoice-overview-item--total" : ""}`}>
-              <p className="small">{item.label}</p>
-              {item.kind === "badge" ? <span className="badge">{item.value}</span> : null}
+              <p className="account-order-card__meta-label">{item.label}</p>
+              {item.kind === "badge" ? (
+                <span className={`account-status-pill account-status-pill--${item.tone}`}>
+                  {item.value}
+                </span>
+              ) : null}
               {item.kind === "text" ? <strong>{item.value}</strong> : null}
               {item.kind === "total" ? <strong className="invoice-overview-total">{item.value}</strong> : null}
             </div>
@@ -224,19 +241,12 @@ export default async function AccountOrderDetailsPage({ params }: AccountOrderDe
       </section>
 
       {order.deliveryStatus === "UNSCHEDULED" ? (
-        <section className="section">
-          <div
-            style={{
-              padding: "14px 16px",
-              borderRadius: 16,
-              border: "1px solid rgba(180, 83, 9, 0.18)",
-              background: "rgba(255, 247, 237, 0.95)",
-            }}
-          >
-            <p className="small" style={{ margin: 0, fontWeight: 700, color: "#9a3412" }}>
+        <section className="section invoice-alert-section">
+          <div className="invoice-alert invoice-alert--warn">
+            <p className="invoice-alert-title">
               {language === "fr" ? "Planification manuelle en cours" : "Manual scheduling in progress"}
             </p>
-            <p className="small" style={{ margin: "6px 0 0" }}>
+            <p className="small invoice-alert-copy">
               {language === "fr"
                 ? "Aucun créneau n'était libre au moment de la commande. Notre équipe te contactera pour confirmer une plage de livraison."
                 : "No slot was available at the time of order. Our team will contact you to confirm a delivery window."}
@@ -245,13 +255,18 @@ export default async function AccountOrderDetailsPage({ params }: AccountOrderDe
         </section>
       ) : null}
 
-      <section className="section">
-        <h2>{language === "fr" ? "Client et livraison" : "Customer and delivery"}</h2>
+      <section className="section invoice-section">
+        <div className="invoice-section-head">
+          <div>
+            <p className="account-order-card__meta-label">{language === "fr" ? "Détails" : "Details"}</p>
+            <h2>{language === "fr" ? "Client et livraison" : "Customer and delivery"}</h2>
+          </div>
+        </div>
         <div className="invoice-two-column">
           <div className="invoice-panel">
             <p className="invoice-panel-label">{language === "fr" ? "Client" : "Customer"}</p>
             <strong className="invoice-panel-value">{order.customerName}</strong>
-            <p className="small" style={{ marginTop: 6 }}>{order.customerEmail}</p>
+            <p className="small invoice-panel-meta">{order.customerEmail}</p>
           </div>
           <div className="invoice-panel">
             <p className="invoice-panel-label">{language === "fr" ? "Livraison" : "Delivery"}</p>
@@ -269,8 +284,18 @@ export default async function AccountOrderDetailsPage({ params }: AccountOrderDe
         </div>
       </section>
 
-      <section className="section">
-        <h2>{language === "fr" ? "Articles" : "Items"}</h2>
+      <section className="section invoice-section invoice-section--items">
+        <div className="invoice-section-head">
+          <div>
+            <p className="account-order-card__meta-label">{language === "fr" ? "Articles" : "Items"}</p>
+            <h2>{language === "fr" ? "Articles commandés" : "Ordered items"}</h2>
+          </div>
+          <span className="cart-summary-count">
+            {language === "fr"
+              ? `${totalItemCount} article${totalItemCount !== 1 ? "s" : ""}`
+              : `${totalItemCount} item${totalItemCount !== 1 ? "s" : ""}`}
+          </span>
+        </div>
         <div className="invoice-line-items">
           {order.items.map((item) => (
             <div key={item.id} className="invoice-line-item">
@@ -278,7 +303,7 @@ export default async function AccountOrderDetailsPage({ params }: AccountOrderDe
                 <strong className="invoice-panel-value">
                   {language === "fr" ? item.productNameSnapshotFr : item.productNameSnapshotEn}
                 </strong>
-                <p className="small" style={{ marginTop: 6 }}>
+                <p className="small invoice-line-meta">
                   {language === "fr" ? "Quantité" : "Qty"}: {item.quantity} · {language === "fr" ? "Prix unit." : "Unit price"}:{" "}
                   {formatCurrency(item.unitPriceCents, order.currency, locale)}
                 </p>
@@ -291,8 +316,13 @@ export default async function AccountOrderDetailsPage({ params }: AccountOrderDe
         </div>
       </section>
 
-      <section className="section">
-        <h2>{language === "fr" ? "Montants" : "Amounts"}</h2>
+      <section className="section invoice-section invoice-section--amounts">
+        <div className="invoice-section-head">
+          <div>
+            <p className="account-order-card__meta-label">{language === "fr" ? "Facture" : "Invoice"}</p>
+            <h2>{language === "fr" ? "Montants" : "Amounts"}</h2>
+          </div>
+        </div>
         <div className="invoice-amount-card">
           {amountRows.map((row) => (
             <div key={row.label}>

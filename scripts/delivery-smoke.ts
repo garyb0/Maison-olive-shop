@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process";
-import { getEnvFilesForTarget, loadEnvFilesInOrder, resolveEnvTargetFromArgs } from "./db-utils";
+import { loadEnvForTarget, resolveEnvTargetFromArgs } from "./db-utils";
+import { checkoutSchema } from "../src/lib/validators";
 
 type CheckLevel = "pass" | "warn" | "fail";
 
@@ -302,9 +303,27 @@ function summarizeBody(value: unknown) {
   return value === null || value === undefined ? "" : String(value);
 }
 
+function summarizeValidationIssues(issues: Array<{ path: PropertyKey[]; message: string }>) {
+  return issues
+    .map((issue) => `${issue.path.map(String).join(".") || "<root>"}: ${issue.message}`)
+    .join("; ");
+}
+
 function isLocalTarget(baseUrl: string) {
   const hostname = new URL(baseUrl).hostname.toLowerCase();
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+}
+
+function resolveSeedDatabaseUrl(config: ScriptConfig) {
+  const configured = process.env.DELIVERY_SMOKE_DATABASE_URL?.trim();
+  if (configured) return configured;
+
+  const url = new URL(config.baseUrl);
+  if (isLocalTarget(config.baseUrl) && url.port === "3103") {
+    return "file:./delivery-dev.db";
+  }
+
+  return process.env.DATABASE_URL;
 }
 
 function parseTokenFromDriverUrl(driverUrl: string) {
@@ -368,9 +387,18 @@ function pushWarning(results: CheckResult[], name: string, details: string) {
   printResult(results.at(-1)!);
 }
 
+function pushFailure(results: CheckResult[], name: string, details: string) {
+  results.push({ name, level: "fail", details });
+  printResult(results.at(-1)!);
+}
+
+function getActiveDriverIds(drivers: DeliveryDriver[]) {
+  return drivers.filter((driver) => driver.isActive).map((driver) => driver.id).sort();
+}
+
 function resolveConfig(): ScriptConfig {
   const envTarget = resolveEnvTargetFromArgs(process.argv, "development");
-  loadEnvFilesInOrder(getEnvFilesForTarget(envTarget));
+  loadEnvForTarget(envTarget);
 
   const envSeedDemo = parseEnvBoolean(process.env.DELIVERY_SMOKE_SEED_DEMO);
   const seedDemo = hasFlag("--no-seed-demo")
@@ -561,12 +589,15 @@ async function ensureCustomerAccount(
   };
 }
 
-function seedDemoData(baseUrl: string) {
+function seedDemoData(config: ScriptConfig) {
+  const seedDatabaseUrl = resolveSeedDatabaseUrl(config);
   const command = spawnSync(process.execPath, ["scripts/seed-delivery-runs-demo.cjs"], {
     cwd: process.cwd(),
     env: {
       ...process.env,
-      NEXT_PUBLIC_SITE_URL: baseUrl,
+      NEXT_PUBLIC_SITE_URL: config.baseUrl,
+      DELIVERY_SMOKE_ENV_TARGET: config.envTarget,
+      ...(seedDatabaseUrl ? { DATABASE_URL: seedDatabaseUrl } : {}),
     },
     encoding: "utf8",
   });
@@ -597,6 +628,7 @@ async function main() {
 
   let createdSmokeSlotId: string | null = null;
   let keepCreatedSmokeSlot = false;
+  let activeDriverIdsBefore: string[] | null = null;
 
   console.log(
     `Delivery smoke target: ${config.baseUrl} (env=${config.envTarget}, remote=${config.allowRemote ? "allowed" : "blocked"})`,
@@ -647,7 +679,7 @@ async function main() {
     const slotNote = `Smoke route ${timestampToken}`;
     const exceptionDateKey = toDateKey(addDays(slotDay, 1));
 
-    await runStep(results, "admin:drivers-list", async () => {
+    const driversBefore = await runStep(results, "admin:drivers-list", async () => {
       const result = await adminSession.request<{ drivers?: DeliveryDriver[] }>("/api/admin/delivery/drivers");
       ensureOkStatus(result, 200, "driver list");
       const payload = expectObjectPayload<{ drivers?: DeliveryDriver[] }>(result.data, "driver list");
@@ -657,6 +689,7 @@ async function main() {
         value: payload.drivers ?? [],
       };
     });
+    activeDriverIdsBefore = getActiveDriverIds(driversBefore);
 
     const createdDriver = await runStep(results, "admin:driver-create", async () => {
       const result = await adminSession.request<{ driver?: DeliveryDriver }>("/api/admin/delivery/drivers", {
@@ -664,7 +697,7 @@ async function main() {
         json: {
           name: driverName,
           phone: "4185550199",
-          isActive: true,
+          isActive: false,
         },
       });
       ensureOkStatus(result, 200, "driver create");
@@ -820,7 +853,7 @@ async function main() {
 
     if (config.seedDemo) {
       await runStep(results, "seed:demo-run", async () => {
-        const output = seedDemoData(config.baseUrl);
+        const output = seedDemoData(config);
         return {
           details: output.split(/\r?\n/)[0] ?? "demo data prepared",
           value: output,
@@ -860,7 +893,7 @@ async function main() {
         run.deliverySlot.note?.startsWith(DEMO_SLOT_NOTE_PREFIX),
     ) ?? listedRuns[0];
 
-    const runDetail = await runStep(results, "admin:run-detail", async () => {
+    await runStep(results, "admin:run-detail", async () => {
       const result = await adminSession.request<{ run?: DeliveryRunSummary }>(
         `/api/admin/delivery/runs/${targetRun.id}`,
       );
@@ -917,7 +950,7 @@ async function main() {
       };
     });
 
-    const reorderedRun = await runStep(results, "admin:run-reorder", async () => {
+    await runStep(results, "admin:run-reorder", async () => {
       const reorderedStopIds = [...optimizedRun.stops].map((stop) => stop.id).reverse();
       const result = await adminSession.request<{ run?: DeliveryRunSummary; warning?: string }>(
         `/api/admin/delivery/runs/${targetRun.id}/reorder`,
@@ -1407,15 +1440,11 @@ async function main() {
       if (!selectedAddress) {
         throw new SmokeError("No delivery address is available for checkout.");
       }
+      if (!storefrontProducts.id) {
+        throw new SmokeError(`Smoke product is missing an id: ${summarizeBody(storefrontProducts)}`);
+      }
 
-      const result = await accountSession.request<{
-        order?: {
-          id: string;
-          orderNumber: string;
-        };
-      }>("/api/orders", {
-        method: "POST",
-        json: {
+      const orderPayload = {
           paymentMethod: "MANUAL",
           items: [
             {
@@ -1424,11 +1453,39 @@ async function main() {
             },
           ],
           deliveryAddressId: selectedAddress.id,
+          customerEmail: config.accountEmail,
+          customerName: `${config.accountFirstName} ${config.accountLastName}`,
+          shippingLine1: selectedAddress.shippingLine1,
+          shippingCity: selectedAddress.shippingCity,
+          shippingRegion: selectedAddress.shippingRegion,
+          shippingPostal: selectedAddress.shippingPostal,
+          shippingCountry: selectedAddress.shippingCountry,
+          deliveryPhone: selectedAddress.deliveryPhone ?? undefined,
+          deliveryInstructions: selectedAddress.deliveryInstructions ?? undefined,
           deliveryWindowStartAt: preferredSlot.startAt,
           deliveryWindowEndAt: preferredSlot.endAt,
-        },
+        };
+      const parsedOrderPayload = checkoutSchema.safeParse(orderPayload);
+      if (!parsedOrderPayload.success) {
+        throw new SmokeError(
+          `Smoke checkout payload invalid: ${summarizeValidationIssues(parsedOrderPayload.error.issues)}`,
+        );
+      }
+
+      const result = await accountSession.request<{
+        order?: {
+          id: string;
+          orderNumber: string;
+        };
+      }>("/api/orders", {
+        method: "POST",
+        json: orderPayload,
       });
-      ensureOkStatus(result, 200, "order create");
+      if (result.response.status !== 200) {
+        throw new SmokeError(
+          `order create failed with HTTP ${result.response.status}: ${getResultMessage(result.data, result.text)}; payload=${JSON.stringify(orderPayload)}`,
+        );
+      }
 
       if (!result.data || typeof result.data !== "object" || !result.data.order?.id) {
         throw new SmokeError(`Order create returned an unexpected payload: ${summarizeBody(result.data)}`);
@@ -1438,6 +1495,17 @@ async function main() {
         details: `orderNumber=${result.data.order.orderNumber}`,
         value: result.data.order,
       };
+    });
+    cleanupTasks.push(async () => {
+      const cleanupResult = await adminSession.request<{ order?: unknown }>("/api/admin/orders", {
+        method: "PATCH",
+        json: {
+          orderId: createdOrder.id,
+          status: "CANCELLED",
+          deliveryStatus: "FAILED",
+        },
+      });
+      ensureOkStatus(cleanupResult, 200, "smoke order cancel cleanup");
     });
 
     await runStep(results, "checkout:orders-list", async () => {
@@ -1472,6 +1540,38 @@ async function main() {
         await task();
       } catch (error) {
         pushWarning(results, "cleanup", formatError(error));
+      }
+    }
+
+    if (activeDriverIdsBefore) {
+      try {
+        const result = await adminSession.request<{ drivers?: DeliveryDriver[] }>("/api/admin/delivery/drivers");
+        ensureOkStatus(result, 200, "driver active-state verification");
+        const payload = expectObjectPayload<{ drivers?: DeliveryDriver[] }>(
+          result.data,
+          "driver active-state verification",
+        );
+        const activeDriverIdsAfter = getActiveDriverIds(payload.drivers ?? []);
+        const missingActiveDrivers = activeDriverIdsBefore.filter(
+          (driverId) => !activeDriverIdsAfter.includes(driverId),
+        );
+
+        if (missingActiveDrivers.length > 0) {
+          pushFailure(
+            results,
+            "admin:drivers-active-state",
+            `active drivers changed: ${missingActiveDrivers.join(", ")}`,
+          );
+        } else {
+          results.push({
+            name: "admin:drivers-active-state",
+            level: "pass",
+            details: `preserved=${activeDriverIdsBefore.length}`,
+          });
+          printResult(results.at(-1)!);
+        }
+      } catch (error) {
+        pushFailure(results, "admin:drivers-active-state", formatError(error));
       }
     }
   }

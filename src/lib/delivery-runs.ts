@@ -3,6 +3,11 @@ import { Prisma } from "@prisma/client";
 import type { DeliveryStopStatus } from "@prisma/client";
 import { env } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
+import {
+  buildDeliveryProofFileName,
+  readDeliveryProofFile,
+  saveDeliveryProofFile,
+} from "@/lib/delivery-proof-storage";
 import type {
   DeliveryDriver,
   DeliveryKmReferenceRow,
@@ -32,6 +37,7 @@ import {
 } from "@/lib/delivery-mode";
 
 const DRIVER_TOKEN_TTL_MS = 12 * 60 * 60 * 1000;
+const EARTH_RADIUS_METERS = 6371000;
 
 const deliveryRunDetailInclude = Prisma.validator<Prisma.DeliveryRunInclude>()({
   driver: true,
@@ -218,6 +224,22 @@ function getStopCounts(stops: Array<{ status: DeliveryStopStatus }>) {
   );
 }
 
+function buildStopAddressLabel(order: {
+  shippingLine1: string | null;
+  shippingCity: string | null;
+  shippingRegion: string | null;
+  shippingPostal: string | null;
+  shippingCountry: string | null;
+}) {
+  return buildDeliveryAddressLabel({
+    shippingLine1: order.shippingLine1 ?? "",
+    shippingCity: order.shippingCity ?? "",
+    shippingRegion: order.shippingRegion ?? "",
+    shippingPostal: order.shippingPostal ?? "",
+    shippingCountry: order.shippingCountry ?? "CA",
+  });
+}
+
 function buildMapsHref(order: {
   shippingLine1: string | null;
   shippingCity: string | null;
@@ -225,15 +247,41 @@ function buildMapsHref(order: {
   shippingPostal: string | null;
   shippingCountry: string | null;
 }) {
-  const query = buildDeliveryAddressLabel({
-    shippingLine1: order.shippingLine1 ?? "",
-    shippingCity: order.shippingCity ?? "",
-    shippingRegion: order.shippingRegion ?? "",
-    shippingPostal: order.shippingPostal ?? "",
-    shippingCountry: order.shippingCountry ?? "CA",
-  });
-
+  const query = buildStopAddressLabel(order);
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+}
+
+function buildWazeHref(order: {
+  shippingLine1: string | null;
+  shippingCity: string | null;
+  shippingRegion: string | null;
+  shippingPostal: string | null;
+  shippingCountry: string | null;
+}) {
+  const query = buildStopAddressLabel(order);
+  return `https://www.waze.com/ul?q=${encodeURIComponent(query)}&navigate=yes`;
+}
+
+function buildAdminProofHref(stop: { runId: string; id: string; proofPhotoPath: string | null }) {
+  return stop.proofPhotoPath
+    ? `/api/admin/delivery/runs/${stop.runId}/stops/${stop.id}/proof`
+    : null;
+}
+
+function toRadians(value: number) {
+  return (value * Math.PI) / 180;
+}
+
+function distanceMetersBetween(left: LatLng, right: LatLng) {
+  const latDelta = toRadians(right.lat - left.lat);
+  const lngDelta = toRadians(right.lng - left.lng);
+  const leftLat = toRadians(left.lat);
+  const rightLat = toRadians(right.lat);
+  const a =
+    Math.sin(latDelta / 2) * Math.sin(latDelta / 2) +
+    Math.cos(leftLat) * Math.cos(rightLat) * Math.sin(lngDelta / 2) * Math.sin(lngDelta / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return Math.round(EARTH_RADIUS_METERS * c);
 }
 
 function mapRunStop(stop: DeliveryRunDetailRecord["stops"][number]): DeliveryRunStop {
@@ -259,9 +307,25 @@ function mapRunStop(stop: DeliveryRunDetailRecord["stops"][number]): DeliveryRun
     plannedEta: stop.plannedEta?.toISOString() ?? null,
     actualCumulativeKmAtStop: stop.actualCumulativeKmAtStop,
     arrivedAt: stop.arrivedAt?.toISOString() ?? null,
+    arrivedLat: stop.arrivedLat,
+    arrivedLng: stop.arrivedLng,
+    arrivedAccuracyMeters: stop.arrivedAccuracyMeters,
+    arrivedDistanceMeters: stop.arrivedDistanceMeters,
     completedAt: stop.completedAt?.toISOString() ?? null,
     note: stop.note,
+    proofPhotoUrl: buildAdminProofHref(stop),
+    proofPhotoMime: stop.proofPhotoMime,
+    proofPhotoSizeBytes: stop.proofPhotoSizeBytes,
+    proofPhotoUploadedAt: stop.proofPhotoUploadedAt?.toISOString() ?? null,
+    proofPhotoLat: stop.proofPhotoLat,
+    proofPhotoLng: stop.proofPhotoLng,
+    proofPhotoAccuracyMeters: stop.proofPhotoAccuracyMeters,
+    hasProofPhoto: Boolean(stop.proofPhotoPath),
+    geocodedLat: stop.geocodedLat,
+    geocodedLng: stop.geocodedLng,
+    geocodedAt: stop.geocodedAt?.toISOString() ?? null,
     mapsHref: buildMapsHref(stop.order),
+    wazeHref: buildWazeHref(stop.order),
   };
 }
 
@@ -359,6 +423,33 @@ type DeliveryRunStartLocationInput = {
   recordedAt?: string;
 };
 
+type DriverRunOptimizeInput = {
+  lat: number;
+  lng: number;
+  accuracyMeters: number;
+  recordedAt: string;
+  navigationProvider?: "WAZE" | "GOOGLE_MAPS";
+};
+
+type DriverStopArriveInput = {
+  stopId: string;
+  lat: number;
+  lng: number;
+  accuracyMeters: number;
+  recordedAt: string;
+};
+
+type DriverStopProofInput = {
+  stopId: string;
+  buffer: Buffer;
+  mimeType: string;
+  sizeBytes: number;
+  lat?: number;
+  lng?: number;
+  accuracyMeters?: number;
+  recordedAt?: string;
+};
+
 async function planOrderedStops(
   run: DeliveryRunDetailRecord,
   orderedStops: DeliveryRunDetailRecord["stops"],
@@ -371,10 +462,22 @@ async function planOrderedStops(
   if (!depotAddress && !options?.originOverride) {
     throw new Error("DELIVERY_DEPOT_NOT_CONFIGURED");
   }
+  if (run.includeReturnToDepot && !depotAddress) {
+    throw new Error("DELIVERY_DEPOT_NOT_CONFIGURED");
+  }
 
   const geocodeTasks = orderedStops.map((stop) => geocodeAddressCached(getStopAddress(stop)));
   const depotPoint = depotAddress ? await geocodeAddressCached(depotAddress) : null;
   const stopPoints = await Promise.all(geocodeTasks);
+  const stopPointsById = new Map<string, LatLng>(
+    orderedStops.map((stop, index) => [
+      stop.id,
+      {
+        lat: stopPoints[index].lat,
+        lng: stopPoints[index].lng,
+      },
+    ]),
+  );
   const origin = options?.originOverride ?? (depotPoint ? { lat: depotPoint.lat, lng: depotPoint.lng } : null);
 
   if (!origin) {
@@ -396,6 +499,7 @@ async function planOrderedStops(
   return {
     route,
     orderedStops: nextStops,
+    stopPointsById,
   };
 }
 
@@ -415,11 +519,23 @@ function mapCurrentStopsById(
   return mappedStops.length === stopIds.length ? mappedStops : null;
 }
 
+function getGeocodedStopData(stopId: string, geocodedPointsByStopId?: Map<string, LatLng>) {
+  const point = geocodedPointsByStopId?.get(stopId);
+  return point
+    ? {
+        geocodedLat: point.lat,
+        geocodedLng: point.lng,
+        geocodedAt: new Date(),
+      }
+    : {};
+}
+
 async function applyCurrentRoutePlan(
   tx: PrismaLike,
   run: DeliveryRunDetailRecord,
   orderedStops: DeliveryRunDetailRecord["stops"],
   routePlan: Awaited<ReturnType<typeof planOrderedStops>>["route"] | null,
+  geocodedPointsByStopId?: Map<string, LatLng>,
 ) {
   let cumulativeKm = 0;
   let cumulativeDurationSec = 0;
@@ -439,6 +555,50 @@ async function applyCurrentRoutePlan(
         plannedEta: leg
           ? new Date(run.deliverySlot.startAt.getTime() + cumulativeDurationSec * 1000)
           : null,
+        ...getGeocodedStopData(stop.id, geocodedPointsByStopId),
+      },
+    });
+  }
+
+  await tx.deliveryRun.update({
+    where: { id: run.id },
+    data: {
+      plannedKm: routePlan?.totalDistanceKm ?? null,
+      plannedDurationSec: routePlan?.totalDurationSec ?? null,
+    },
+  });
+}
+
+async function applyRemainingRoutePlan(
+  tx: PrismaLike,
+  run: DeliveryRunDetailRecord,
+  orderedStops: DeliveryRunDetailRecord["stops"],
+  routePlan: Awaited<ReturnType<typeof planOrderedStops>>["route"] | null,
+  baseTime: Date,
+  geocodedPointsByStopId?: Map<string, LatLng>,
+) {
+  const sequenceSlots = orderedStops
+    .map((stop) => stop.finalSequence)
+    .sort((left, right) => left - right);
+  let cumulativeKm = 0;
+  let cumulativeDurationSec = 0;
+
+  for (let index = 0; index < orderedStops.length; index += 1) {
+    const stop = orderedStops[index];
+    const leg = routePlan?.legs[index] ?? null;
+    cumulativeKm = leg ? Number((cumulativeKm + leg.distanceKm).toFixed(3)) : 0;
+    cumulativeDurationSec = leg ? cumulativeDurationSec + leg.durationSec : 0;
+
+    await tx.deliveryStop.update({
+      where: { id: stop.id },
+      data: {
+        manualSequence: sequenceSlots[index],
+        finalSequence: sequenceSlots[index],
+        plannedLegKm: leg?.distanceKm ?? null,
+        plannedCumulativeKm: leg ? cumulativeKm : null,
+        plannedLegDurationSec: leg?.durationSec ?? null,
+        plannedEta: leg ? new Date(baseTime.getTime() + cumulativeDurationSec * 1000) : null,
+        ...getGeocodedStopData(stop.id, geocodedPointsByStopId),
       },
     });
   }
@@ -457,6 +617,7 @@ async function applyAutoRoutePlan(
   run: DeliveryRunDetailRecord,
   orderedStops: DeliveryRunDetailRecord["stops"],
   routePlan: Awaited<ReturnType<typeof planOrderedStops>>["route"] | null,
+  geocodedPointsByStopId?: Map<string, LatLng>,
 ) {
   let cumulativeKm = 0;
   let cumulativeDurationSec = 0;
@@ -479,6 +640,7 @@ async function applyAutoRoutePlan(
         plannedEta: leg
           ? new Date(run.deliverySlot.startAt.getTime() + cumulativeDurationSec * 1000)
           : null,
+        ...getGeocodedStopData(stop.id, geocodedPointsByStopId),
       },
     });
   }
@@ -497,6 +659,7 @@ async function applyManualRoutePlan(
   run: DeliveryRunDetailRecord,
   orderedStops: DeliveryRunDetailRecord["stops"],
   routePlan: Awaited<ReturnType<typeof planOrderedStops>>["route"] | null,
+  geocodedPointsByStopId?: Map<string, LatLng>,
 ) {
   let cumulativeKm = 0;
   let cumulativeDurationSec = 0;
@@ -518,6 +681,7 @@ async function applyManualRoutePlan(
         plannedEta: leg
           ? new Date(run.deliverySlot.startAt.getTime() + cumulativeDurationSec * 1000)
           : null,
+        ...getGeocodedStopData(stop.id, geocodedPointsByStopId),
       },
     });
   }
@@ -899,7 +1063,7 @@ export async function optimizeDeliveryRun(input: {
     plannedRoute = await planOrderedStops(run, originalStops, true);
   } catch {
     warning =
-      "Google Maps n'est pas disponible pour cette tournee. L'ordre brut a ete conserve et les KM planifies restent vides.";
+      "Google Maps n'est pas disponible pour cette tournée. L'ordre brut a été conservé et les KM planifiés restent vides.";
   }
 
   await prisma.$transaction(async (tx) => {
@@ -913,12 +1077,12 @@ export async function optimizeDeliveryRun(input: {
       plannedRoute ? mapCurrentStopsById(current, plannedRoute.orderedStops.map((stop) => stop.id)) : null;
 
     if (plannedRoute && currentPlannedStops) {
-      await applyAutoRoutePlan(tx, current, currentPlannedStops, plannedRoute.route);
+      await applyAutoRoutePlan(tx, current, currentPlannedStops, plannedRoute.route, plannedRoute.stopPointsById);
     } else {
       if (plannedRoute && !currentPlannedStops) {
         warning =
           warning ??
-          "La tournee a change pendant l'optimisation. L'ordre courant a ete conserve et les KM planifies restent vides.";
+          "La tournée a changé pendant l'optimisation. L'ordre courant a été conservé et les KM planifiés restent vides.";
       }
       await applyAutoRoutePlan(tx, current, currentOriginalStops, null);
     }
@@ -973,7 +1137,7 @@ export async function reorderDeliveryRun(input: {
     plannedRoute = await planOrderedStops(run, orderedStops, false);
   } catch {
     warning =
-      "Google Maps n'a pas pu recalculer le trajet. Le nouvel ordre est conserve mais les KM planifies restent vides.";
+      "Google Maps n'a pas pu recalculer le trajet. Le nouvel ordre est conservé, mais les KM planifiés restent vides.";
   }
 
   await prisma.$transaction(async (tx) => {
@@ -987,7 +1151,7 @@ export async function reorderDeliveryRun(input: {
       throw new Error("DELIVERY_RUN_REORDER_INVALID");
     }
 
-    await applyManualRoutePlan(tx, current, currentOrderedStops, plannedRoute?.route ?? null);
+    await applyManualRoutePlan(tx, current, currentOrderedStops, plannedRoute?.route ?? null, plannedRoute?.stopPointsById);
 
     if (input.actorUserId) {
       await tx.auditLog.create({
@@ -1221,13 +1385,316 @@ export async function startDriverRun(token: string, input?: DeliveryRunStartLoca
         throw new Error("DELIVERY_RUN_NOT_FOUND");
       }
 
-      await applyCurrentRoutePlan(tx, current, sortStopsByFinalSequence(current.stops), plannedRoute?.route ?? null);
+      await applyCurrentRoutePlan(
+        tx,
+        current,
+        sortStopsByFinalSequence(current.stops),
+        plannedRoute?.route ?? null,
+        plannedRoute?.stopPointsById,
+      );
     });
 
     return getDeliveryRunDetail(access.run.id);
   }
 
   return mapRunSummary(updated);
+}
+
+export async function optimizeDriverRunFromCurrentPosition(token: string, input: DriverRunOptimizeInput) {
+  await ensureDeliveryRunsEnabledForMutation();
+  const access = await getRunByToken(token);
+
+  if (access.run.status !== "IN_PROGRESS") {
+    throw new Error("DELIVERY_RUN_NOT_IN_PROGRESS");
+  }
+
+  const pendingStops = sortStopsByFinalSequence(access.run.stops).filter((stop) => stop.status === "PENDING");
+  if (!pendingStops.length) {
+    throw new Error("DELIVERY_RUN_NO_PENDING_STOPS");
+  }
+
+  const recordedAt = new Date(input.recordedAt);
+  if (Number.isNaN(recordedAt.getTime())) {
+    throw new Error("DELIVERY_GPS_SAMPLE_INVALID");
+  }
+
+  let warning: string | null = null;
+  let plannedRoute: Awaited<ReturnType<typeof planOrderedStops>> | null = null;
+
+  try {
+    plannedRoute = await planOrderedStops(access.run, pendingStops, true, {
+      originOverride: {
+        lat: input.lat,
+        lng: input.lng,
+      },
+    });
+  } catch {
+    warning =
+      "Google Routes n'est pas disponible. L'ordre actuel est conserve, mais Waze ouvre quand meme le prochain arret.";
+  }
+
+  await prisma.$transaction(async (tx) => {
+    const current = await loadRunDetail(access.run.id, tx);
+    if (!current) {
+      throw new Error("DELIVERY_RUN_NOT_FOUND");
+    }
+    if (current.status !== "IN_PROGRESS") {
+      throw new Error("DELIVERY_RUN_NOT_IN_PROGRESS");
+    }
+
+    const currentPendingStops = sortStopsByFinalSequence(current.stops).filter((stop) => stop.status === "PENDING");
+    if (!currentPendingStops.length) {
+      throw new Error("DELIVERY_RUN_NO_PENDING_STOPS");
+    }
+
+    const currentPlannedStops =
+      plannedRoute ? mapCurrentStopsById(current, plannedRoute.orderedStops.map((stop) => stop.id)) : null;
+    const plannedStopsStillPending =
+      currentPlannedStops?.length === currentPendingStops.length &&
+      currentPlannedStops.every((stop) => stop.status === "PENDING");
+
+    if (plannedRoute && currentPlannedStops && plannedStopsStillPending) {
+      await applyRemainingRoutePlan(tx, current, currentPlannedStops, plannedRoute.route, recordedAt, plannedRoute.stopPointsById);
+    } else {
+      if (plannedRoute) {
+        warning =
+          warning ??
+          "La tournee a change pendant l'optimisation. L'ordre actuel est conserve, mais Waze ouvre quand meme le prochain arret.";
+      }
+      await applyRemainingRoutePlan(tx, current, currentPendingStops, null, recordedAt);
+    }
+
+    await tx.auditLog.create({
+      data: {
+        action: "DELIVERY_RUN_DRIVER_OPTIMIZED",
+        entity: "DeliveryRun",
+        entityId: access.run.id,
+        metadata: JSON.stringify({
+          lat: input.lat,
+          lng: input.lng,
+          accuracyMeters: input.accuracyMeters,
+          recordedAt: recordedAt.toISOString(),
+          navigationProvider: input.navigationProvider ?? "WAZE",
+          optimized: Boolean(plannedRoute && currentPlannedStops && plannedStopsStillPending),
+        }),
+      },
+    });
+  });
+
+  const refreshed = await getDeliveryRunDetail(access.run.id);
+  const nextStop = refreshed.stops.find((stop) => stop.status === "PENDING") ?? null;
+  const navigationProvider = input.navigationProvider ?? "WAZE";
+
+  return {
+    run: refreshed,
+    navigationHref: nextStop ? (navigationProvider === "GOOGLE_MAPS" ? nextStop.mapsHref : nextStop.wazeHref) : null,
+    warning,
+  };
+}
+
+async function resolveStopPoint(stop: DeliveryRunDetailRecord["stops"][number]): Promise<LatLng | null> {
+  if (stop.geocodedLat !== null && stop.geocodedLng !== null) {
+    return {
+      lat: stop.geocodedLat,
+      lng: stop.geocodedLng,
+    };
+  }
+
+  try {
+    const point = await geocodeAddressCached(getStopAddress(stop));
+    return {
+      lat: point.lat,
+      lng: point.lng,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function arriveDriverStop(token: string, input: DriverStopArriveInput) {
+  await ensureDeliveryRunsEnabledForMutation();
+  const access = await getRunByToken(token);
+
+  if (access.run.status !== "IN_PROGRESS") {
+    throw new Error("DELIVERY_RUN_NOT_IN_PROGRESS");
+  }
+
+  const stop = access.run.stops.find((row) => row.id === input.stopId);
+  if (!stop) {
+    throw new Error("DELIVERY_STOP_NOT_FOUND");
+  }
+
+  const recordedAt = new Date(input.recordedAt);
+  if (Number.isNaN(recordedAt.getTime())) {
+    throw new Error("DELIVERY_GPS_SAMPLE_INVALID");
+  }
+
+  const stopPoint = await resolveStopPoint(stop);
+  const arrivedDistanceMeters = stopPoint
+    ? distanceMetersBetween({ lat: input.lat, lng: input.lng }, stopPoint)
+    : null;
+
+  await prisma.$transaction(async (tx) => {
+    const current = await loadRunDetail(access.run.id, tx);
+    if (!current) {
+      throw new Error("DELIVERY_RUN_NOT_FOUND");
+    }
+    if (current.status !== "IN_PROGRESS") {
+      throw new Error("DELIVERY_RUN_NOT_IN_PROGRESS");
+    }
+
+    const currentStop = current.stops.find((row) => row.id === input.stopId);
+    if (!currentStop) {
+      throw new Error("DELIVERY_STOP_NOT_FOUND");
+    }
+
+    await tx.deliveryStop.update({
+      where: { id: currentStop.id },
+      data: {
+        arrivedAt: currentStop.arrivedAt ?? recordedAt,
+        arrivedLat: input.lat,
+        arrivedLng: input.lng,
+        arrivedAccuracyMeters: input.accuracyMeters,
+        arrivedDistanceMeters,
+        ...(stopPoint
+          ? {
+              geocodedLat: stopPoint.lat,
+              geocodedLng: stopPoint.lng,
+              geocodedAt: currentStop.geocodedAt ?? new Date(),
+            }
+          : {}),
+      },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        action: "DELIVERY_STOP_ARRIVED",
+        entity: "DeliveryStop",
+        entityId: currentStop.id,
+        metadata: JSON.stringify({
+          runId: current.id,
+          lat: input.lat,
+          lng: input.lng,
+          accuracyMeters: input.accuracyMeters,
+          arrivedDistanceMeters,
+          recordedAt: recordedAt.toISOString(),
+        }),
+      },
+    });
+  });
+
+  return getDeliveryRunDetail(access.run.id);
+}
+
+export async function uploadDriverStopProof(token: string, input: DriverStopProofInput) {
+  await ensureDeliveryRunsEnabledForMutation();
+  const access = await getRunByToken(token);
+
+  if (access.run.status !== "IN_PROGRESS") {
+    throw new Error("DELIVERY_RUN_NOT_IN_PROGRESS");
+  }
+
+  const stop = access.run.stops.find((row) => row.id === input.stopId);
+  if (!stop) {
+    throw new Error("DELIVERY_STOP_NOT_FOUND");
+  }
+
+  const uploadedAt =
+    input.recordedAt && !Number.isNaN(new Date(input.recordedAt).getTime())
+      ? new Date(input.recordedAt)
+      : new Date();
+  const fileName = buildDeliveryProofFileName({
+    runId: access.run.id,
+    stopId: input.stopId,
+    mimeType: input.mimeType,
+  });
+
+  await saveDeliveryProofFile({
+    fileName,
+    buffer: input.buffer,
+  });
+
+  await prisma.$transaction(async (tx) => {
+    const current = await loadRunDetail(access.run.id, tx);
+    if (!current) {
+      throw new Error("DELIVERY_RUN_NOT_FOUND");
+    }
+    if (current.status !== "IN_PROGRESS") {
+      throw new Error("DELIVERY_RUN_NOT_IN_PROGRESS");
+    }
+
+    const currentStop = current.stops.find((row) => row.id === input.stopId);
+    if (!currentStop) {
+      throw new Error("DELIVERY_STOP_NOT_FOUND");
+    }
+
+    await tx.deliveryStop.update({
+      where: { id: currentStop.id },
+      data: {
+        proofPhotoPath: fileName,
+        proofPhotoMime: input.mimeType,
+        proofPhotoSizeBytes: input.sizeBytes,
+        proofPhotoUploadedAt: uploadedAt,
+        proofPhotoLat: input.lat ?? null,
+        proofPhotoLng: input.lng ?? null,
+        proofPhotoAccuracyMeters: input.accuracyMeters ?? null,
+      },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        action: "DELIVERY_STOP_PROOF_UPLOADED",
+        entity: "DeliveryStop",
+        entityId: currentStop.id,
+        metadata: JSON.stringify({
+          runId: current.id,
+          mimeType: input.mimeType,
+          sizeBytes: input.sizeBytes,
+          recordedAt: uploadedAt.toISOString(),
+        }),
+      },
+    });
+  });
+
+  return getDeliveryRunDetail(access.run.id);
+}
+
+export async function getDriverStopProofFile(token: string, stopId: string) {
+  if (!isDeliveryRunsEnabled()) {
+    throw new Error("DELIVERY_RUNS_DISABLED");
+  }
+
+  const access = await getRunByToken(token);
+  const stop = access.run.stops.find((row) => row.id === stopId);
+  if (!stop || !stop.proofPhotoPath || !stop.proofPhotoMime) {
+    throw new Error("DELIVERY_PROOF_NOT_FOUND");
+  }
+
+  return {
+    buffer: await readDeliveryProofFile(stop.proofPhotoPath),
+    mimeType: stop.proofPhotoMime,
+  };
+}
+
+export async function getAdminStopProofFile(runId: string, stopId: string) {
+  if (!(await hasDeliveryRunsSchemaTables())) {
+    throw new Error("DELIVERY_RUNS_SCHEMA_UNAVAILABLE");
+  }
+
+  const run = await loadRunDetail(runId);
+  if (!run) {
+    throw new Error("DELIVERY_RUN_NOT_FOUND");
+  }
+
+  const stop = run.stops.find((row) => row.id === stopId);
+  if (!stop || !stop.proofPhotoPath || !stop.proofPhotoMime) {
+    throw new Error("DELIVERY_PROOF_NOT_FOUND");
+  }
+
+  return {
+    buffer: await readDeliveryProofFile(stop.proofPhotoPath),
+    mimeType: stop.proofPhotoMime,
+  };
 }
 
 export async function recordDriverRunLocation(
@@ -1349,6 +1816,20 @@ export async function completeDriverStop(
   const stop = access.run.stops.find((row) => row.id === input.stopId);
   if (!stop) {
     throw new Error("DELIVERY_STOP_NOT_FOUND");
+  }
+
+  if (stop.status !== "PENDING") {
+    if (stop.status === input.result) {
+      if (input.note !== undefined && input.note.trim() !== (stop.note ?? "")) {
+        await prisma.deliveryStop.update({
+          where: { id: stop.id },
+          data: { note: input.note.trim() || null },
+        });
+      }
+      return getDeliveryRunDetail(access.run.id);
+    }
+
+    throw new Error("DELIVERY_STOP_ALREADY_COMPLETED");
   }
 
   const now = new Date();
@@ -1544,6 +2025,8 @@ export function mapDeliveryRunError(error: unknown) {
         return { message: "Delivery run not found.", status: 404 };
       case "DELIVERY_STOP_NOT_FOUND":
         return { message: "Delivery stop not found.", status: 404 };
+      case "DELIVERY_PROOF_NOT_FOUND":
+        return { message: "Delivery proof not found.", status: 404 };
       case "DELIVERY_RUN_EMPTY":
         return { message: "No eligible scheduled orders exist for this slot.", status: 400 };
       case "DELIVERY_RUN_REORDER_INVALID":
@@ -1554,10 +2037,16 @@ export function mapDeliveryRunError(error: unknown) {
         return { message: "This driver link is no longer valid.", status: 404 };
       case "DELIVERY_RUN_NOT_IN_PROGRESS":
         return { message: "The delivery run has not started yet.", status: 409 };
+      case "DELIVERY_RUN_NO_PENDING_STOPS":
+        return { message: "There are no pending stops to optimize.", status: 409 };
       case "DELIVERY_GPS_TRACKING_DISABLED":
         return { message: "GPS tracking is disabled for this environment.", status: 409 };
       case "DELIVERY_RUN_ALREADY_FINISHED":
         return { message: "This delivery run is already completed or cancelled.", status: 409 };
+      case "DELIVERY_STOP_ALREADY_COMPLETED":
+        return { message: "This stop has already been completed with a different result.", status: 409 };
+      case "DELIVERY_PROOF_TYPE_INVALID":
+        return { message: "Invalid delivery proof image type.", status: 400 };
       case "DELIVERY_STOP_ADDRESS_INCOMPLETE":
       case "DELIVERY_DEPOT_NOT_CONFIGURED":
       case "GOOGLE_MAPS_NOT_CONFIGURED":

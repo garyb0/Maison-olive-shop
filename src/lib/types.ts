@@ -26,6 +26,16 @@ export type OrderStatus =
 
 export type SupportConversationStatus = "WAITING" | "OPEN" | "ASSIGNED" | "CLOSED";
 export type SupportSenderType = "CUSTOMER" | "ADMIN" | "SYSTEM";
+export type SupportConversationPriority = "LOW" | "NORMAL" | "HIGH" | "URGENT";
+export type SupportConversationSource = "WIDGET" | "ACCOUNT" | "EMAIL" | "ADMIN" | "AI";
+export type SupportConversationCloseReason =
+  | "RESOLVED"
+  | "DELIVERY"
+  | "PRODUCT"
+  | "PAYMENT"
+  | "REFUND"
+  | "DUPLICATE"
+  | "OTHER";
 
 export type CurrentUser = {
   id: string;
@@ -83,9 +93,25 @@ export type DeliveryRunStop = {
   plannedEta: string | null;
   actualCumulativeKmAtStop: number | null;
   arrivedAt: string | null;
+  arrivedLat: number | null;
+  arrivedLng: number | null;
+  arrivedAccuracyMeters: number | null;
+  arrivedDistanceMeters: number | null;
   completedAt: string | null;
   note: string | null;
+  proofPhotoUrl: string | null;
+  proofPhotoMime: string | null;
+  proofPhotoSizeBytes: number | null;
+  proofPhotoUploadedAt: string | null;
+  proofPhotoLat: number | null;
+  proofPhotoLng: number | null;
+  proofPhotoAccuracyMeters: number | null;
+  hasProofPhoto: boolean;
+  geocodedLat: number | null;
+  geocodedLng: number | null;
+  geocodedAt: string | null;
   mapsHref: string;
+  wazeHref: string;
 };
 
 export type DeliveryRunSummary = {

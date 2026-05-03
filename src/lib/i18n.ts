@@ -13,7 +13,6 @@ export const dictionaries = {
     navFaq: "Aide",
     navTerms: "CGV",
     navReturns: "Retours",
-    navSell: "Vendre chez nous",
     heroTitle: "Boutique animale bilingue, ind\u00e9pendante et fiable",
     heroSubtitle:
       "Nourriture, jouets et accessoires premium pour animaux, avec un espace client et admin complet.",
@@ -23,7 +22,7 @@ export const dictionaries = {
     cart: "Panier",
     cartEmpty: "Panier vide",
     checkoutTitle: "Finaliser ma commande",
-    checkoutSubtitle: "Livraison locale (Rimouski) \u2014 paiement à la livraison ou par carte.",
+    checkoutSubtitle: "Livraison locale (Rimouski) \u2014 carte en ligne ou paiement local selon le compte.",
     accountTitle: "Mon compte",
     login: "Connexion",
     register: "Inscription",
@@ -63,7 +62,6 @@ export const dictionaries = {
     navFaq: "Help",
     navTerms: "Terms",
     navReturns: "Returns",
-    navSell: "Sell with us",
     heroTitle: "Independent bilingual pet shop, built for reliability",
     heroSubtitle:
       "Food, toys and premium accessories for pets, with complete customer and admin spaces.",
@@ -73,7 +71,7 @@ export const dictionaries = {
     cart: "Cart",
     cartEmpty: "Cart is empty",
     checkoutTitle: "Complete your order",
-    checkoutSubtitle: "Local delivery (Rimouski) \u2014 pay on delivery or by card.",
+    checkoutSubtitle: "Local delivery (Rimouski) \u2014 online card payment or local payment depending on the account.",
     accountTitle: "My account",
     login: "Login",
     register: "Register",

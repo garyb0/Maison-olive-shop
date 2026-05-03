@@ -7,6 +7,7 @@ type SupportMessage = {
   id: string;
   senderType: "CUSTOMER" | "ADMIN" | "SYSTEM";
   content: string;
+  readAt?: string | null;
   createdAt?: string;
 };
 
@@ -17,6 +18,10 @@ type SupportConversation = {
   customerName: string;
   closedAt?: string | null;
   messages: SupportMessage[];
+  unreadCount?: number;
+  lastMessagePreview?: string;
+  priority?: string;
+  tags?: string[];
 };
 
 type Props = {
@@ -99,11 +104,11 @@ function getConversationStatusLabel(
   if (language === "fr") {
     switch (status) {
       case "WAITING":
-        return "Message Reçu";
+        return "Message reçu";
       case "OPEN":
         return "Conversation ouverte";
       case "ASSIGNED":
-        return "Equipe en cours";
+        return "Équipe en cours";
       case "CLOSED":
         return "Conversation terminée";
       default:
@@ -137,6 +142,9 @@ export function SupportChatWidget({ language, user }: Props) {
   const [adminAvailable, setAdminAvailable] = useState(false);
   const [unread, setUnread] = useState(0);
   const [hadNetworkIssue, setHadNetworkIssue] = useState(false);
+  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
+  const [sendState, setSendState] = useState<"idle" | "sent" | "failed">("idle");
+  const [readMarking, setReadMarking] = useState(false);
   const messagesRef = useRef<HTMLDivElement>(null);
   const previousMessageCount = useRef(0);
 
@@ -187,8 +195,12 @@ export function SupportChatWidget({ language, user }: Props) {
       language === "fr"
         ? "La connexion semble capricieuse. Vous pouvez réessayer dans un instant."
         : "The connection seems unstable. Please try again in a moment.",
-    signedInAs: language === "fr" ? "Connecte en tant que" : "Signed in as",
+    signedInAs: language === "fr" ? "Connecté en tant que" : "Signed in as",
     loading: language === "fr" ? "Chargement..." : "Loading...",
+    synced: language === "fr" ? "Synchronisé" : "Synced",
+    reconnecting: language === "fr" ? "Reconnexion..." : "Reconnecting...",
+    sent: language === "fr" ? "Message envoyé" : "Message sent",
+    unread: language === "fr" ? "nouveau message" : "new message",
   };
 
   const signedInName = useMemo(() => getCustomerDisplayName(user, conversation), [user, conversation]);
@@ -196,6 +208,16 @@ export function SupportChatWidget({ language, user }: Props) {
   const canSend = draft.trim().length > 0 && (Boolean(user) || canSendGuestIdentity || Boolean(conversation));
   const isClosed = conversation?.status === "CLOSED";
   const statusLabel = getConversationStatusLabel(conversation?.status, language);
+
+  useEffect(() => {
+    const openFromHelpCenter = () => {
+      setOpen(true);
+      setUnread(0);
+    };
+
+    window.addEventListener("chezolive:support-open", openFromHelpCenter);
+    return () => window.removeEventListener("chezolive:support-open", openFromHelpCenter);
+  }, []);
 
   const fetchGuestConversation = async (id: string, token: string) => {
     if (!token) {
@@ -216,6 +238,8 @@ export function SupportChatWidget({ language, user }: Props) {
     const payload = (await response.json()) as { conversation?: SupportConversation };
     const nextConversation = payload.conversation ?? null;
     setConversation(nextConversation);
+    setLastSyncedAt(new Date());
+    setHadNetworkIssue(false);
   };
 
   useEffect(() => {
@@ -246,6 +270,7 @@ export function SupportChatWidget({ language, user }: Props) {
         const state = (await stateResponse.json()) as SupportStatePayload;
         setAdminAvailable(Boolean(state.adminAvailable));
         setHadNetworkIssue(false);
+        setLastSyncedAt(new Date());
 
         if (user) {
           const nextConversation = state.activeConversation ?? null;
@@ -308,6 +333,38 @@ export function SupportChatWidget({ language, user }: Props) {
     });
   }, [open, conversation?.messages.length]);
 
+  useEffect(() => {
+    if (!open || !conversation || readMarking || (conversation.unreadCount ?? 0) <= 0) return;
+
+    const markRead = async () => {
+      setReadMarking(true);
+      try {
+        const guestSession = !user ? loadGuestSession() : null;
+        const response = await fetch(`/api/support/conversations/${conversation.id}/read`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: user
+            ? undefined
+            : JSON.stringify({
+                guestEmail: guestSession?.email ?? guestEmail.trim(),
+                guestToken: guestSession?.token ?? "",
+              }),
+        });
+        const payload = (await response.json().catch(() => ({}))) as { conversation?: SupportConversation };
+        if (response.ok && payload.conversation) {
+          setConversation(payload.conversation);
+          setLastSyncedAt(new Date());
+        }
+      } catch {
+        // Polling will retry and keep the visible state stable.
+      } finally {
+        setReadMarking(false);
+      }
+    };
+
+    void markRead();
+  }, [conversation, guestEmail, open, readMarking, user]);
+
   const resetConversation = () => {
     clearGuestSession();
     setConversation(null);
@@ -326,6 +383,7 @@ export function SupportChatWidget({ language, user }: Props) {
 
     setLoading(true);
     setError("");
+    setSendState("idle");
 
     try {
       let response: Response;
@@ -367,21 +425,27 @@ export function SupportChatWidget({ language, user }: Props) {
       };
       if (!response.ok || !payload.conversation) {
         setError(payload.error ?? t.errorSend);
+        setSendState("failed");
         return;
       }
 
       setConversation(payload.conversation);
+      setLastSyncedAt(new Date());
       if (!user) {
         const guestToken = payload.guestAccessToken ?? guestSession?.token ?? "";
         if (!guestToken) {
           setError(t.errorSend);
+          setSendState("failed");
           return;
         }
         saveGuestSession(payload.conversation.id, guestEmail.trim(), guestName.trim(), guestToken);
       }
       setDraft("");
+      setSendState("sent");
+      window.setTimeout(() => setSendState("idle"), 2200);
     } catch {
       setError(t.errorSend);
+      setSendState("failed");
     } finally {
       setLoading(false);
     }
@@ -415,7 +479,7 @@ export function SupportChatWidget({ language, user }: Props) {
                 : `${unread} new`
               : adminAvailable
                 ? language === "fr"
-                  ? "Reponse ici"
+                  ? "Réponse ici"
                   : "Reply here"
                 : language === "fr"
                   ? "Message hors ligne"
@@ -442,6 +506,23 @@ export function SupportChatWidget({ language, user }: Props) {
               ✕
             </button>
           </header>
+          <div className="support-lite-connection-row">
+            <span className={hadNetworkIssue ? "support-lite-connection-dot support-lite-connection-dot--warn" : "support-lite-connection-dot"} />
+            <span>
+              {hadNetworkIssue
+                ? t.reconnecting
+                : lastSyncedAt
+                  ? `${t.synced} ${formatTime(lastSyncedAt.toISOString(), language)}`
+                  : adminAvailable
+                    ? t.subtitleAvailable
+                    : t.subtitleOffline}
+            </span>
+            {conversation && (conversation.unreadCount ?? 0) > 0 ? (
+              <strong>
+                {conversation.unreadCount} {t.unread}{conversation.unreadCount && conversation.unreadCount > 1 ? "s" : ""}
+              </strong>
+            ) : null}
+          </div>
 
           <div className="support-lite-body">
             {user ? (
@@ -501,6 +582,7 @@ export function SupportChatWidget({ language, user }: Props) {
             {isClosed ? <div className="support-lite-closed">{t.closed}</div> : null}
             {hadNetworkIssue ? <div className="support-lite-error support-lite-error--muted">{t.errorPolling}</div> : null}
             {error ? <div className="support-lite-error">{error}</div> : null}
+            {sendState === "sent" ? <div className="support-lite-ok">{t.sent}</div> : null}
           </div>
 
           {isClosed ? (

@@ -21,12 +21,89 @@ export function CheckoutSuccessView({
   fallbackPaymentMode = "stripe",
 }: Props) {
   const locale = language === "fr" ? "fr-CA" : "en-CA";
-  const orderNumber = confirmation?.orderNumber ?? fallbackOrderNumber ?? "";
-  const registerEmail = confirmation?.registerEmail ?? fallbackRegisterEmail ?? "";
+  const orderNumber = confirmation?.orderNumber ?? "";
+  const registerEmail = confirmation?.registerEmail ?? "";
   const paymentMode = confirmation?.paymentMode ?? fallbackPaymentMode;
+  const fallbackOrderReference = fallbackOrderNumber?.trim() ?? "";
+  const fallbackEmailReference = fallbackRegisterEmail?.trim() ?? "";
   const createAccountHref = registerEmail
     ? `/?registerEmail=${encodeURIComponent(registerEmail)}`
     : "/";
+  const confirmationItemCount = confirmation
+    ? confirmation.items.reduce((sum, item) => sum + item.quantity, 0)
+    : 0;
+  const confirmationItemCountLabel = language === "fr"
+    ? `${confirmationItemCount} article${confirmationItemCount !== 1 ? "s" : ""}`
+    : `${confirmationItemCount} item${confirmationItemCount !== 1 ? "s" : ""}`;
+
+  if (!confirmation) {
+    return (
+      <section className="section checkout-success-shell">
+        <article className="support-lite-card checkout-success-card checkout-success-card--unverified">
+          <div className="checkout-success-hero">
+            <span className="checkout-success-hero-icon" aria-hidden="true">{"\u{26A0}"}</span>
+            <div className="checkout-success-hero-copy">
+              <p className="support-lite-card__eyebrow">
+                {language === "fr" ? "Confirmation à vérifier" : "Confirmation needs review"}
+              </p>
+              <h1 className="support-lite-card__title checkout-success-title">
+                {language === "fr"
+                  ? "On n’a pas pu confirmer cette commande."
+                  : "We could not confirm this order."}
+              </h1>
+              <p className="small support-lite-card__text">
+                {language === "fr"
+                  ? "Les informations dans l’URL ne correspondent à aucune commande enregistrée. Si tu viens de payer par carte, la synchronisation peut prendre quelques instants; sinon retourne au checkout ou contacte le support."
+                  : "The URL details do not match a saved order. If you just paid by card, syncing can take a few moments; otherwise return to checkout or contact support."}
+              </p>
+            </div>
+          </div>
+
+          {fallbackOrderReference || fallbackEmailReference ? (
+            <div className="checkout-success-meta">
+              {fallbackOrderReference ? (
+                <div className="checkout-success-meta-item">
+                  <span>{language === "fr" ? "Référence demandée" : "Requested reference"}</span>
+                  <strong>{fallbackOrderReference}</strong>
+                </div>
+              ) : null}
+              {fallbackEmailReference ? (
+                <div className="checkout-success-meta-item">
+                  <span>{language === "fr" ? "Courriel fourni" : "Provided email"}</span>
+                  <strong>{fallbackEmailReference}</strong>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          <div className="checkout-success-next-step">
+            <strong className="checkout-success-next-step-title">
+              {language === "fr" ? "À faire maintenant" : "What to do now"}
+            </strong>
+            <p className="small checkout-success-note">
+              {language === "fr"
+                ? "Ne considère pas cette page comme une preuve de commande. Vérifie ton compte, reprends le checkout, ou écris-nous si tu as déjà reçu une confirmation de paiement."
+                : "Do not treat this page as proof of order. Check your account, restart checkout, or contact us if you already received a payment confirmation."}
+            </p>
+          </div>
+
+          <div className="checkout-success-actions">
+            <Link className="btn" href="/checkout">
+              {language === "fr" ? "Retour au checkout" : "Back to checkout"}
+            </Link>
+            {user ? (
+              <Link className="btn btn-secondary" href="/account">
+                {language === "fr" ? "Voir mon compte" : "View my account"}
+              </Link>
+            ) : null}
+            <Link className="btn btn-secondary" href="/faq">
+              {language === "fr" ? "Contacter le support" : "Contact support"}
+            </Link>
+          </div>
+        </article>
+      </section>
+    );
+  }
 
   const amountRows = confirmation
     ? [
@@ -139,7 +216,7 @@ export function CheckoutSuccessView({
           <strong className="checkout-success-next-step-title">
             {language === "fr" ? "Prochaine bonne étape" : "Good next step"}
           </strong>
-          <p className="small" style={{ margin: 0, color: "#6f624d" }}>
+          <p className="small checkout-success-note">
             {user
               ? language === "fr"
                 ? paymentMode === "manual"
@@ -156,6 +233,16 @@ export function CheckoutSuccessView({
 
         {confirmation ? (
           <div className="checkout-success-invoice">
+            <div className="checkout-success-invoice-head">
+              <div>
+                <span className="checkout-success-invoice-label">
+                  {language === "fr" ? "Facture" : "Invoice"}
+                </span>
+                <h2>{language === "fr" ? "Résumé de la commande" : "Order summary"}</h2>
+              </div>
+              <span className="checkout-summary-count">{confirmationItemCountLabel}</span>
+            </div>
+
             <div className="checkout-success-invoice-grid">
               <div className="checkout-success-invoice-panel">
                 <span className="checkout-success-invoice-label">
@@ -188,7 +275,7 @@ export function CheckoutSuccessView({
                 <div key={item.id} className="checkout-success-line-item">
                   <div>
                     <strong>{language === "fr" ? item.nameFr : item.nameEn}</strong>
-                    <p className="small" style={{ margin: "0.2rem 0 0" }}>
+                    <p className="small checkout-success-line-meta">
                       {language === "fr" ? "Quantité" : "Quantity"}: {item.quantity}
                     </p>
                   </div>
@@ -198,6 +285,9 @@ export function CheckoutSuccessView({
             </div>
 
             <div className="checkout-success-amounts">
+              <div className="checkout-success-amounts-head">
+                <span>{language === "fr" ? "Montants" : "Amounts"}</span>
+              </div>
               {amountRows.map((row) => (
                 <div
                   key={row.label}

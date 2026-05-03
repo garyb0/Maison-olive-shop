@@ -202,8 +202,12 @@ export async function geocodeAddressCached(input: DeliveryAddressInput): Promise
   }
 
   const geocoded = await fetchGoogleGeocode(input);
-  const created = await prisma.geocodedAddressCache.create({
-    data: {
+  const created = await prisma.geocodedAddressCache.upsert({
+    where: { addressKey },
+    update: {
+      lastUsedAt: new Date(),
+    },
+    create: {
       addressKey,
       shippingLine1: normalizeDeliveryAddressPart(input.shippingLine1),
       shippingCity: normalizeDeliveryAddressPart(input.shippingCity),

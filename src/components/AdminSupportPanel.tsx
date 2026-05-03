@@ -1,12 +1,31 @@
 ﻿"use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type Message = {
   id: string;
   senderType: "CUSTOMER" | "ADMIN" | "SYSTEM";
   content: string;
+  readAt?: string | null;
   createdAt?: string;
+};
+
+type SupportOrderSummary = {
+  id: string;
+  orderNumber: string;
+  status: string;
+  paymentStatus: string;
+  deliveryStatus: string;
+  totalCents: number;
+  currency: string;
+  createdAt?: string;
+};
+
+type InternalNote = {
+  id: string;
+  content: string;
+  createdAt?: string;
+  adminName?: string;
 };
 
 type Conversation = {
@@ -14,8 +33,65 @@ type Conversation = {
   customerEmail: string;
   customerName: string;
   status: "WAITING" | "OPEN" | "ASSIGNED" | "CLOSED";
+  assignedAdminId?: string | null;
+  assignedAdminName?: string;
+  assignedToMe?: boolean;
   lastMessageAt?: string;
+  unreadCount?: number;
+  lastMessagePreview?: string;
+  priority?: "LOW" | "NORMAL" | "HIGH" | "URGENT" | string;
+  tags?: string[];
+  aiSummary?: string | null;
+  aiIntent?: string | null;
+  aiEnabled?: boolean;
+  closedReason?: string | null;
+  closedNote?: string | null;
+  reopenedAt?: string | null;
+  slaDueAt?: string | null;
+  slaStatus?: "ok" | "watch" | "overdue" | "closed" | string;
+  needsReply?: boolean;
+  waitMinutes?: number;
+  internalNotes?: InternalNote[];
+  customerContext?: {
+    account: { id: string; email: string; name: string; role: string } | null;
+    linkedOrder: SupportOrderSummary | null;
+    recentOrders: SupportOrderSummary[];
+    supportHistoryCount: number;
+  };
   messages: Message[];
+};
+
+type QuickReply = {
+  id: string;
+  title: string;
+  content: string;
+  category: string;
+  language: "fr" | "en" | string;
+  isActive: boolean;
+  sortOrder: number;
+};
+
+type SupportSettingsPayload = {
+  uiSettings?: {
+    displayName?: string;
+  };
+  supportHealth?: {
+    ok: boolean;
+    missingTables?: string[];
+  };
+};
+
+type AiSuggestion = {
+  summary: string;
+  intent: string;
+  priority: "LOW" | "NORMAL" | "HIGH" | "URGENT" | string;
+  tags: string[];
+  draftReply: string;
+  confidence: number;
+  needsHumanReview: string[];
+  generatedAt: string;
+  model: string;
+  provider: "openai";
 };
 
 type Props = {
@@ -39,7 +115,7 @@ function getStatusText(status: Conversation["status"], language: "fr" | "en") {
       case "ASSIGNED":
         return "Prise en charge";
       case "CLOSED":
-        return "Fermee";
+        return "Fermée";
       default:
         return status;
     }
@@ -59,8 +135,64 @@ function getStatusText(status: Conversation["status"], language: "fr" | "en") {
   }
 }
 
-const QUICK_REPLIES_KEY = "admin_quick_replies";
-const ADMIN_NAME_KEY = "admin_display_name";
+function getPriorityLabel(priority: string | undefined, language: "fr" | "en") {
+  switch (priority) {
+    case "URGENT":
+      return language === "fr" ? "Urgent" : "Urgent";
+    case "HIGH":
+      return language === "fr" ? "Élevée" : "High";
+    case "LOW":
+      return language === "fr" ? "Basse" : "Low";
+    default:
+      return language === "fr" ? "Normale" : "Normal";
+  }
+}
+
+function getPriorityTone(priority: string | undefined) {
+  switch (priority) {
+    case "URGENT":
+      return "urgent";
+    case "HIGH":
+      return "high";
+    case "LOW":
+      return "low";
+    default:
+      return "normal";
+  }
+}
+
+function formatMoney(cents: number, currency: string, language: "fr" | "en") {
+  return new Intl.NumberFormat(language === "fr" ? "fr-CA" : "en-CA", {
+    style: "currency",
+    currency,
+  }).format(cents / 100);
+}
+
+function getSlaLabel(status: string | undefined, language: "fr" | "en") {
+  switch (status) {
+    case "overdue":
+      return language === "fr" ? "En retard" : "Overdue";
+    case "watch":
+      return language === "fr" ? "À surveiller" : "Watch";
+    case "closed":
+      return language === "fr" ? "Fermée" : "Closed";
+    default:
+      return language === "fr" ? "Dans les temps" : "On time";
+  }
+}
+
+function getCloseReasonLabel(reason: string | null | undefined, language: "fr" | "en") {
+  const labels: Record<string, { fr: string; en: string }> = {
+    RESOLVED: { fr: "Résolu", en: "Resolved" },
+    DELIVERY: { fr: "Livraison", en: "Delivery" },
+    PRODUCT: { fr: "Produit", en: "Product" },
+    PAYMENT: { fr: "Paiement", en: "Payment" },
+    REFUND: { fr: "Remboursement", en: "Refund" },
+    DUPLICATE: { fr: "Doublon", en: "Duplicate" },
+    OTHER: { fr: "Autre", en: "Other" },
+  };
+  return labels[reason || "RESOLVED"]?.[language] ?? labels.RESOLVED[language];
+}
 
 const DEFAULT_QUICK_REPLIES_FR = (name: string) => [
   `Bonjour ! Je suis ${name} de l'équipe Chez Olive. Comment puis-je vous aider aujourd'hui ? 🫒`,
@@ -83,6 +215,19 @@ const DEFAULT_QUICK_REPLIES_EN = (name: string) => [
   `Thank you for your patience. Your satisfaction is our priority at Chez Olive.`,
   `This conversation is now closed. Don't hesitate to contact us again if you have other questions. Have a great day! 🫒`,
 ];
+
+function makeFallbackQuickReplies(language: "fr" | "en", name: string): QuickReply[] {
+  const replies = language === "fr" ? DEFAULT_QUICK_REPLIES_FR(name) : DEFAULT_QUICK_REPLIES_EN(name);
+  return replies.map((content, index) => ({
+    id: `fallback-${language}-${index}`,
+    title: content.slice(0, 44),
+    content,
+    category: index >= replies.length - 2 ? "fermeture" : "general",
+    language,
+    isActive: true,
+    sortOrder: index + 1,
+  }));
+}
 
 function formatTime(dateStr?: string): string {
   if (!dateStr) return "";
@@ -166,42 +311,8 @@ function playBeep() {
   }
 }
 
-function loadQuickReplies(): string[] {
-  try {
-    const raw = localStorage.getItem(QUICK_REPLIES_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as unknown;
-    if (Array.isArray(parsed) && parsed.every((item) => typeof item === "string")) {
-      return parsed as string[];
-    }
-  } catch {
-    // ignore
-  }
-  return [];
-}
-
-function saveQuickReplies(replies: string[]) {
-  try {
-    localStorage.setItem(QUICK_REPLIES_KEY, JSON.stringify(replies));
-  } catch {
-    // ignore
-  }
-}
-
-function loadAdminName(): string {
-  try {
-    return localStorage.getItem(ADMIN_NAME_KEY) ?? "";
-  } catch {
-    return "";
-  }
-}
-
-function saveAdminName(name: string) {
-  try {
-    localStorage.setItem(ADMIN_NAME_KEY, name);
-  } catch {
-    // ignore
-  }
+function getDefaultAdminDisplayName(language: "fr" | "en") {
+  return language === "fr" ? "votre conseiller" : "your advisor";
 }
 
 export function AdminSupportPanel({ language }: Props) {
@@ -212,6 +323,7 @@ export function AdminSupportPanel({ language }: Props) {
   const [error, setError] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const prevWaitingCountRef = useRef<number | null>(null);
 
   // Request notification permission on mount
   useEffect(() => {
@@ -223,36 +335,54 @@ export function AdminSupportPanel({ language }: Props) {
   // Send browser notification when new waiting conversation appears
   useEffect(() => {
     const waitingCount = items.filter((c) => c.status === "WAITING").length;
-    const newWaiting = waitingCount - prevWaitingCountRef.current;
-    
-    if (newWaiting > 0 && typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
-      const title = language === "fr" 
-        ? `🔔 ${newWaiting} nouvelle conversation${newWaiting > 1 ? 's' : ''}` 
-        : `🔔 ${newWaiting} new conversation${newWaiting > 1 ? 's' : ''}`;
-      
-      const body = language === "fr"
-        ? "Un client attend votre réponse sur Chez Olive"
-        : "A customer is waiting for your response on Chez Olive";
-      
-      new Notification(title, {
-        body,
-        icon: "/olive-logo-3.png",
-        tag: "support-notification",
-        requireInteraction: true,
-      });
+    const previousWaitingCount = prevWaitingCountRef.current;
+
+    if (previousWaitingCount === null) {
+      prevWaitingCountRef.current = waitingCount;
+      return;
+    }
+
+    const newWaiting = waitingCount - previousWaitingCount;
+
+    if (newWaiting > 0) {
+      playBeep();
+
+      if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+        const title = language === "fr"
+          ? `🔔 ${newWaiting} nouvelle conversation${newWaiting > 1 ? 's' : ''}`
+          : `🔔 ${newWaiting} new conversation${newWaiting > 1 ? 's' : ''}`;
+
+        const body = language === "fr"
+          ? "Un client attend votre réponse sur Chez Olive"
+          : "A customer is waiting for your response on Chez Olive";
+
+        new Notification(title, {
+          body,
+          icon: "/olive-logo-3.png",
+          tag: "support-notification",
+          requireInteraction: true,
+        });
+      }
     }
     
     prevWaitingCountRef.current = waitingCount;
   }, [items, language]);
 
   // Quick replies state
-  const [quickReplies, setQuickReplies] = useState<string[]>([]);
+  const [quickReplies, setQuickReplies] = useState<QuickReply[]>([]);
   const [adminName, setAdminName] = useState("");
   const [adminNameInput, setAdminNameInput] = useState("");
   const [newReply, setNewReply] = useState("");
+  const [newReplyTitle, setNewReplyTitle] = useState("");
+  const [newReplyCategory, setNewReplyCategory] = useState("general");
   const [showQuickReplies, setShowQuickReplies] = useState(false);
   const [editingName, setEditingName] = useState(false);
+  const [noteDraft, setNoteDraft] = useState("");
+  const [closeReason, setCloseReason] = useState("RESOLVED");
+  const [closeNote, setCloseNote] = useState("");
+  const [tagDraft, setTagDraft] = useState("");
   const draftRef = useRef<HTMLTextAreaElement>(null);
+  const readInFlightRef = useRef<string | null>(null);
 
   const t = {
     title: language === "fr" ? "Support client en direct" : "Live customer support",
@@ -266,6 +396,9 @@ export function AdminSupportPanel({ language }: Props) {
     waiting: language === "fr" ? "En attente" : "Waiting",
     filterAll: language === "fr" ? "Tout" : "All",
     filterOpen: language === "fr" ? "Actives" : "Active",
+    filterMine: language === "fr" ? "Mes conversations" : "Mine",
+    filterUnassigned: language === "fr" ? "Non assignées" : "Unassigned",
+    filterReply: language === "fr" ? "À répondre" : "Needs reply",
     filterClosed: language === "fr" ? "Fermées" : "Closed",
     quickReplies: language === "fr" ? "Réponses rapides" : "Quick replies",
     quickRepliesHint: language === "fr" ? "Cliquez sur une phrase pour l'insérer" : "Click a phrase to insert it",
@@ -284,59 +417,156 @@ export function AdminSupportPanel({ language }: Props) {
       : "No saved phrases. Load default phrases or add your own.",
   };
 
-  // Load from localStorage on mount
-  useEffect(() => {
-    const stored = loadQuickReplies();
-    const storedName = loadAdminName();
-    const displayName = storedName || (language === "fr" ? "votre conseiller" : "your advisor");
-    setAdminName(displayName);
-    setAdminNameInput(storedName);
+  const [filter, setFilter] = useState<"ALL" | "ACTIVE" | "MINE" | "UNASSIGNED" | "NEEDS_REPLY" | "CLOSED">("ACTIVE");
+  const [closeConfirming, setCloseConfirming] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState("");
+  const [settingsWarning, setSettingsWarning] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [aiSuggestion, setAiSuggestion] = useState<AiSuggestion | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
 
-    if (stored.length > 0) {
-      setQuickReplies(stored);
-    } else {
-      // First load — populate with defaults
-      const defaults = language === "fr"
-        ? DEFAULT_QUICK_REPLIES_FR(displayName)
-        : DEFAULT_QUICK_REPLIES_EN(displayName);
-      setQuickReplies(defaults);
-      saveQuickReplies(defaults);
+  const saveAdminDisplaySettings = async (nextDisplayName = adminName) => {
+    try {
+      const res = await fetch("/api/admin/support/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          displayName: nextDisplayName,
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as SupportSettingsPayload & { error?: string };
+      if (!res.ok) throw new Error(data.error || "FAILED");
+      if (data.uiSettings?.displayName) {
+        setAdminName(data.uiSettings.displayName);
+        setAdminNameInput(data.uiSettings.displayName);
+      }
+      setSettingsWarning("");
+    } catch {
+      setSettingsWarning(
+        language === "fr"
+          ? "Réponses rapides affichées seulement dans cette session: les réglages serveur sont indisponibles."
+          : "Quick replies are only available in this session: server settings are unavailable.",
+      );
+    }
+  };
+
+  const loadQuickReplies = useCallback(async (fallbackName: string) => {
+    try {
+      const res = await fetch(`/api/admin/support/quick-replies?language=${language}`);
+      const data = (await res.json().catch(() => ({}))) as { quickReplies?: QuickReply[]; error?: string };
+      if (!res.ok) throw new Error(data.error || "FAILED");
+      setQuickReplies(data.quickReplies?.length ? data.quickReplies : makeFallbackQuickReplies(language, fallbackName));
+    } catch {
+      setQuickReplies(makeFallbackQuickReplies(language, fallbackName));
+      setSettingsWarning(
+        language === "fr"
+          ? "Macros serveur indisponibles: phrases par défaut chargées pour cette session."
+          : "Server macros unavailable: default phrases loaded for this session.",
+      );
     }
   }, [language]);
 
+  // Load shared admin UI settings from the server. localStorage is intentionally not used so replies stay consistent.
+  useEffect(() => {
+    let active = true;
+    const fallbackName = getDefaultAdminDisplayName(language);
+
+    const loadSettings = async () => {
+      try {
+        const res = await fetch("/api/admin/support/settings");
+        const data = (await res.json().catch(() => ({}))) as SupportSettingsPayload & { error?: string };
+        if (!res.ok) throw new Error(data.error || "FAILED");
+
+        const displayName = data.uiSettings?.displayName?.trim() || fallbackName;
+
+        if (!active) return;
+        setAdminName(displayName);
+        setAdminNameInput(displayName);
+        void loadQuickReplies(displayName);
+        setSettingsWarning(
+          data.supportHealth && !data.supportHealth.ok
+            ? language === "fr"
+              ? `Réglages support incomplets: migration requise (${data.supportHealth.missingTables?.join(", ") || "tables manquantes"}).`
+              : `Support settings incomplete: migration required (${data.supportHealth.missingTables?.join(", ") || "missing tables"}).`
+            : "",
+        );
+      } catch {
+        if (!active) return;
+        setAdminName(fallbackName);
+        setAdminNameInput(fallbackName);
+        setQuickReplies(makeFallbackQuickReplies(language, fallbackName));
+        setSettingsWarning(
+          language === "fr"
+            ? "Réponses rapides par défaut chargées: réglages serveur indisponibles."
+            : "Default quick replies loaded: server settings are unavailable.",
+        );
+      }
+    };
+
+    void loadSettings();
+    return () => {
+      active = false;
+    };
+  }, [language, loadQuickReplies]);
+
   const saveNameAndUpdate = () => {
     const trimmed = adminNameInput.trim();
-    const displayName = trimmed || (language === "fr" ? "votre conseiller" : "your advisor");
-    saveAdminName(trimmed);
+    const displayName = trimmed || getDefaultAdminDisplayName(language);
     setAdminName(displayName);
+    setAdminNameInput(displayName);
     setEditingName(false);
+    void saveAdminDisplaySettings(displayName);
   };
 
   const loadDefaults = () => {
-    const defaults = language === "fr"
-      ? DEFAULT_QUICK_REPLIES_FR(adminName)
-      : DEFAULT_QUICK_REPLIES_EN(adminName);
+    const defaults = makeFallbackQuickReplies(language, adminName);
     setQuickReplies(defaults);
-    saveQuickReplies(defaults);
   };
 
   const clearAllReplies = () => {
+    quickReplies.forEach((reply) => {
+      if (!reply.id.startsWith("fallback-")) {
+        void fetch(`/api/admin/support/quick-replies/${reply.id}`, { method: "DELETE" });
+      }
+    });
     setQuickReplies([]);
-    saveQuickReplies([]);
   };
 
-  const addReply = () => {
+  const addReply = async () => {
     if (!newReply.trim()) return;
-    const updated = [...quickReplies, newReply.trim()];
-    setQuickReplies(updated);
-    saveQuickReplies(updated);
+    const fallbackReply: QuickReply = {
+      id: `local-${Date.now()}`,
+      title: (newReplyTitle.trim() || newReply.trim().slice(0, 44)),
+      content: newReply.trim(),
+      category: newReplyCategory.trim() || "general",
+      language,
+      isActive: true,
+      sortOrder: quickReplies.length + 1,
+    };
+    try {
+      const res = await fetch("/api/admin/support/quick-replies", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(fallbackReply),
+      });
+      const data = (await res.json().catch(() => ({}))) as { quickReply?: QuickReply };
+      setQuickReplies((current) => [...current, data.quickReply ?? fallbackReply]);
+      setSettingsWarning("");
+    } catch {
+      setQuickReplies((current) => [...current, fallbackReply]);
+      setSettingsWarning(language === "fr" ? "Macro ajoutée localement seulement." : "Macro added locally only.");
+    }
     setNewReply("");
+    setNewReplyTitle("");
   };
 
   const deleteReply = (index: number) => {
-    const updated = quickReplies.filter((_, i) => i !== index);
-    setQuickReplies(updated);
-    saveQuickReplies(updated);
+    const target = quickReplies[index];
+    setQuickReplies((current) => current.filter((_, i) => i !== index));
+    if (target && !target.id.startsWith("fallback-") && !target.id.startsWith("local-")) {
+      void fetch(`/api/admin/support/quick-replies/${target.id}`, { method: "DELETE" });
+    }
   };
 
   const insertReply = (text: string) => {
@@ -348,13 +578,46 @@ export function AdminSupportPanel({ language }: Props) {
     }, 50);
   };
 
-  const [filter, setFilter] = useState<"ALL" | "ACTIVE" | "CLOSED">("ACTIVE");
-  const [closeConfirming, setCloseConfirming] = useState<string | null>(null);
-  const [actionMessage, setActionMessage] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
-
   const selected = items.find((i) => i.id === selectedId) ?? null;
-  const prevWaitingCountRef = useRef(0);
+
+  useEffect(() => {
+    setAiSuggestion(null);
+    setAiError("");
+    setAiLoading(false);
+  }, [selectedId]);
+
+  useEffect(() => {
+    if (!selected || (selected.unreadCount ?? 0) <= 0) return;
+    if (readInFlightRef.current === selected.id) return;
+
+    let active = true;
+    readInFlightRef.current = selected.id;
+
+    const markRead = async () => {
+      try {
+        const res = await fetch(`/api/admin/support/conversations/${selected.id}/read`, {
+          method: "POST",
+        });
+        const data = (await res.json().catch(() => ({}))) as { conversation?: Conversation };
+        if (active && res.ok && data.conversation) {
+          setItems((current) =>
+            current.map((item) => (item.id === selected.id ? data.conversation as Conversation : item)),
+          );
+        }
+      } catch {
+        // The next polling cycle will keep the UI consistent.
+      } finally {
+        if (readInFlightRef.current === selected.id) {
+          readInFlightRef.current = null;
+        }
+      }
+    };
+
+    void markRead();
+    return () => {
+      active = false;
+    };
+  }, [selected]);
 
   const load = async () => {
     try {
@@ -362,11 +625,6 @@ export function AdminSupportPanel({ language }: Props) {
       if (!res.ok) return;
       const data = await res.json();
       const convs: Conversation[] = data.conversations ?? [];
-      const newWaiting = convs.filter((c) => c.status === "WAITING").length;
-      if (newWaiting > prevWaitingCountRef.current) {
-        playBeep();
-      }
-      prevWaitingCountRef.current = newWaiting;
       setItems(convs);
     } catch {
       // silent
@@ -443,12 +701,134 @@ export function AdminSupportPanel({ language }: Props) {
     }
   };
 
+  const unassign = async () => {
+    if (!selected) return;
+    setError("");
+    try {
+      const res = await fetch(`/api/admin/support/conversations/${selected.id}/assign`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "FAILED");
+      setItems((current) =>
+        current.map((item) => (item.id === selected.id ? (data.conversation as Conversation) : item)),
+      );
+    } catch {
+      setError(language === "fr" ? "Impossible de libérer l'assignation." : "Could not unassign.");
+    }
+  };
+
+  const patchConversation = async (payload: { priority?: string; tags?: string[] }) => {
+    if (!selected) return;
+    setError("");
+    try {
+      const res = await fetch(`/api/admin/support/conversations/${selected.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "FAILED");
+      setItems((current) =>
+        current.map((item) => (item.id === selected.id ? (data.conversation as Conversation) : item)),
+      );
+    } catch {
+      setError(language === "fr" ? "Impossible de mettre à jour la conversation." : "Could not update conversation.");
+    }
+  };
+
+  const addTag = () => {
+    if (!selected || !tagDraft.trim()) return;
+    const tags = Array.from(new Set([...(selected.tags ?? []), tagDraft.trim().toLowerCase()])).slice(0, 12);
+    setTagDraft("");
+    void patchConversation({ tags });
+  };
+
+  const removeTag = (tag: string) => {
+    if (!selected) return;
+    void patchConversation({ tags: (selected.tags ?? []).filter((item) => item !== tag) });
+  };
+
+  const generateAiSuggestion = async () => {
+    if (!selected) return;
+    setAiLoading(true);
+    setAiError("");
+    try {
+      const res = await fetch(`/api/admin/support/conversations/${selected.id}/ai-suggestion`, {
+        method: "POST",
+      });
+      const data = (await res.json().catch(() => ({}))) as { suggestion?: AiSuggestion; error?: string };
+      if (!res.ok || !data.suggestion) throw new Error(data.error || "FAILED");
+      setAiSuggestion(data.suggestion);
+      setItems((current) =>
+        current.map((item) =>
+          item.id === selected.id
+            ? {
+                ...item,
+                aiSummary: data.suggestion?.summary ?? item.aiSummary,
+                aiIntent: data.suggestion?.intent ?? item.aiIntent,
+              }
+            : item,
+        ),
+      );
+      setActionMessage(language === "fr" ? "Suggestion IA prête à vérifier." : "AI suggestion ready for review.");
+      setTimeout(() => setActionMessage(""), 3000);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      setAiError(
+        message === "Support AI disabled"
+          ? language === "fr"
+            ? "L'IA maison est désactivée pour le moment."
+            : "House AI is disabled for now."
+          : language === "fr"
+            ? "Impossible de générer la suggestion IA."
+            : "Could not generate the AI suggestion.",
+      );
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const insertAiDraft = () => {
+    if (!aiSuggestion) return;
+    setDraft(aiSuggestion.draftReply);
+    setTimeout(() => draftRef.current?.focus(), 50);
+  };
+
+  const applyAiWorkflow = () => {
+    if (!selected || !aiSuggestion) return;
+    const nextTags = Array.from(new Set([...(selected.tags ?? []), ...aiSuggestion.tags])).slice(0, 12);
+    void patchConversation({ priority: aiSuggestion.priority, tags: nextTags });
+  };
+
+  const addInternalNote = async () => {
+    if (!selected || !noteDraft.trim()) return;
+    setError("");
+    try {
+      const res = await fetch(`/api/admin/support/conversations/${selected.id}/notes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: noteDraft.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "FAILED");
+      setItems((current) =>
+        current.map((item) => (item.id === selected.id ? (data.conversation as Conversation) : item)),
+      );
+      setNoteDraft("");
+    } catch {
+      setError(language === "fr" ? "Impossible d'ajouter la note interne." : "Could not add internal note.");
+    }
+  };
+
   const closeConversation = async () => {
     if (!selected) return;
     setError("");
     setCloseConfirming(null);
     try {
-      const res = await fetch(`/api/admin/support/conversations/${selected.id}/close`, { method: "POST" });
+      const res = await fetch(`/api/admin/support/conversations/${selected.id}/close`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: closeReason, note: closeNote }),
+      });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "FAILED");
       setItems((current) => {
@@ -462,10 +842,29 @@ export function AdminSupportPanel({ language }: Props) {
         }
         return updated;
       });
+      setCloseNote("");
+      setCloseReason("RESOLVED");
       setActionMessage(language === "fr" ? "✓ Conversation fermée" : "✓ Conversation closed");
       setTimeout(() => setActionMessage(""), 3000);
     } catch {
       setError(language === "fr" ? "Impossible de fermer." : "Could not close.");
+    }
+  };
+
+  const reopenConversation = async () => {
+    if (!selected) return;
+    setError("");
+    try {
+      const res = await fetch(`/api/admin/support/conversations/${selected.id}/reopen`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "FAILED");
+      setItems((current) =>
+        current.map((item) => (item.id === selected.id ? (data.conversation as Conversation) : item)),
+      );
+      setActionMessage(language === "fr" ? "✓ Conversation réouverte" : "✓ Conversation reopened");
+      setTimeout(() => setActionMessage(""), 3000);
+    } catch {
+      setError(language === "fr" ? "Impossible de réouvrir." : "Could not reopen.");
     }
   };
 
@@ -478,14 +877,37 @@ export function AdminSupportPanel({ language }: Props) {
 
   const q = searchQuery.toLowerCase().trim();
   const filtered = items.filter((c) => {
-    const matchesFilter = filter === "ACTIVE" ? c.status !== "CLOSED" : filter === "CLOSED" ? c.status === "CLOSED" : true;
-    const matchesSearch = !q || c.customerName.toLowerCase().includes(q) || c.customerEmail.toLowerCase().includes(q);
+    const matchesFilter =
+      filter === "ACTIVE"
+        ? c.status !== "CLOSED"
+        : filter === "MINE"
+          ? c.status !== "CLOSED" && Boolean(c.assignedToMe)
+          : filter === "UNASSIGNED"
+            ? c.status !== "CLOSED" && !c.assignedAdminId
+            : filter === "NEEDS_REPLY"
+              ? c.status !== "CLOSED" && Boolean(c.needsReply)
+              : filter === "CLOSED"
+                ? c.status === "CLOSED"
+                : true;
+    const searchBlob = [
+      c.customerName,
+      c.customerEmail,
+      c.lastMessagePreview,
+      c.customerContext?.linkedOrder?.orderNumber,
+      ...(c.tags ?? []),
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+    const matchesSearch = !q || searchBlob.includes(q);
     return matchesFilter && matchesSearch;
   });
 
   const waitingCount = items.filter((c) => c.status === "WAITING").length;
   const activeCount = items.filter((c) => c.status !== "CLOSED").length;
   const closedCount = items.filter((c) => c.status === "CLOSED").length;
+  const unreadTotal = items.reduce((sum, c) => sum + (c.unreadCount ?? 0), 0);
+  const needsReplyCount = items.filter((c) => c.status !== "CLOSED" && c.needsReply).length;
 
   return (
     <section className="section" style={{ padding: 0, overflow: "hidden" }}>
@@ -507,6 +929,12 @@ export function AdminSupportPanel({ language }: Props) {
             <span className="support-admin-summary-pill support-admin-summary-pill--soft">
               {closedCount} {language === "fr" ? "fermées" : "closed"}
             </span>
+            <span className={`support-admin-summary-pill${unreadTotal > 0 ? " support-admin-summary-pill--alert" : " support-admin-summary-pill--soft"}`}>
+              {unreadTotal} {language === "fr" ? "non lus" : "unread"}
+            </span>
+            <span className={`support-admin-summary-pill${needsReplyCount > 0 ? " support-admin-summary-pill--alert" : " support-admin-summary-pill--soft"}`}>
+              {needsReplyCount} {language === "fr" ? "à répondre" : "needs reply"}
+            </span>
           </div>
           {waitingCount > 0 && (
             <span className="support-admin-waiting-badge">
@@ -525,14 +953,24 @@ export function AdminSupportPanel({ language }: Props) {
             ⚡ {t.quickReplies}
           </button>
           <div className="support-admin-filter-row">
-            {(["ACTIVE", "ALL", "CLOSED"] as const).map((f) => (
+            {(["ACTIVE", "MINE", "UNASSIGNED", "NEEDS_REPLY", "ALL", "CLOSED"] as const).map((f) => (
               <button
                 key={f}
                 type="button"
                 className={`support-admin-filter-btn${filter === f ? " active" : ""}`}
                 onClick={() => setFilter(f)}
               >
-                {f === "ACTIVE" ? t.filterOpen : f === "CLOSED" ? t.filterClosed : t.filterAll}
+                {f === "ACTIVE"
+                  ? t.filterOpen
+                  : f === "MINE"
+                    ? t.filterMine
+                    : f === "UNASSIGNED"
+                      ? t.filterUnassigned
+                      : f === "NEEDS_REPLY"
+                        ? t.filterReply
+                        : f === "CLOSED"
+                          ? t.filterClosed
+                          : t.filterAll}
               </button>
             ))}
           </div>
@@ -542,6 +980,10 @@ export function AdminSupportPanel({ language }: Props) {
       {/* Quick replies panel */}
       {showQuickReplies && (
         <div className="support-qr-panel">
+          {settingsWarning ? (
+            <div className="support-admin-settings-warning">{settingsWarning}</div>
+          ) : null}
+
           {/* Admin name section */}
           <div className="support-qr-name-row">
             <span className="support-qr-name-label">
@@ -586,14 +1028,16 @@ export function AdminSupportPanel({ language }: Props) {
               </p>
             )}
             {quickReplies.map((reply, index) => (
-              <div key={index} className="support-qr-item">
+              <div key={reply.id} className="support-qr-item">
                 <button
                   type="button"
                   className="support-qr-text"
-                  onClick={() => insertReply(reply)}
+                  onClick={() => insertReply(reply.content)}
                   title={language === "fr" ? "Cliquer pour insérer" : "Click to insert"}
                 >
-                  {reply}
+                  <strong className="support-qr-title">{reply.title}</strong>
+                  <span>{reply.content}</span>
+                  <small>{reply.category}</small>
                 </button>
                 <button
                   type="button"
@@ -611,16 +1055,30 @@ export function AdminSupportPanel({ language }: Props) {
           <div className="support-qr-add-row">
             <input
               className="input"
+              placeholder={language === "fr" ? "Titre" : "Title"}
+              value={newReplyTitle}
+              onChange={(e) => setNewReplyTitle(e.target.value)}
+              style={{ flex: "0 1 180px", minWidth: 0 }}
+            />
+            <input
+              className="input"
+              placeholder={language === "fr" ? "Catégorie" : "Category"}
+              value={newReplyCategory}
+              onChange={(e) => setNewReplyCategory(e.target.value)}
+              style={{ flex: "0 1 140px", minWidth: 0 }}
+            />
+            <input
+              className="input"
               placeholder={t.addReply}
               value={newReply}
               onChange={(e) => setNewReply(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") addReply(); }}
+              onKeyDown={(e) => { if (e.key === "Enter") void addReply(); }}
               style={{ flex: 1, minWidth: 0 }}
             />
             <button
               className="btn"
               type="button"
-              onClick={addReply}
+              onClick={() => void addReply()}
               disabled={!newReply.trim()}
               style={{ fontSize: "0.82rem", padding: "0.4rem 0.8rem", flexShrink: 0 }}
             >
@@ -673,13 +1131,15 @@ export function AdminSupportPanel({ language }: Props) {
             const lastMsgSenderIcon = lastMsg?.senderType === "ADMIN" ? "🫒" : lastMsg?.senderType === "CUSTOMER" ? "👤" : "";
             const lastMsgTime = lastMsg?.createdAt ? formatRelativeTime(lastMsg.createdAt, language) : "";
             const isWaiting = conv.status === "WAITING";
+            const unreadCount = conv.unreadCount ?? 0;
+            const preview = conv.lastMessagePreview ?? lastMsg?.content ?? "";
 
             return (
               <div
                 key={conv.id}
                 role="button"
                 tabIndex={0}
-                className={`support-admin-item${selectedId === conv.id ? " active" : ""}${conv.status === "CLOSED" ? " closed" : ""}${isWaiting ? " waiting" : ""}`}
+                className={`support-admin-item${selectedId === conv.id ? " active" : ""}${conv.status === "CLOSED" ? " closed" : ""}${isWaiting ? " waiting" : ""}${unreadCount > 0 ? " unread" : ""}`}
                 onClick={() => {
                   setSelectedId(conv.id);
                 }}
@@ -701,11 +1161,35 @@ export function AdminSupportPanel({ language }: Props) {
                   )}
                 </div>
                 <div className="support-admin-item-email">{conv.customerEmail}</div>
-                {lastMsg && (
+                <div className="support-admin-item-meta">
+                  <span className={`support-admin-priority support-admin-priority--${getPriorityTone(conv.priority)}`}>
+                    {getPriorityLabel(conv.priority, language)}
+                  </span>
+                  {unreadCount > 0 ? (
+                    <span className="support-admin-unread">
+                      {unreadCount} {language === "fr" ? "non lu" : "unread"}{unreadCount > 1 && language === "fr" ? "s" : ""}
+                    </span>
+                  ) : null}
+                  {conv.needsReply ? (
+                    <span className={`support-admin-sla support-admin-sla--${conv.slaStatus ?? "ok"}`}>
+                      {getSlaLabel(conv.slaStatus, language)} · {conv.waitMinutes ?? 0}min
+                    </span>
+                  ) : null}
+                  {conv.assignedAdminName ? (
+                    <span className="support-admin-tag">
+                      {conv.assignedToMe
+                        ? language === "fr"
+                          ? "À moi"
+                          : "Mine"
+                        : conv.assignedAdminName}
+                    </span>
+                  ) : null}
+                </div>
+                {preview && (
                   <div className="support-admin-item-preview">
                     <span className="support-admin-item-preview-icon">{lastMsgSenderIcon}</span>
-                    {lastMsg.content.slice(0, 55)}
-                    {lastMsg.content.length > 55 ? "…" : ""}
+                    {preview.slice(0, 70)}
+                    {preview.length > 70 ? "…" : ""}
                   </div>
                 )}
                 <button
@@ -745,20 +1229,95 @@ export function AdminSupportPanel({ language }: Props) {
                   <span className={`support-admin-status-pill support-admin-status-pill--${selected.status.toLowerCase()}`}>
                     {STATUS_ICON[selected.status]} {getStatusText(selected.status, language)}
                   </span>
+                  <div className="support-admin-detail-tags">
+                    <span className={`support-admin-priority support-admin-priority--${getPriorityTone(selected.priority)}`}>
+                      {getPriorityLabel(selected.priority, language)}
+                    </span>
+                    {(selected.unreadCount ?? 0) > 0 ? (
+                      <span className="support-admin-unread">
+                        {selected.unreadCount} {language === "fr" ? "non lu" : "unread"}{(selected.unreadCount ?? 0) > 1 && language === "fr" ? "s" : ""}
+                      </span>
+                    ) : null}
+                    {selected.tags?.map((tag) => (
+                      <button className="support-admin-tag support-admin-tag--button" key={tag} type="button" onClick={() => removeTag(tag)}>
+                        {tag} ×
+                      </button>
+                    ))}
+                    {selected.assignedAdminName ? (
+                      <span className="support-admin-tag">
+                        {language === "fr" ? "Assignée à " : "Assigned to "}
+                        {selected.assignedToMe ? (language === "fr" ? "moi" : "me") : selected.assignedAdminName}
+                      </span>
+                    ) : null}
+                    {selected.needsReply ? (
+                      <span className={`support-admin-sla support-admin-sla--${selected.slaStatus ?? "ok"}`}>
+                        {getSlaLabel(selected.slaStatus, language)} · {selected.waitMinutes ?? 0}min
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="support-admin-workflow-row">
+                    <select
+                      className="support-admin-select"
+                      value={selected.priority ?? "NORMAL"}
+                      onChange={(event) => void patchConversation({ priority: event.target.value })}
+                    >
+                      <option value="LOW">{getPriorityLabel("LOW", language)}</option>
+                      <option value="NORMAL">{getPriorityLabel("NORMAL", language)}</option>
+                      <option value="HIGH">{getPriorityLabel("HIGH", language)}</option>
+                      <option value="URGENT">{getPriorityLabel("URGENT", language)}</option>
+                    </select>
+                    <input
+                      className="support-admin-tag-input"
+                      placeholder={language === "fr" ? "Ajouter un tag" : "Add tag"}
+                      value={tagDraft}
+                      onChange={(event) => setTagDraft(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          addTag();
+                        }
+                      }}
+                    />
+                    <button className="support-admin-filter-btn" type="button" onClick={addTag} disabled={!tagDraft.trim()}>
+                      {language === "fr" ? "Tag" : "Tag"}
+                    </button>
+                  </div>
                 </div>
                 <div className="row" style={{ gap: "0.5rem" }}>
-                  {selected.status !== "ASSIGNED" && selected.status !== "CLOSED" && (
+                  {selected.status === "CLOSED" ? (
+                    <button className="btn btn-secondary" type="button" onClick={() => void reopenConversation()} style={{ fontSize: "0.8rem" }}>
+                      {language === "fr" ? "Réouvrir" : "Reopen"}
+                    </button>
+                  ) : selected.status !== "ASSIGNED" ? (
                     <button className="btn btn-secondary" type="button" onClick={() => void assign()} style={{ fontSize: "0.8rem" }}>
                       {t.assign}
+                    </button>
+                  ) : (
+                    <button className="btn btn-secondary" type="button" onClick={() => void unassign()} style={{ fontSize: "0.8rem" }}>
+                      {language === "fr" ? "Libérer" : "Unassign"}
                     </button>
                   )}
                   {selected.status !== "CLOSED" && (
                     <>
                       {closeConfirming === selected.id ? (
-                        <>
-                          <span className="small" style={{ color: "var(--danger)" }}>
-                            {language === "fr" ? "Confirmer ?" : "Confirm?"}
-                          </span>
+                        <div className="support-admin-close-pop">
+                          <select
+                            className="support-admin-select"
+                            value={closeReason}
+                            onChange={(event) => setCloseReason(event.target.value)}
+                          >
+                            {["RESOLVED", "DELIVERY", "PRODUCT", "PAYMENT", "REFUND", "DUPLICATE", "OTHER"].map((reason) => (
+                              <option key={reason} value={reason}>
+                                {getCloseReasonLabel(reason, language)}
+                              </option>
+                            ))}
+                          </select>
+                          <input
+                            className="support-admin-tag-input"
+                            placeholder={language === "fr" ? "Note interne de fermeture" : "Internal close note"}
+                            value={closeNote}
+                            onChange={(event) => setCloseNote(event.target.value)}
+                          />
                           <button
                             className="btn btn-danger"
                             type="button"
@@ -775,7 +1334,7 @@ export function AdminSupportPanel({ language }: Props) {
                           >
                             {language === "fr" ? "Annuler" : "Cancel"}
                           </button>
-                        </>
+                        </div>
                       ) : (
                         <button
                           className="btn btn-danger"
@@ -789,6 +1348,232 @@ export function AdminSupportPanel({ language }: Props) {
                     </>
                   )}
                 </div>
+              </div>
+
+              <div className="support-admin-detail-scroll">
+              {/* Customer context */}
+              <div className="support-admin-context">
+                <div className="support-admin-context__header">
+                  <strong>{language === "fr" ? "Contexte client" : "Customer context"}</strong>
+                  <span>
+                    {language === "fr"
+                      ? "Préparé pour assistance humaine et IA maison"
+                      : "Prepared for human support and house AI"}
+                  </span>
+                </div>
+                <div className="support-admin-context-grid">
+                  <article className="support-admin-context-card">
+                    <span>{language === "fr" ? "Compte" : "Account"}</span>
+                    <strong>
+                      {selected.customerContext?.account
+                        ? language === "fr"
+                          ? "Client connecté"
+                          : "Signed-in customer"
+                        : language === "fr"
+                          ? "Invité"
+                          : "Guest"}
+                    </strong>
+                    <p>
+                      {selected.customerContext?.account
+                        ? `${selected.customerContext.account.name} · ${selected.customerContext.account.email}`
+                        : selected.customerEmail}
+                    </p>
+                  </article>
+
+                  <article className="support-admin-context-card">
+                    <span>{language === "fr" ? "Historique" : "History"}</span>
+                    <strong>{selected.customerContext?.supportHistoryCount ?? 1}</strong>
+                    <p>
+                      {language === "fr"
+                        ? "conversation(s) support reliée(s) à ce client."
+                        : "support conversation(s) linked to this customer."}
+                    </p>
+                  </article>
+
+                  <article className="support-admin-context-card">
+                    <span>{language === "fr" ? "Commande liée" : "Linked order"}</span>
+                    {selected.customerContext?.linkedOrder ? (
+                      <>
+                        <strong>{selected.customerContext.linkedOrder.orderNumber}</strong>
+                        <p>
+                          {formatMoney(
+                            selected.customerContext.linkedOrder.totalCents,
+                            selected.customerContext.linkedOrder.currency,
+                            language,
+                          )}{" "}
+                          · {selected.customerContext.linkedOrder.status}
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <strong>{language === "fr" ? "Aucune" : "None"}</strong>
+                        <p>
+                          {language === "fr"
+                            ? "Les commandes récentes restent disponibles ci-dessous."
+                            : "Recent orders remain available below."}
+                        </p>
+                      </>
+                    )}
+                  </article>
+
+                  <article className="support-admin-context-card">
+                    <span>{language === "fr" ? "IA maison" : "House AI"}</span>
+                    <strong>
+                      {!selected.aiEnabled
+                        ? language === "fr"
+                          ? "Désactivée"
+                          : "Disabled"
+                        : selected.aiSummary
+                        ? language === "fr"
+                          ? "Résumé prêt"
+                          : "Summary ready"
+                        : language === "fr"
+                          ? "Disponible"
+                          : "Available"}
+                    </strong>
+                    <p>
+                      {selected.aiSummary ||
+                        (language === "fr"
+                          ? "Aucune réponse automatique au client. Les suggestions restent internes et éditables."
+                          : "No automatic customer reply. Suggestions stay internal and editable.")}
+                    </p>
+                    <button
+                      className="support-admin-filter-btn support-admin-ai-card-btn"
+                      type="button"
+                      onClick={() => void generateAiSuggestion()}
+                      disabled={!selected.aiEnabled || aiLoading}
+                    >
+                      {aiLoading
+                        ? language === "fr"
+                          ? "Génération..."
+                          : "Generating..."
+                        : language === "fr"
+                          ? "Générer une suggestion IA"
+                          : "Generate AI suggestion"}
+                    </button>
+                  </article>
+                </div>
+                {selected.customerContext?.recentOrders?.length ? (
+                  <div className="support-admin-recent-orders">
+                    <span>{language === "fr" ? "Commandes récentes" : "Recent orders"}</span>
+                    {selected.customerContext.recentOrders.slice(0, 3).map((order) => (
+                      <span className="support-admin-order-chip" key={order.id}>
+                        {order.orderNumber} · {formatMoney(order.totalCents, order.currency, language)}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+                {selected.status === "CLOSED" ? (
+                  <div className="support-admin-recent-orders">
+                    <span>{language === "fr" ? "Fermeture" : "Closure"}</span>
+                    <span className="support-admin-order-chip">{getCloseReasonLabel(selected.closedReason, language)}</span>
+                    {selected.closedNote ? <span className="support-admin-order-chip">{selected.closedNote}</span> : null}
+                  </div>
+                ) : null}
+              </div>
+
+              {(aiSuggestion || aiError) && (
+                <div className="support-admin-ai-panel">
+                  <div className="support-admin-ai-panel__head">
+                    <div>
+                      <strong>{language === "fr" ? "Suggestion IA maison" : "House AI suggestion"}</strong>
+                      <span>
+                        {language === "fr"
+                          ? "Interne seulement. Validez avant d'envoyer."
+                          : "Internal only. Review before sending."}
+                      </span>
+                    </div>
+                    {aiSuggestion ? (
+                      <span className="support-admin-ai-confidence">
+                        {Math.round(aiSuggestion.confidence * 100)}%
+                      </span>
+                    ) : null}
+                  </div>
+                  {aiError ? <div className="support-win-error">{aiError}</div> : null}
+                  {aiSuggestion ? (
+                    <>
+                      <div className="support-admin-ai-grid">
+                        <article>
+                          <span>{language === "fr" ? "Résumé" : "Summary"}</span>
+                          <p>{aiSuggestion.summary}</p>
+                        </article>
+                        <article>
+                          <span>{language === "fr" ? "Intention" : "Intent"}</span>
+                          <p>{aiSuggestion.intent}</p>
+                        </article>
+                        <article>
+                          <span>{language === "fr" ? "Priorité suggérée" : "Suggested priority"}</span>
+                          <p>{getPriorityLabel(aiSuggestion.priority, language)}</p>
+                        </article>
+                        <article>
+                          <span>{language === "fr" ? "Tags suggérés" : "Suggested tags"}</span>
+                          <p>{aiSuggestion.tags.length ? aiSuggestion.tags.join(", ") : "—"}</p>
+                        </article>
+                      </div>
+                      <div className="support-admin-ai-draft">
+                        <span>{language === "fr" ? "Brouillon proposé" : "Suggested draft"}</span>
+                        <p>{aiSuggestion.draftReply}</p>
+                      </div>
+                      {aiSuggestion.needsHumanReview.length ? (
+                        <div className="support-admin-ai-review">
+                          <span>{language === "fr" ? "À vérifier" : "Review"}</span>
+                          <p>{aiSuggestion.needsHumanReview.join(" · ")}</p>
+                        </div>
+                      ) : null}
+                      <div className="support-admin-ai-actions">
+                        <button className="btn btn-secondary" type="button" onClick={insertAiDraft}>
+                          {language === "fr" ? "Insérer le brouillon" : "Insert draft"}
+                        </button>
+                        <button className="support-admin-filter-btn" type="button" onClick={applyAiWorkflow}>
+                          {language === "fr" ? "Appliquer priorité/tags" : "Apply priority/tags"}
+                        </button>
+                      </div>
+                    </>
+                  ) : null}
+                </div>
+              )}
+
+              <div className="support-admin-notes">
+                <div className="support-admin-notes__head">
+                  <strong>{language === "fr" ? "Notes internes" : "Internal notes"}</strong>
+                  <span>{language === "fr" ? "Jamais visibles par le client" : "Never visible to customers"}</span>
+                </div>
+                {selected.internalNotes?.length ? (
+                  <div className="support-admin-note-list">
+                    {selected.internalNotes.map((note) => (
+                      <article className="support-admin-note" key={note.id}>
+                        <p>{note.content}</p>
+                        <span>
+                          {note.adminName || (language === "fr" ? "Admin" : "Admin")}
+                          {note.createdAt ? ` · ${formatRelativeTime(note.createdAt, language)}` : ""}
+                        </span>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="small" style={{ margin: 0, color: "var(--muted)" }}>
+                    {language === "fr" ? "Aucune note interne pour le moment." : "No internal notes yet."}
+                  </p>
+                )}
+                {selected.status !== "CLOSED" ? (
+                  <div className="support-admin-note-compose">
+                    <input
+                      className="support-admin-tag-input"
+                      placeholder={language === "fr" ? "Ajouter une note interne" : "Add an internal note"}
+                      value={noteDraft}
+                      onChange={(event) => setNoteDraft(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          void addInternalNote();
+                        }
+                      }}
+                    />
+                    <button className="support-admin-filter-btn" type="button" onClick={() => void addInternalNote()} disabled={!noteDraft.trim()}>
+                      {language === "fr" ? "Note" : "Note"}
+                    </button>
+                  </div>
+                ) : null}
               </div>
 
               {/* Messages */}
@@ -839,7 +1624,9 @@ export function AdminSupportPanel({ language }: Props) {
                   );
                 })}
                 {selected.status === "CLOSED" && (
-                  <div className="support-win-closed">{t.closed}</div>
+                  <div className="support-win-closed">
+                    {t.closed} · {getCloseReasonLabel(selected.closedReason, language)}
+                  </div>
                 )}
                 <div ref={messagesEndRef} />
               </div>
@@ -847,6 +1634,7 @@ export function AdminSupportPanel({ language }: Props) {
               {/* Message */}
               {error && <div className="support-win-error">{error}</div>}
               {actionMessage && <div className="support-win-ok">{actionMessage}</div>}
+              </div>
 
               {/* Compose */}
               {selected.status !== "CLOSED" && (

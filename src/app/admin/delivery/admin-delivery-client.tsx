@@ -604,7 +604,7 @@ export function AdminDeliveryClient({
       return;
     }
 
-    setMessage(language === "fr" ? "Exception supprimee." : "Exception deleted.");
+    setMessage(language === "fr" ? "Exception supprimée." : "Exception deleted.");
     await refreshSlots();
   };
 
@@ -703,38 +703,43 @@ export function AdminDeliveryClient({
 
   return (
     <>
-      <section className="section">
-        <h1>{language === "fr" ? "Gestion des livraisons" : "Delivery management"}</h1>
-        <p className="small">
-          {language === "fr"
-            ? "Créer des créneaux, ajuste les capacités et gère la tournée du jour."
-            : "Create slots, adjust capacities and apply day-level exceptions."}
-        </p>
+      <section className="section admin-page-header">
+        <div className="admin-page-header__copy">
+          <span className="admin-page-header__eyebrow">
+            {language === "fr" ? "Livraison" : "Delivery"}
+          </span>
+          <h1>{language === "fr" ? "Gestion des livraisons" : "Delivery management"}</h1>
+          <p className="small">
+            {language === "fr"
+              ? "Crée des créneaux, ajuste les capacités et gère la tournée du jour."
+              : "Create slots, adjust capacities and apply day-level exceptions."}
+          </p>
+        </div>
         {message ? <p className="ok small">{message}</p> : null}
         {error ? <p className="err small">{error}</p> : null}
-        <div className="row" style={{ gap: 10, flexWrap: "wrap", marginTop: 12 }}>
-          <div className="card" style={{ padding: 12, minWidth: 120 }}>
+        <div className="admin-mini-stats">
+          <div className="admin-mini-stat">
             <div className="small">{language === "fr" ? "Créneaux ouverts" : "Open slots"}</div>
             <strong>{visibleSlotsCount}</strong>
           </div>
-          <div className="card" style={{ padding: 12, minWidth: 120 }}>
+          <div className="admin-mini-stat">
             <div className="small">{language === "fr" ? "Livraisons du jour" : "Today's deliveries"}</div>
             <strong>{todayStats.total}</strong>
           </div>
-          <div className="card" style={{ padding: 12, minWidth: 120 }}>
+          <div className="admin-mini-stat">
             <div className="small">{language === "fr" ? "Planifiées" : "Scheduled"}</div>
             <strong>{todayStats.scheduled}</strong>
           </div>
-          <div className="card" style={{ padding: 12, minWidth: 120 }}>
+          <div className="admin-mini-stat">
             <div className="small">{language === "fr" ? "En tournée" : "Out for delivery"}</div>
             <strong>{todayStats.outForDelivery}</strong>
           </div>
-          <div className="card" style={{ padding: 12, minWidth: 120 }}>
+          <div className="admin-mini-stat">
             <div className="small">{language === "fr" ? "Livrées" : "Delivered"}</div>
             <strong>{todayStats.delivered}</strong>
           </div>
-          <div className="card" style={{ padding: 12, minWidth: 120 }}>
-            <div className="small">{language === "fr" ? "A surveiller" : "Need attention"}</div>
+          <div className="admin-mini-stat">
+            <div className="small">{language === "fr" ? "À surveiller" : "Need attention"}</div>
             <strong>{todayStats.attention}</strong>
           </div>
         </div>
@@ -845,7 +850,7 @@ export function AdminDeliveryClient({
       <section className="section">
         <div className="row" style={{ justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
           <div>
-            <h2>{language === "fr" ? "Tournee du jour" : "Today's route"}</h2>
+            <h2>{language === "fr" ? "Tournée du jour" : "Today's route"}</h2>
             <p className="small" style={{ marginTop: 4 }}>
               {language === "fr"
                 ? "Vue opérationnelle pour organiser la tournée et ajuster les livraisons."
@@ -876,7 +881,7 @@ export function AdminDeliveryClient({
               <div key={item.windowLabel} className="card" style={{ padding: 12, minWidth: 180 }}>
                 <div className="small">{item.windowLabel}</div>
                 <strong>
-                  {item.count} {language === "fr" ? "arret(s)" : "stop(s)"}
+                  {item.count} {language === "fr" ? "arrêt(s)" : "stop(s)"}
                 </strong>
               </div>
             ))}
@@ -891,7 +896,7 @@ export function AdminDeliveryClient({
               </h3>
               <p className="small" style={{ marginTop: 0 }}>
                 {language === "fr"
-                  ? `Total: ${routeRows.length} arret(s)`
+                  ? `Total: ${routeRows.length} arrêt(s)`
                   : `Total: ${routeRows.length} stop(s)`}
               </p>
             </div>
@@ -901,7 +906,7 @@ export function AdminDeliveryClient({
                 <div key={item.windowLabel} className="route-print-sheet__summary-card">
                   <strong>{item.windowLabel}</strong>
                   <span>
-                    {item.count} {language === "fr" ? "arret(s)" : "stop(s)"}
+                    {item.count} {language === "fr" ? "arrêt(s)" : "stop(s)"}
                   </span>
                 </div>
               ))}
@@ -928,7 +933,7 @@ export function AdminDeliveryClient({
                       <div>{[row.shippingCity, row.shippingPostal].filter(Boolean).join(", ") || "-"}</div>
                     </div>
                     <div>
-                      <div className="small">{language === "fr" ? "Telephone" : "Phone"}</div>
+                      <div className="small">{language === "fr" ? "Téléphone" : "Phone"}</div>
                       <div>{row.deliveryPhone ?? "-"}</div>
                       <div>{row.customerEmail}</div>
                     </div>
@@ -941,7 +946,7 @@ export function AdminDeliveryClient({
                   <div className="route-print-stop__footer">
                     <span>{language === "fr" ? "Livrée" : "Delivered"}</span>
                     <span>{language === "fr" ? "Absente" : "No answer"}</span>
-                    <span>{language === "fr" ? "Paiement/verif." : "Payment/check"}</span>
+                    <span>{language === "fr" ? "Paiement/vérif." : "Payment/check"}</span>
                   </div>
 
                   <div className="route-print-stop__notes">
@@ -959,8 +964,8 @@ export function AdminDeliveryClient({
             {language === "fr" ? "Aucune livraison planifiée pour aujourd'hui." : "No deliveries scheduled for today."}
           </p>
         ) : (
-          <div className="table-wrap">
-            <table>
+          <div className="table-wrap admin-mobile-table-wrap">
+            <table className="admin-mobile-table">
               <thead>
                 <tr>
                   <th>#</th>
@@ -980,36 +985,36 @@ export function AdminDeliveryClient({
 
                   return (
                     <tr key={row.id}>
-                      <td>
+                      <td data-label="#">
                         <strong>{index + 1}</strong>
                       </td>
-                      <td>
+                      <td data-label={language === "fr" ? "Commande" : "Order"}>
                         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                           <strong>{row.orderNumber}</strong>
                           <span className="small">{getDeliveryStatusLabel(row.deliveryStatus)}</span>
                         </div>
                       </td>
-                      <td className="small">{row.windowLabel}</td>
-                      <td>
+                      <td className="small" data-label={language === "fr" ? "Créneau" : "Window"}>{row.windowLabel}</td>
+                      <td data-label={language === "fr" ? "Client" : "Customer"}>
                         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                           <strong>{row.customerName}</strong>
                           <span className="small">{row.customerEmail}</span>
                         </div>
                       </td>
-                      <td>
+                      <td data-label={language === "fr" ? "Adresse" : "Address"}>
                         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                           <span>{row.shippingLine1 ?? "-"}</span>
                           <span className="small">{[row.shippingCity, row.shippingPostal].filter(Boolean).join(", ") || "-"}</span>
                           <span className="small">{row.deliveryInstructions ?? "-"}</span>
                         </div>
                       </td>
-                      <td>
+                      <td data-label="Contact">
                         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                           <span>{row.deliveryPhone ?? "-"}</span>
                           <span className="small">{row.customerEmail}</span>
                         </div>
                       </td>
-                      <td>
+                      <td data-label={language === "fr" ? "Statut" : "Status"}>
                         <select
                           className="select"
                           value={row.deliveryStatus}
@@ -1024,7 +1029,7 @@ export function AdminDeliveryClient({
                           ))}
                         </select>
                       </td>
-                      <td>
+                      <td className="admin-mobile-actions-cell" data-label={language === "fr" ? "Replanifier" : "Reschedule"}>
                         <select
                           className="select"
                           value={row.deliverySlotId ?? ""}
@@ -1073,7 +1078,7 @@ export function AdminDeliveryClient({
             />
           </div>
           <div className="field">
-            <label>{language === "fr" ? "Capacite" : "Capacity"}</label>
+            <label>{language === "fr" ? "Capacité" : "Capacity"}</label>
             <input
               className="input"
               type="number"
@@ -1124,7 +1129,7 @@ export function AdminDeliveryClient({
                 type="button"
                 onClick={resetSlotForm}
               >
-                {language === "fr" ? "annulér" : "Cancel"}
+                {language === "fr" ? "Annuler" : "Cancel"}
               </button>
             ) : null}
           </div>
@@ -1137,7 +1142,7 @@ export function AdminDeliveryClient({
               style={{ width: "100%" }}
             >
               {reçurringMode 
-                ? (language === "fr" ? "annulér creation multiple" : "Cancel multiple creation")
+                ? (language === "fr" ? "Annuler la création multiple" : "Cancel multiple creation")
                 : (language === "fr" ? "Créer plusieurs créneaux récurrents" : "Create multiple recurring slots")}
             </button>
           </div>
@@ -1191,7 +1196,7 @@ export function AdminDeliveryClient({
                   disabled={reçurringLoading || reçurringDays.length === 0}
                 >
                   {reçurringLoading 
-                    ? (language === "fr" ? "Creation en cours..." : "Creating slots...")
+                    ? (language === "fr" ? "Création en cours..." : "Creating slots...")
                     : (language === "fr" ? "Générer tous les créneaux" : "Generate all slots")}
                 </button>
               </div>
@@ -1201,7 +1206,7 @@ export function AdminDeliveryClient({
       </section>
 
       <section className="section">
-        <h2>{language === "fr" ? "Exception journaliere" : "Day exception"}</h2>
+        <h2>{language === "fr" ? "Exception journalière" : "Day exception"}</h2>
         <form className="two-col" onSubmit={submitException}>
           <div className="field">
             <label>{language === "fr" ? "Date" : "Date"}</label>
@@ -1225,7 +1230,7 @@ export function AdminDeliveryClient({
             </select>
           </div>
           <div className="field">
-            <label>{language === "fr" ? "Capacite (optionnel)" : "Capacity (optional)"}</label>
+            <label>{language === "fr" ? "Capacité (optionnel)" : "Capacity (optional)"}</label>
             <input
               className="input"
               type="number"
@@ -1242,7 +1247,7 @@ export function AdminDeliveryClient({
               className="input"
               value={exceptionForm.reason}
               onChange={(e) => setExceptionForm((c) => ({ ...c, reason: e.target.value }))}
-              placeholder={language === "fr" ? "Ex: Jour ferie" : "e.g. Holiday"}
+              placeholder={language === "fr" ? "Ex: Jour férié" : "e.g. Holiday"}
             />
           </div>
           <div className="row" style={{ gridColumn: "1 / -1", gap: 8 }}>
@@ -1264,15 +1269,15 @@ export function AdminDeliveryClient({
         {slotsByDate.length === 0 ? (
           <p className="small">{language === "fr" ? "Aucun créneau pour l'instant." : "No slots yet."}</p>
         ) : (
-          <div className="table-wrap">
-            <table>
+          <div className="table-wrap admin-mobile-table-wrap">
+            <table className="admin-mobile-table">
               <thead>
                 <tr>
                   <th>{language === "fr" ? "Date" : "Date"}</th>
                   <th>{language === "fr" ? "Créneau" : "Slot"}</th>
-                  <th>{language === "fr" ? "Visibilite client" : "Customer visibility"}</th>
-                  <th>{language === "fr" ? "Capacite" : "Capacity"}</th>
-                  <th>{language === "fr" ? "Reserve" : "Reserved"}</th>
+                  <th>{language === "fr" ? "Visibilité client" : "Customer visibility"}</th>
+                  <th>{language === "fr" ? "Capacité" : "Capacity"}</th>
+                  <th>{language === "fr" ? "Réservé" : "Reserved"}</th>
                   <th>{language === "fr" ? "Exception" : "Exception"}</th>
                   <th>{language === "fr" ? "Actions" : "Actions"}</th>
                 </tr>
@@ -1281,18 +1286,18 @@ export function AdminDeliveryClient({
                 {slotsByDate.map(([dateKey, group]) =>
                   group.map((slot, index) => (
                     <tr key={slot.id}>
-                      <td>
+                      <td data-label={language === "fr" ? "Date" : "Date"}>
                         {index === 0 ? dateKey : ""}
                       </td>
-                      <td>
+                      <td data-label={language === "fr" ? "Créneau" : "Slot"}>
                         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                           <strong>{slot.periodLabel}</strong>
                           <span>{formatDateTime(slot.startAt)}{" -> "}{formatDateTime(slot.endAt)}</span>
-                          <span className="small">{slot.isOpen ? (language === "fr" ? "Ouvert" : "Open") : (language === "fr" ? "Ferme" : "Closed")}</span>
+                          <span className="small">{slot.isOpen ? (language === "fr" ? "Ouvert" : "Open") : (language === "fr" ? "Fermé" : "Closed")}</span>
                           {slot.note ? <span className="small">Note: {slot.note}</span> : null}
                         </div>
                       </td>
-                      <td>
+                      <td data-label={language === "fr" ? "Visibilité" : "Visibility"}>
                         {(() => {
                           const closedByException = slot.exception?.isClosed ?? false;
                           const isPast = new Date(slot.endAt) <= new Date();
@@ -1300,10 +1305,10 @@ export function AdminDeliveryClient({
                           let color = "#16a34a";
 
                           if (isPast) {
-                            label = language === "fr" ? "Passe" : "Past";
+                            label = language === "fr" ? "Passé" : "Past";
                             color = "#6b7280";
                           } else if (closedByException || !slot.isOpen) {
-                            label = language === "fr" ? "Masque" : "Hidden";
+                            label = language === "fr" ? "Masqué" : "Hidden";
                             color = "#dc2626";
                           } else if (slot.remainingCapacity <= 0) {
                             label = language === "fr" ? "Complet" : "Full";
@@ -1313,8 +1318,8 @@ export function AdminDeliveryClient({
                           return <span style={{ color, fontWeight: 600 }}>{label}</span>;
                         })()}
                       </td>
-                      <td>{slot.capacity}</td>
-                      <td>
+                      <td data-label={language === "fr" ? "Capacité" : "Capacity"}>{slot.capacity}</td>
+                      <td data-label={language === "fr" ? "Réservé" : "Reserved"}>
                          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                            <span>{slot.reservedCount} / {slot.capacity}</span>
                            <div style={{ 
@@ -1333,16 +1338,16 @@ export function AdminDeliveryClient({
                            </div>
                          </div>
                        </td>
-                      <td>
+                      <td data-label={language === "fr" ? "Exception" : "Exception"}>
                         {slot.exception ? (
                           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                             <span className="small">
                               {slot.exception.isClosed
-                                ? (language === "fr" ? "Ferme" : "Closed")
+                                ? (language === "fr" ? "Fermé" : "Closed")
                                 : (language === "fr" ? "Ouvert" : "Open")}
                             </span>
                             {slot.exception.capacityOverride != null ? (
-                              <span className="small">{language === "fr" ? "Capacite" : "Capacity"}: {slot.exception.capacityOverride}</span>
+                              <span className="small">{language === "fr" ? "Capacité" : "Capacity"}: {slot.exception.capacityOverride}</span>
                             ) : null}
                             {slot.exception.reason ? <span className="small">{slot.exception.reason}</span> : null}
                             <button
@@ -1358,7 +1363,7 @@ export function AdminDeliveryClient({
                           <span className="small">-</span>
                         )}
                       </td>
-                      <td>
+                      <td className="admin-mobile-actions-cell" data-label={language === "fr" ? "Actions" : "Actions"}>
                         <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
                            <button className="btn btn-secondary" type="button" onClick={() => editSlot(slot)}>
                              {language === "fr" ? "Modifier" : "Edit"}

@@ -1,4 +1,4 @@
-import { getEnvFilesForTarget, loadEnvFilesInOrder, resolveEnvTargetFromArgs } from "./db-utils";
+import { loadEnvForTarget, resolveEnvTargetFromArgs } from "./db-utils";
 import { readDeliveryCheckpointManifest } from "./delivery-checkpoint-lib";
 
 type CheckLevel = "pass" | "warn" | "fail";
@@ -70,7 +70,7 @@ function buildRoutePlanningSnippet(
 
 async function main() {
   const envTarget = resolveEnvTargetFromArgs(process.argv, "development");
-  loadEnvFilesInOrder(getEnvFilesForTarget(envTarget));
+  loadEnvForTarget(envTarget);
 
   const currentFlagEnabled = process.env.DELIVERY_EXPERIMENTAL_ROUTING_ENABLED === "true";
   const samplePostal = parseFlagValue("--postal") ?? process.env.DELIVERY_PREACTIVATE_POSTAL ?? "G5L 1A1";
@@ -81,7 +81,7 @@ async function main() {
     process.env.DELIVERY_EXPERIMENTAL_ROUTING_ENABLED = "true";
   }
 
-  const [{ validateEnv, env }, { resolvePublicSiteUrl }] = await Promise.all([
+  const [{ validateEnv }, { resolvePublicSiteUrl }] = await Promise.all([
     import("../src/lib/env"),
     import("../src/lib/site-url"),
   ]);

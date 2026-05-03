@@ -87,6 +87,8 @@ const nextOrderNumber = () => {
   return `MO-${yyyy}${mm}${dd}-${random}`;
 };
 
+const ORDER_CREATE_TRANSACTION_TIMEOUT_MS = 15_000;
+
 // CRITICAL DATA SAFETY NOTE (FR/EN)
 // FR: Cette fonction utilise une transaction pour protéger commandes + inventaire.
 // EN: This function uses a transaction to protect orders + inventory.
@@ -329,7 +331,7 @@ export async function createOrderSafely(input: CreateOrderInput) {
     }
 
     return order;
-  });
+  }, { timeout: ORDER_CREATE_TRANSACTION_TIMEOUT_MS });
 }
 
 export async function getOrdersForUser(userId: string) {

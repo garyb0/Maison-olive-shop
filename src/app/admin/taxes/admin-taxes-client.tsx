@@ -18,11 +18,16 @@ type Props = {
 export function AdminTaxesClient({ language, t, taxSummary }: Props) {
   return (
     <>
-      <section className="section">
-        <h1>{t.taxReport}</h1>
-        <p className="small">
-          {language === "fr" ? "Résumé des ventes et taxes collectées." : "Sales and tax collection summary."}
-        </p>
+      <section className="section admin-page-header">
+        <div className="admin-page-header__copy">
+          <span className="admin-page-header__eyebrow">
+            {language === "fr" ? "Finances" : "Finance"}
+          </span>
+          <h1>{t.taxReport}</h1>
+          <p className="small">
+            {language === "fr" ? "Résumé des ventes et taxes collectées." : "Sales and tax collection summary."}
+          </p>
+        </div>
       </section>
 
       <section className="section">

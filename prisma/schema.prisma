@@ -100,6 +100,9 @@ model User {
   customerSupportConversations SupportConversation[] @relation("CustomerSupportConversations")
   assignedSupportConversations SupportConversation[] @relation("AssignedSupportConversations")
   supportMessages              SupportMessage[]      @relation("SupportMessages")
+  supportNotificationPreference SupportNotificationPreference?
+  supportInternalNotes          SupportInternalNote[]
+  supportQuickReplies           SupportQuickReply[]
   passwordResets               PasswordReset[]
   subscriptions                Subscription[]
   deliveryAddresses            UserDeliveryAddress[]
@@ -260,6 +263,7 @@ model Order {
   inventoryMovements InventoryMovement[]
   deliverySlot       DeliverySlot?       @relation(fields: [deliverySlotId], references: [id], onDelete: SetNull)
   deliveryStops      DeliveryStop[]
+  supportConversations SupportConversation[]
 
   @@index([userId, createdAt])
   @@index([status])
@@ -386,8 +390,22 @@ model DeliveryStop {
   plannedEta               DateTime?
   actualCumulativeKmAtStop Float?
   arrivedAt                DateTime?
+  arrivedLat               Float?
+  arrivedLng               Float?
+  arrivedAccuracyMeters    Float?
+  arrivedDistanceMeters    Float?
   completedAt              DateTime?
   note                     String?
+  proofPhotoPath           String?
+  proofPhotoMime           String?
+  proofPhotoSizeBytes      Int?
+  proofPhotoUploadedAt     DateTime?
+  proofPhotoLat            Float?
+  proofPhotoLng            Float?
+  proofPhotoAccuracyMeters Float?
+  geocodedLat              Float?
+  geocodedLng              Float?
+  geocodedAt               DateTime?
   createdAt                DateTime           @default(now())
   updatedAt                DateTime           @updatedAt
 
@@ -516,7 +534,18 @@ model SupportConversation {
   customerEmail   String
   customerName    String
   assignedAdminId String?
+  orderId         String?
   status          SupportConversationStatus @default(WAITING)
+  priority        String                    @default("NORMAL")
+  source          String                    @default("WIDGET")
+  tagsJson        String?
+  aiSummary       String?
+  aiIntent        String?
+  closedReason    String?
+  closedNote      String?
+  reopenedAt      DateTime?
+  priorityUpdatedAt DateTime?
+  slaDueAt        DateTime?
   lastMessageAt   DateTime                  @default(now())
   closedAt        DateTime?
   createdAt       DateTime                  @default(now())
@@ -524,10 +553,16 @@ model SupportConversation {
 
   customerUser  User?            @relation("CustomerSupportConversations", fields: [customerUserId], references: [id], onDelete: SetNull)
   assignedAdmin User?            @relation("AssignedSupportConversations", fields: [assignedAdminId], references: [id], onDelete: SetNull)
+  order         Order?           @relation(fields: [orderId], references: [id], onDelete: SetNull)
   messages      SupportMessage[]
+  internalNotes SupportInternalNote[]
 
   @@index([customerUserId, createdAt])
   @@index([assignedAdminId, status])
+  @@index([orderId])
+  @@index([priority, status])
+  @@index([source, createdAt])
+  @@index([slaDueAt, status])
   @@index([status, lastMessageAt])
 }
 
@@ -537,6 +572,7 @@ model SupportMessage {
   senderUserId   String?
   senderType     SupportSenderType
   content        String
+  metadataJson    String?
   readAt         DateTime?
   createdAt      DateTime          @default(now())
 
@@ -545,6 +581,58 @@ model SupportMessage {
 
   @@index([conversationId, createdAt])
   @@index([senderUserId, createdAt])
+}
+
+model SupportNotificationPreference {
+  id                        String   @id @default(cuid())
+  adminUserId               String   @unique
+  emailNewConversation      Boolean  @default(true)
+  emailNewMessage           Boolean  @default(true)
+  emailConversationAssigned Boolean  @default(true)
+  emailDigest               String   @default("none")
+  displayName               String?
+  quickRepliesJson          String?
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  adminUser User @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+
+  @@index([emailNewConversation])
+  @@index([emailNewMessage])
+  @@index([emailConversationAssigned])
+}
+
+model SupportInternalNote {
+  id             String   @id @default(cuid())
+  conversationId String
+  adminUserId    String?
+  content        String
+  createdAt      DateTime @default(now())
+
+  conversation SupportConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  adminUser    User?               @relation(fields: [adminUserId], references: [id], onDelete: SetNull)
+
+  @@index([conversationId, createdAt])
+  @@index([adminUserId, createdAt])
+}
+
+model SupportQuickReply {
+  id               String   @id @default(cuid())
+  title            String
+  content          String
+  category         String   @default("general")
+  language         String   @default("fr")
+  isActive         Boolean  @default(true)
+  sortOrder        Int      @default(0)
+  createdByAdminId String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  createdByAdmin User? @relation(fields: [createdByAdminId], references: [id], onDelete: SetNull)
+
+  @@index([language, isActive, sortOrder])
+  @@index([category, isActive])
+  @@index([createdByAdminId, createdAt])
 }
 
 model Category {
