@@ -4,9 +4,49 @@ export type OwnerTodaySnapshot = {
   dateKey: string;
   todayOrderCount: number;
   ordersToPrepareCount: number;
+  ordersToPrepare: Array<{
+    id: string;
+    orderNumber: string;
+    customerName: string;
+    status: string;
+    paymentStatus: string;
+    totalCents: number;
+    currency: string;
+    createdAt: Date;
+    itemCount: number;
+  }>;
   deliveryOrderCount: number;
+  deliveryOrders: Array<{
+    id: string;
+    orderNumber: string;
+    customerName: string;
+    deliveryStatus: string;
+    deliveryWindowStartAt: Date | null;
+    deliveryWindowEndAt: Date | null;
+    shippingCity: string | null;
+    itemCount: number;
+  }>;
   openSupportCount: number;
+  supportQueue: Array<{
+    id: string;
+    customerName: string;
+    customerEmail: string;
+    status: string;
+    priority: string;
+    lastMessageAt: Date;
+    slaDueAt: Date | null;
+    orderNumber: string | null;
+  }>;
   activeRunCount: number;
+  activeRuns: Array<{
+    id: string;
+    dateKey: string;
+    status: string;
+    slotStartAt: Date;
+    slotEndAt: Date;
+    startedAt: Date | null;
+    stopCount: number;
+  }>;
   todaySalesCents: number;
   lowStockCount: number;
   lowStockProducts: Array<{
@@ -53,9 +93,13 @@ export async function getOwnerTodaySnapshot(): Promise<OwnerTodaySnapshot> {
   const [
     todayOrderCount,
     ordersToPrepareCount,
+    ordersToPrepare,
     deliveryOrderCount,
+    deliveryOrders,
     openSupportCount,
+    supportQueue,
     activeRunCount,
+    activeRuns,
     todaySales,
     lowStockCount,
     lowStockProducts,
@@ -66,16 +110,88 @@ export async function getOwnerTodaySnapshot(): Promise<OwnerTodaySnapshot> {
         status: { in: ["PENDING", "PAID", "PROCESSING"] },
       },
     }),
+    prisma.order.findMany({
+      where: {
+        status: { in: ["PENDING", "PAID", "PROCESSING"] },
+      },
+      orderBy: [{ createdAt: "asc" }],
+      take: 5,
+      select: {
+        id: true,
+        orderNumber: true,
+        customerName: true,
+        status: true,
+        paymentStatus: true,
+        totalCents: true,
+        currency: true,
+        createdAt: true,
+        _count: { select: { items: true } },
+      },
+    }),
     prisma.order.count({
       where: {
         deliveryStatus: { in: ["SCHEDULED", "OUT_FOR_DELIVERY"] },
       },
     }),
+    prisma.order.findMany({
+      where: {
+        deliveryStatus: { in: ["SCHEDULED", "OUT_FOR_DELIVERY"] },
+      },
+      orderBy: [{ deliveryWindowStartAt: "asc" }, { createdAt: "asc" }],
+      take: 5,
+      select: {
+        id: true,
+        orderNumber: true,
+        customerName: true,
+        deliveryStatus: true,
+        deliveryWindowStartAt: true,
+        deliveryWindowEndAt: true,
+        shippingCity: true,
+        _count: { select: { items: true } },
+      },
+    }),
     prisma.supportConversation.count({
       where: { status: { in: ["WAITING", "OPEN", "ASSIGNED"] } },
     }),
+    prisma.supportConversation.findMany({
+      where: { status: { in: ["WAITING", "OPEN", "ASSIGNED"] } },
+      orderBy: [{ slaDueAt: "asc" }, { lastMessageAt: "asc" }],
+      take: 5,
+      select: {
+        id: true,
+        customerName: true,
+        customerEmail: true,
+        status: true,
+        priority: true,
+        lastMessageAt: true,
+        slaDueAt: true,
+        order: {
+          select: {
+            orderNumber: true,
+          },
+        },
+      },
+    }),
     prisma.deliveryRun.count({
       where: { status: { in: ["PUBLISHED", "IN_PROGRESS"] } },
+    }),
+    prisma.deliveryRun.findMany({
+      where: { status: { in: ["PUBLISHED", "IN_PROGRESS"] } },
+      orderBy: [{ dateKey: "asc" }, { updatedAt: "desc" }],
+      take: 5,
+      select: {
+        id: true,
+        dateKey: true,
+        status: true,
+        startedAt: true,
+        deliverySlot: {
+          select: {
+            startAt: true,
+            endAt: true,
+          },
+        },
+        _count: { select: { stops: true } },
+      },
     }),
     prisma.order.aggregate({
       where: {
@@ -105,9 +221,49 @@ export async function getOwnerTodaySnapshot(): Promise<OwnerTodaySnapshot> {
     dateKey,
     todayOrderCount,
     ordersToPrepareCount,
+    ordersToPrepare: ordersToPrepare.map((order) => ({
+      id: order.id,
+      orderNumber: order.orderNumber,
+      customerName: order.customerName,
+      status: order.status,
+      paymentStatus: order.paymentStatus,
+      totalCents: order.totalCents,
+      currency: order.currency,
+      createdAt: order.createdAt,
+      itemCount: order._count.items,
+    })),
     deliveryOrderCount,
+    deliveryOrders: deliveryOrders.map((order) => ({
+      id: order.id,
+      orderNumber: order.orderNumber,
+      customerName: order.customerName,
+      deliveryStatus: order.deliveryStatus,
+      deliveryWindowStartAt: order.deliveryWindowStartAt,
+      deliveryWindowEndAt: order.deliveryWindowEndAt,
+      shippingCity: order.shippingCity,
+      itemCount: order._count.items,
+    })),
     openSupportCount,
+    supportQueue: supportQueue.map((conversation) => ({
+      id: conversation.id,
+      customerName: conversation.customerName,
+      customerEmail: conversation.customerEmail,
+      status: conversation.status,
+      priority: conversation.priority,
+      lastMessageAt: conversation.lastMessageAt,
+      slaDueAt: conversation.slaDueAt,
+      orderNumber: conversation.order?.orderNumber ?? null,
+    })),
     activeRunCount,
+    activeRuns: activeRuns.map((run) => ({
+      id: run.id,
+      dateKey: run.dateKey,
+      status: run.status,
+      slotStartAt: run.deliverySlot.startAt,
+      slotEndAt: run.deliverySlot.endAt,
+      startedAt: run.startedAt,
+      stopCount: run._count.stops,
+    })),
     todaySalesCents: todaySales._sum.totalCents ?? 0,
     lowStockCount,
     lowStockProducts,

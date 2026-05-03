@@ -53,6 +53,25 @@ type AdminSnapshot = {
     status: string;
     stopCount: number;
   } | null;
+  nextOrder: {
+    orderNumber: string;
+    customerName: string;
+  } | null;
+  nextDelivery: {
+    orderNumber: string;
+    customerName: string;
+    city: string | null;
+    status: string;
+  } | null;
+  nextSupport: {
+    customerName: string;
+    status: string;
+  } | null;
+  criticalProduct: {
+    nameFr: string;
+    nameEn: string;
+    stock: number;
+  } | null;
 };
 
 function HubCard({ item }: { item: HubLink }) {
@@ -140,6 +159,40 @@ function runStatusLabel(status: string, language: "fr" | "en") {
   return (language === "fr" ? fr : en)[status] ?? status.toLowerCase();
 }
 
+function deliveryStatusLabel(status: string, language: "fr" | "en") {
+  const fr: Record<string, string> = {
+    SCHEDULED: "planifiee",
+    OUT_FOR_DELIVERY: "sur la route",
+    DELIVERED: "livree",
+    FAILED: "echec",
+    RESCHEDULED: "a replanifier",
+  };
+  const en: Record<string, string> = {
+    SCHEDULED: "scheduled",
+    OUT_FOR_DELIVERY: "out for delivery",
+    DELIVERED: "delivered",
+    FAILED: "failed",
+    RESCHEDULED: "rescheduled",
+  };
+  return (language === "fr" ? fr : en)[status] ?? status.toLowerCase();
+}
+
+function supportStatusLabel(status: string, language: "fr" | "en") {
+  const fr: Record<string, string> = {
+    WAITING: "attend une reponse",
+    OPEN: "ouverte",
+    ASSIGNED: "assignee",
+    CLOSED: "fermee",
+  };
+  const en: Record<string, string> = {
+    WAITING: "waiting",
+    OPEN: "open",
+    ASSIGNED: "assigned",
+    CLOSED: "closed",
+  };
+  return (language === "fr" ? fr : en)[status] ?? status.toLowerCase();
+}
+
 async function getCustomerSnapshot(userId?: string): Promise<CustomerSnapshot | null> {
   if (!userId) return null;
 
@@ -173,18 +226,12 @@ async function getCustomerSnapshot(userId?: string): Promise<CustomerSnapshot | 
 
 async function getAdminSnapshot(): Promise<AdminSnapshot | null> {
   try {
-    const [ownerSnapshot, latestRun] = await Promise.all([
-      getOwnerTodaySnapshot(),
-      prisma.deliveryRun.findFirst({
-        where: { status: { in: ["PUBLISHED", "IN_PROGRESS"] } },
-        orderBy: { updatedAt: "desc" },
-        select: {
-          dateKey: true,
-          status: true,
-          _count: { select: { stops: true } },
-        },
-      }),
-    ]);
+    const ownerSnapshot = await getOwnerTodaySnapshot();
+    const latestRun = ownerSnapshot.activeRuns[0] ?? null;
+    const nextOrder = ownerSnapshot.ordersToPrepare[0] ?? null;
+    const nextDelivery = ownerSnapshot.deliveryOrders[0] ?? null;
+    const nextSupport = ownerSnapshot.supportQueue[0] ?? null;
+    const criticalProduct = ownerSnapshot.lowStockProducts[0] ?? null;
 
     return {
       todayOrderCount: ownerSnapshot.todayOrderCount,
@@ -200,7 +247,34 @@ async function getAdminSnapshot(): Promise<AdminSnapshot | null> {
         ? {
             dateKey: latestRun.dateKey,
             status: latestRun.status,
-            stopCount: latestRun._count.stops,
+            stopCount: latestRun.stopCount,
+          }
+        : null,
+      nextOrder: nextOrder
+        ? {
+            orderNumber: nextOrder.orderNumber,
+            customerName: nextOrder.customerName,
+          }
+        : null,
+      nextDelivery: nextDelivery
+        ? {
+            orderNumber: nextDelivery.orderNumber,
+            customerName: nextDelivery.customerName,
+            city: nextDelivery.shippingCity,
+            status: nextDelivery.deliveryStatus,
+          }
+        : null,
+      nextSupport: nextSupport
+        ? {
+            customerName: nextSupport.customerName || nextSupport.customerEmail,
+            status: nextSupport.status,
+          }
+        : null,
+      criticalProduct: criticalProduct
+        ? {
+            nameFr: criticalProduct.nameFr,
+            nameEn: criticalProduct.nameEn,
+            stock: criticalProduct.stock,
           }
         : null,
     };
@@ -391,7 +465,7 @@ export default async function PwaAppPage() {
             <div className="pwa-section-head">
               <div>
                 <p className="pwa-kicker">{language === "fr" ? "Equipe" : "Team"}</p>
-                <h2>{language === "fr" ? "Admin leger" : "Light admin"}</h2>
+                <h2>{language === "fr" ? "Admin quotidien" : "Daily admin"}</h2>
               </div>
               <Link className="btn btn-secondary" href="/admin">
                 {language === "fr" ? "Admin complet" : "Full admin"}
@@ -400,19 +474,45 @@ export default async function PwaAppPage() {
             <div className="pwa-stat-grid pwa-admin-stats">
               <StatCard
                 href="/admin/orders"
-                label={language === "fr" ? "Aujourd'hui" : "Today"}
-                value={String(adminSnapshot?.todayOrderCount ?? 0)}
+                label={language === "fr" ? "A preparer" : "To prepare"}
+                value={String(adminSnapshot?.ordersToPrepareCount ?? 0)}
                 help={
-                  language === "fr"
-                    ? `${formatCurrency(adminSnapshot?.todaySalesCents ?? 0, language)} ventes; ${adminSnapshot?.ordersToPrepareCount ?? 0} a preparer.`
-                    : `${formatCurrency(adminSnapshot?.todaySalesCents ?? 0, language)} sales; ${adminSnapshot?.ordersToPrepareCount ?? 0} to prepare.`
+                  adminSnapshot?.nextOrder
+                    ? language === "fr"
+                      ? `Prochaine #${adminSnapshot.nextOrder.orderNumber} - ${adminSnapshot.nextOrder.customerName}.`
+                      : `Next #${adminSnapshot.nextOrder.orderNumber} - ${adminSnapshot.nextOrder.customerName}.`
+                    : language === "fr"
+                      ? `${formatCurrency(adminSnapshot?.todaySalesCents ?? 0, language)} aujourd'hui; rien en attente.`
+                      : `${formatCurrency(adminSnapshot?.todaySalesCents ?? 0, language)} today; nothing waiting.`
+                }
+              />
+              <StatCard
+                href="/admin/delivery"
+                label={language === "fr" ? "Livraison" : "Delivery"}
+                value={String(adminSnapshot?.deliveryOrderCount ?? 0)}
+                help={
+                  adminSnapshot?.nextDelivery
+                    ? language === "fr"
+                      ? `#${adminSnapshot.nextDelivery.orderNumber} - ${adminSnapshot.nextDelivery.city ?? adminSnapshot.nextDelivery.customerName} - ${deliveryStatusLabel(adminSnapshot.nextDelivery.status, language)}.`
+                      : `#${adminSnapshot.nextDelivery.orderNumber} - ${adminSnapshot.nextDelivery.city ?? adminSnapshot.nextDelivery.customerName} - ${deliveryStatusLabel(adminSnapshot.nextDelivery.status, language)}.`
+                    : language === "fr"
+                      ? "Aucune livraison active."
+                      : "No active delivery."
                 }
               />
               <StatCard
                 href="/admin/support"
                 label="Support"
                 value={String(adminSnapshot?.waitingSupportCount ?? 0)}
-                help={language === "fr" ? "Conversations a surveiller." : "Conversations to watch."}
+                help={
+                  adminSnapshot?.nextSupport
+                    ? language === "fr"
+                      ? `${adminSnapshot.nextSupport.customerName} - ${supportStatusLabel(adminSnapshot.nextSupport.status, language)}.`
+                      : `${adminSnapshot.nextSupport.customerName} - ${supportStatusLabel(adminSnapshot.nextSupport.status, language)}.`
+                    : language === "fr"
+                      ? "Aucune conversation active."
+                      : "No active conversation."
+                }
               />
               <StatCard
                 href="/admin/delivery/runs"
@@ -432,13 +532,15 @@ export default async function PwaAppPage() {
                 href="/admin/products"
                 label={language === "fr" ? "Stock bas" : "Low stock"}
                 value={String(adminSnapshot?.lowStockCount ?? 0)}
-                help={language === "fr" ? "Produits actifs a surveiller." : "Active products to watch."}
-              />
-              <StatCard
-                href="/admin/delivery"
-                label={language === "fr" ? "Livraison" : "Delivery"}
-                value={String(adminSnapshot?.deliveryOrderCount ?? 0)}
-                help={language === "fr" ? "Commandes planifiees ou sur la route." : "Scheduled or out-for-delivery orders."}
+                help={
+                  adminSnapshot?.criticalProduct
+                    ? language === "fr"
+                      ? `${adminSnapshot.criticalProduct.nameFr} - ${adminSnapshot.criticalProduct.stock} en stock.`
+                      : `${adminSnapshot.criticalProduct.nameEn} - ${adminSnapshot.criticalProduct.stock} in stock.`
+                    : language === "fr"
+                      ? "Aucun produit critique."
+                      : "No critical product."
+                }
               />
               <StatCard
                 label="Backup"

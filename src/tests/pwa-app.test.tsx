@@ -8,6 +8,7 @@ import { PwaSupportButton } from "@/app/app/pwa-support-button";
 const prismaMock = vi.hoisted(() => ({
   order: {
     count: vi.fn(),
+    findMany: vi.fn(),
     findFirst: vi.fn(),
     aggregate: vi.fn(),
   },
@@ -16,9 +17,11 @@ const prismaMock = vi.hoisted(() => ({
   },
   supportConversation: {
     count: vi.fn(),
+    findMany: vi.fn(),
   },
   deliveryRun: {
     count: vi.fn(),
+    findMany: vi.fn(),
     findFirst: vi.fn(),
   },
   product: {
@@ -71,11 +74,14 @@ describe("PWA Chez Olive", () => {
     getCurrentLanguageMock.mockResolvedValue("fr");
     getCurrentUserMock.mockResolvedValue(null);
     prismaMock.order.count.mockResolvedValue(0);
+    prismaMock.order.findMany.mockResolvedValue([]);
     prismaMock.order.findFirst.mockResolvedValue(null);
     prismaMock.order.aggregate.mockResolvedValue({ _sum: { totalCents: 0 } });
     prismaMock.dogProfile.count.mockResolvedValue(0);
     prismaMock.supportConversation.count.mockResolvedValue(0);
+    prismaMock.supportConversation.findMany.mockResolvedValue([]);
     prismaMock.deliveryRun.count.mockResolvedValue(0);
+    prismaMock.deliveryRun.findMany.mockResolvedValue([]);
     prismaMock.deliveryRun.findFirst.mockResolvedValue(null);
     prismaMock.product.count.mockResolvedValue(0);
     prismaMock.product.findMany.mockResolvedValue([]);
@@ -154,25 +160,81 @@ describe("PWA Chez Olive", () => {
       language: "fr",
     });
     prismaMock.order.count.mockResolvedValue(3);
+    prismaMock.order.findMany
+      .mockResolvedValueOnce([
+        {
+          id: "order_1",
+          orderNumber: "CO-9001",
+          customerName: "Client Admin",
+          status: "PAID",
+          paymentStatus: "PAID",
+          totalCents: 4599,
+          currency: "CAD",
+          createdAt: new Date("2026-05-03T13:00:00.000Z"),
+          _count: { items: 2 },
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: "order_delivery_1",
+          orderNumber: "CO-9002",
+          customerName: "Client Livraison",
+          deliveryStatus: "SCHEDULED",
+          deliveryWindowStartAt: new Date("2026-05-03T14:00:00.000Z"),
+          deliveryWindowEndAt: new Date("2026-05-03T17:00:00.000Z"),
+          shippingCity: "Rimouski",
+          _count: { items: 1 },
+        },
+      ]);
     prismaMock.supportConversation.count.mockResolvedValue(4);
+    prismaMock.supportConversation.findMany.mockResolvedValue([
+      {
+        id: "support_1",
+        customerName: "Client Support",
+        customerEmail: "support@chezolive.ca",
+        status: "WAITING",
+        priority: "NORMAL",
+        lastMessageAt: new Date("2026-05-03T12:00:00.000Z"),
+        slaDueAt: null,
+        order: null,
+      },
+    ]);
     prismaMock.deliveryRun.count.mockResolvedValue(1);
+    prismaMock.deliveryRun.findMany.mockResolvedValue([
+      {
+        id: "run_1",
+        dateKey: "2026-05-03",
+        status: "IN_PROGRESS",
+        startedAt: new Date("2026-05-03T13:30:00.000Z"),
+        deliverySlot: {
+          startAt: new Date("2026-05-03T13:00:00.000Z"),
+          endAt: new Date("2026-05-03T17:00:00.000Z"),
+        },
+        _count: { stops: 7 },
+      },
+    ]);
     prismaMock.order.aggregate.mockResolvedValue({ _sum: { totalCents: 12999 } });
     prismaMock.product.count.mockResolvedValue(2);
-    prismaMock.product.findMany.mockResolvedValue([]);
-    prismaMock.deliveryRun.findFirst.mockResolvedValue({
-      dateKey: "2026-05-03",
-      status: "IN_PROGRESS",
-      _count: { stops: 7 },
-    });
+    prismaMock.product.findMany.mockResolvedValue([
+      {
+        id: "prod_1",
+        slug: "collier-test",
+        nameFr: "Collier test",
+        nameEn: "Test collar",
+        stock: 2,
+      },
+    ]);
 
     const { default: PwaAppPage } = await import("@/app/app/page");
     const { container } = render(await PwaAppPage());
     const hrefs = Array.from(container.querySelectorAll("a")).map((link) => link.getAttribute("href"));
 
-    expect(screen.getByText("Admin leger")).toBeInTheDocument();
-    expect(screen.getByText("129,99 $ ventes; 3 a preparer.")).toBeInTheDocument();
+    expect(screen.getByText("Admin quotidien")).toBeInTheDocument();
+    expect(screen.getByText("Prochaine #CO-9001 - Client Admin.")).toBeInTheDocument();
+    expect(screen.getByText("#CO-9002 - Rimouski - planifiee.")).toBeInTheDocument();
+    expect(screen.getByText("Client Support - attend une reponse.")).toBeInTheDocument();
     expect(screen.getByText("2026-05-03 - en cours - 7 arrets")).toBeInTheDocument();
-    expect(screen.getByText("Produits actifs a surveiller.")).toBeInTheDocument();
+    expect(screen.getByText("Collier test - 2 en stock.")).toBeInTheDocument();
     expect(hrefs).toContain("/admin/orders");
     expect(hrefs).toContain("/admin/delivery");
     expect(hrefs).toContain("/admin/delivery/runs");

@@ -8,6 +8,66 @@ import { getMaintenanceState } from "@/lib/maintenance";
 import { getOwnerTodaySnapshot } from "@/lib/owner-dashboard";
 import { AdminDashboardClient } from "./admin-dashboard-client";
 
+const orderStatusLabel = (status: string, language: "fr" | "en") => {
+  const labels: Record<string, Record<"fr" | "en", string>> = {
+    PENDING: { fr: "A verifier", en: "To review" },
+    PAID: { fr: "Payee", en: "Paid" },
+    PROCESSING: { fr: "En preparation", en: "Processing" },
+    SHIPPED: { fr: "Expediee", en: "Shipped" },
+    DELIVERED: { fr: "Livree", en: "Delivered" },
+    CANCELLED: { fr: "Annulee", en: "Cancelled" },
+  };
+
+  return labels[status]?.[language] ?? status;
+};
+
+const paymentStatusLabel = (status: string, language: "fr" | "en") => {
+  const labels: Record<string, Record<"fr" | "en", string>> = {
+    PENDING: { fr: "Paiement a verifier", en: "Payment to review" },
+    PAID: { fr: "Paiement recu", en: "Payment received" },
+    FAILED: { fr: "Paiement echoue", en: "Payment failed" },
+    REFUNDED: { fr: "Remboursee", en: "Refunded" },
+  };
+
+  return labels[status]?.[language] ?? status;
+};
+
+const deliveryStatusLabel = (status: string, language: "fr" | "en") => {
+  const labels: Record<string, Record<"fr" | "en", string>> = {
+    SCHEDULED: { fr: "Planifiee", en: "Scheduled" },
+    OUT_FOR_DELIVERY: { fr: "Sur la route", en: "Out for delivery" },
+    DELIVERED: { fr: "Livree", en: "Delivered" },
+    FAILED: { fr: "Echec", en: "Failed" },
+    RESCHEDULED: { fr: "A replanifier", en: "Rescheduled" },
+    UNSCHEDULED: { fr: "Non planifiee", en: "Unscheduled" },
+  };
+
+  return labels[status]?.[language] ?? status;
+};
+
+const supportStatusLabel = (status: string, language: "fr" | "en") => {
+  const labels: Record<string, Record<"fr" | "en", string>> = {
+    WAITING: { fr: "Attend une reponse", en: "Waiting" },
+    OPEN: { fr: "Ouverte", en: "Open" },
+    ASSIGNED: { fr: "Assignee", en: "Assigned" },
+    CLOSED: { fr: "Fermee", en: "Closed" },
+  };
+
+  return labels[status]?.[language] ?? status;
+};
+
+const runStatusLabel = (status: string, language: "fr" | "en") => {
+  const labels: Record<string, Record<"fr" | "en", string>> = {
+    PUBLISHED: { fr: "Publiee", en: "Published" },
+    IN_PROGRESS: { fr: "En cours", en: "In progress" },
+    DRAFT: { fr: "Brouillon", en: "Draft" },
+    COMPLETED: { fr: "Terminee", en: "Completed" },
+    CANCELLED: { fr: "Annulee", en: "Cancelled" },
+  };
+
+  return labels[status]?.[language] ?? status;
+};
+
 export default async function AdminDashboardPage() {
   const [language, user] = await Promise.all([getCurrentLanguage(), getCurrentUser()]);
   const t = getDictionary(language);
@@ -40,6 +100,20 @@ export default async function AdminDashboardPage() {
   const activeProducts = products.filter((product) => product.isActive).length;
   const pendingOrders = orders.filter((order) => order.status === "PENDING").length;
   const locale = language === "fr" ? "fr-CA" : "en-CA";
+  const formatShortDateTime = (date: Date) =>
+    new Intl.DateTimeFormat(locale, {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(date);
+  const formatDeliveryWindow = (startAt: Date | null, endAt: Date | null) => {
+    if (!startAt || !endAt) {
+      return language === "fr" ? "Fenetre a confirmer" : "Window to confirm";
+    }
+
+    return `${formatShortDateTime(startAt)} - ${formatShortDateTime(endAt)}`;
+  };
 
   const recentOrders = orders.slice(0, 5).map((order) => ({
     id: order.id,
@@ -79,6 +153,58 @@ export default async function AdminDashboardPage() {
           slug: product.slug,
           stock: product.stock,
         })),
+        actionQueues: {
+          ordersToPrepare: todaySnapshot.ordersToPrepare.map((order) => ({
+            id: order.id,
+            href: `/admin/orders/${order.id}`,
+            title: `#${order.orderNumber}`,
+            meta: order.customerName,
+            detail:
+              language === "fr"
+                ? `${order.itemCount} article(s) - ${formatCurrency(order.totalCents, order.currency, locale)} - ${paymentStatusLabel(order.paymentStatus, language)}`
+                : `${order.itemCount} item(s) - ${formatCurrency(order.totalCents, order.currency, locale)} - ${paymentStatusLabel(order.paymentStatus, language)}`,
+            badge: orderStatusLabel(order.status, language),
+          })),
+          deliveryOrders: todaySnapshot.deliveryOrders.map((order) => ({
+            id: order.id,
+            href: `/admin/orders/${order.id}`,
+            title: `#${order.orderNumber}`,
+            meta: order.shippingCity
+              ? `${order.customerName} - ${order.shippingCity}`
+              : order.customerName,
+            detail: formatDeliveryWindow(order.deliveryWindowStartAt, order.deliveryWindowEndAt),
+            badge: deliveryStatusLabel(order.deliveryStatus, language),
+          })),
+          supportQueue: todaySnapshot.supportQueue.map((conversation) => ({
+            id: conversation.id,
+            href: "/admin/support",
+            title: conversation.customerName || conversation.customerEmail,
+            meta: conversation.orderNumber
+              ? language === "fr"
+                ? `Commande #${conversation.orderNumber}`
+                : `Order #${conversation.orderNumber}`
+              : conversation.customerEmail,
+            detail: conversation.slaDueAt
+              ? language === "fr"
+                ? `SLA ${formatShortDateTime(conversation.slaDueAt)}`
+                : `SLA ${formatShortDateTime(conversation.slaDueAt)}`
+              : language === "fr"
+                ? `Dernier message ${formatShortDateTime(conversation.lastMessageAt)}`
+                : `Last message ${formatShortDateTime(conversation.lastMessageAt)}`,
+            badge: `${supportStatusLabel(conversation.status, language)} - ${conversation.priority}`,
+          })),
+          activeRuns: todaySnapshot.activeRuns.map((run) => ({
+            id: run.id,
+            href: "/admin/delivery/runs",
+            title: run.dateKey,
+            meta: formatDeliveryWindow(run.slotStartAt, run.slotEndAt),
+            detail:
+              language === "fr"
+                ? `${run.stopCount} arret(s)${run.startedAt ? ` - depart ${formatShortDateTime(run.startedAt)}` : ""}`
+                : `${run.stopCount} stop(s)${run.startedAt ? ` - started ${formatShortDateTime(run.startedAt)}` : ""}`,
+            badge: runStatusLabel(run.status, language),
+          })),
+        },
         backup: todaySnapshot.backup,
         siteStatus: maintenanceState.enabled
           ? language === "fr"

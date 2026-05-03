@@ -1,8 +1,17 @@
 ﻿"use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import type { Dictionary, Language } from "@/lib/i18n";
+
+type AdminActionItem = {
+  id: string;
+  href: string;
+  title: string;
+  meta: string;
+  detail: string;
+  badge?: string;
+};
 
 type Props = {
   language: Language;
@@ -33,6 +42,12 @@ type Props = {
       slug: string;
       stock: number;
     }>;
+    actionQueues: {
+      ordersToPrepare: AdminActionItem[];
+      deliveryOrders: AdminActionItem[];
+      supportQueue: AdminActionItem[];
+      activeRuns: AdminActionItem[];
+    };
     backup: {
       status: "ok" | "warn" | "unknown";
       label: string;
@@ -77,6 +92,60 @@ const ORDER_STATUS_LABELS_FR: Record<string, string> = {
 
 const formatOrderStatus = (status: string, language: Language) =>
   language === "fr" ? ORDER_STATUS_LABELS_FR[status] ?? status : status;
+
+function AdminActionCard({
+  title,
+  eyebrow,
+  value,
+  summary,
+  href,
+  actionLabel,
+  items,
+  emptyLabel,
+  tone = "default",
+}: {
+  title: string;
+  eyebrow: string;
+  value: ReactNode;
+  summary: string;
+  href: string;
+  actionLabel: string;
+  items: AdminActionItem[];
+  emptyLabel: string;
+  tone?: "default" | "primary" | "warn";
+}) {
+  return (
+    <article className={`admin-action-card admin-action-card--${tone}`}>
+      <div className="admin-action-card__head">
+        <div>
+          <span>{eyebrow}</span>
+          <h3>{title}</h3>
+          <p>{summary}</p>
+        </div>
+        <strong>{value}</strong>
+      </div>
+
+      {items.length > 0 ? (
+        <div className="admin-action-list">
+          {items.map((item) => (
+            <Link className="admin-action-item" href={item.href} key={item.id}>
+              <span className="admin-action-item__title">{item.title}</span>
+              <span className="admin-action-item__meta">{item.meta}</span>
+              <span className="admin-action-item__detail">{item.detail}</span>
+              {item.badge ? <span className="admin-action-item__badge">{item.badge}</span> : null}
+            </Link>
+          ))}
+        </div>
+      ) : (
+        <p className="admin-action-empty">{emptyLabel}</p>
+      )}
+
+      <Link className="admin-action-card__link" href={href}>
+        {actionLabel}
+      </Link>
+    </article>
+  );
+}
 
 export function AdminDashboardClient({
   language,
@@ -304,6 +373,35 @@ export function AdminDashboardClient({
       : language === "fr"
         ? `${todayCockpit.backup.ageHours.toFixed(1)} h`
         : `${todayCockpit.backup.ageHours.toFixed(1)}h`;
+  const lowStockActionItems: AdminActionItem[] = todayCockpit.lowStockProducts.map((product) => ({
+    id: product.id,
+    href: "/admin/products",
+    title: product.name,
+    meta: product.slug,
+    detail:
+      language === "fr"
+        ? `${product.stock} unite(s) en stock`
+        : `${product.stock} unit(s) in stock`,
+    badge: product.stock <= 0 ? (language === "fr" ? "Rupture" : "Out") : language === "fr" ? "Bas" : "Low",
+  }));
+  const healthActionItems: AdminActionItem[] = [
+    {
+      id: "site",
+      href: "/admin/maintenance-cloudflare",
+      title: language === "fr" ? "Site public" : "Public site",
+      meta: todayCockpit.siteStatus,
+      detail: language === "fr" ? "Changer seulement si une intervention est necessaire." : "Change only if maintenance is needed.",
+      badge: maintenanceEnabled ? (language === "fr" ? "A surveiller" : "Watch") : "OK",
+    },
+    {
+      id: "backup",
+      href: "/admin/maintenance-cloudflare",
+      title: "Backup",
+      meta: backupAgeLabel,
+      detail: todayCockpit.backup.latestName ?? todayCockpit.backup.label,
+      badge: todayCockpit.backup.status === "ok" ? "OK" : language === "fr" ? "Verifier" : "Check",
+    },
+  ];
 
   return (
     <>
@@ -321,14 +419,14 @@ export function AdminDashboardClient({
         </div>
       </section>
 
-      <section className="section admin-today-cockpit" aria-label={language === "fr" ? "Cockpit aujourd'hui" : "Today cockpit"}>
+      <section className="section admin-today-cockpit" aria-label={language === "fr" ? "Actions du jour" : "Today actions"}>
         <div className="admin-section-head">
           <div>
-            <h2>{language === "fr" ? "Aujourd'hui" : "Today"}</h2>
+            <h2>{language === "fr" ? "À faire maintenant" : "To do now"}</h2>
             <p className="small">
               {language === "fr"
-                ? "Les signaux a regarder avant de preparer les commandes."
-                : "The signals to check before preparing orders."}
+                ? `${todayCockpit.todaySalesLabel} aujourd'hui, ${todayCockpit.todayOrderCount} commande(s) creees.`
+                : `${todayCockpit.todaySalesLabel} today, ${todayCockpit.todayOrderCount} order(s) created.`}
             </p>
           </div>
           <Link className="btn btn-secondary" href="/app">
@@ -336,53 +434,73 @@ export function AdminDashboardClient({
           </Link>
         </div>
 
-        <div className="admin-today-grid">
-          <Link className="admin-today-card admin-today-card--primary" href="/admin/orders">
-            <span>{language === "fr" ? "Ventes du jour" : "Today sales"}</span>
-            <strong>{todayCockpit.todaySalesLabel}</strong>
-            <p>{todayCockpit.todayOrderCount} {language === "fr" ? "commande(s) creees" : "order(s) created"}</p>
-          </Link>
-          <Link className="admin-today-card" href="/admin/orders">
-            <span>{language === "fr" ? "A preparer" : "To prepare"}</span>
-            <strong>{todayCockpit.ordersToPrepareCount}</strong>
-            <p>{language === "fr" ? "Commandes en attente, payees ou en preparation." : "Pending, paid, or processing orders."}</p>
-          </Link>
-          <Link className="admin-today-card" href="/admin/delivery">
-            <span>{language === "fr" ? "Livraison" : "Delivery"}</span>
-            <strong>{todayCockpit.deliveryOrderCount}</strong>
-            <p>{language === "fr" ? "Commandes planifiees ou sur la route." : "Scheduled or out-for-delivery orders."}</p>
-          </Link>
-          <Link className="admin-today-card" href="/admin/support">
-            <span>Support</span>
-            <strong>{todayCockpit.openSupportCount}</strong>
-            <p>{language === "fr" ? "Conversations ouvertes ou en attente." : "Open or waiting conversations."}</p>
-          </Link>
-          <Link className="admin-today-card" href="/admin/delivery/runs">
-            <span>{language === "fr" ? "Tournees" : "Runs"}</span>
-            <strong>{todayCockpit.activeRunCount}</strong>
-            <p>{language === "fr" ? "Tournees publiees ou en cours." : "Published or in-progress runs."}</p>
-          </Link>
-          <Link className="admin-today-card" href="/admin/products">
-            <span>{language === "fr" ? "Stock bas" : "Low stock"}</span>
-            <strong>{todayCockpit.lowStockCount}</strong>
-            <p>
-              {todayCockpit.lowStockProducts.length > 0
-                ? todayCockpit.lowStockProducts.map((product) => `${product.name} (${product.stock})`).join(", ")
-                : language === "fr"
-                  ? "Aucun produit critique."
-                  : "No critical product."}
-            </p>
-          </Link>
-          <div className={`admin-today-card admin-today-card--${todayCockpit.backup.status}`}>
-            <span>{language === "fr" ? "Backup" : "Backup"}</span>
-            <strong>{backupAgeLabel}</strong>
-            <p>{todayCockpit.backup.latestName ?? todayCockpit.backup.label}</p>
-          </div>
-          <div className="admin-today-card">
-            <span>{language === "fr" ? "Sante site" : "Site health"}</span>
-            <strong>{todayCockpit.siteStatus}</strong>
-            <p>{language === "fr" ? "Voir aussi npm run ops:status." : "Also check npm run ops:status."}</p>
-          </div>
+        <div className="admin-action-board">
+          <AdminActionCard
+            title={language === "fr" ? "Commandes à préparer" : "Orders to prepare"}
+            eyebrow={language === "fr" ? "Priorite" : "Priority"}
+            value={todayCockpit.ordersToPrepareCount}
+            summary={language === "fr" ? "Les prochaines commandes à traiter." : "Next orders to handle."}
+            href="/admin/orders"
+            actionLabel={language === "fr" ? "Voir les commandes" : "View orders"}
+            items={todayCockpit.actionQueues.ordersToPrepare}
+            emptyLabel={language === "fr" ? "Rien à préparer pour l'instant." : "Nothing to prepare right now."}
+            tone={todayCockpit.ordersToPrepareCount > 0 ? "primary" : "default"}
+          />
+          <AdminActionCard
+            title={language === "fr" ? "Livraison client" : "Customer delivery"}
+            eyebrow={language === "fr" ? "A surveiller" : "Watch"}
+            value={todayCockpit.deliveryOrderCount}
+            summary={language === "fr" ? "Commandes planifiees ou deja sur la route." : "Scheduled or already on the road."}
+            href="/admin/delivery"
+            actionLabel={language === "fr" ? "Ouvrir livraison" : "Open delivery"}
+            items={todayCockpit.actionQueues.deliveryOrders}
+            emptyLabel={language === "fr" ? "Aucune livraison active." : "No active delivery."}
+            tone={todayCockpit.deliveryOrderCount > 0 ? "primary" : "default"}
+          />
+          <AdminActionCard
+            title={language === "fr" ? "Support à répondre" : "Support to answer"}
+            eyebrow="Support"
+            value={todayCockpit.openSupportCount}
+            summary={language === "fr" ? "Clients ouverts, en attente ou assignes." : "Open, waiting, or assigned customers."}
+            href="/admin/support"
+            actionLabel={language === "fr" ? "Ouvrir support" : "Open support"}
+            items={todayCockpit.actionQueues.supportQueue}
+            emptyLabel={language === "fr" ? "Aucune conversation urgente." : "No urgent conversation."}
+            tone={todayCockpit.openSupportCount > 0 ? "warn" : "default"}
+          />
+          <AdminActionCard
+            title={language === "fr" ? "Tournées chauffeur" : "Driver runs"}
+            eyebrow={language === "fr" ? "Terrain" : "Field"}
+            value={todayCockpit.activeRunCount}
+            summary={language === "fr" ? "Tournées publiees ou en cours." : "Published or in-progress runs."}
+            href="/admin/delivery/runs"
+            actionLabel={language === "fr" ? "Voir les tournées" : "View runs"}
+            items={todayCockpit.actionQueues.activeRuns}
+            emptyLabel={language === "fr" ? "Aucune tournée active." : "No active run."}
+            tone={todayCockpit.activeRunCount > 0 ? "primary" : "default"}
+          />
+          <AdminActionCard
+            title={language === "fr" ? "Stock critique" : "Critical stock"}
+            eyebrow={language === "fr" ? "Inventaire" : "Inventory"}
+            value={todayCockpit.lowStockCount}
+            summary={language === "fr" ? "Produits actifs à verifier avant de vendre." : "Active products to review before selling."}
+            href="/admin/products"
+            actionLabel={language === "fr" ? "Ouvrir produits" : "Open products"}
+            items={lowStockActionItems}
+            emptyLabel={language === "fr" ? "Aucun produit critique." : "No critical product."}
+            tone={todayCockpit.lowStockCount > 0 ? "warn" : "default"}
+          />
+          <AdminActionCard
+            title={language === "fr" ? "Santé et backup" : "Health and backup"}
+            eyebrow={language === "fr" ? "Ops" : "Ops"}
+            value={maintenanceEnabled ? (language === "fr" ? "A voir" : "Watch") : "OK"}
+            summary={language === "fr" ? "Etat public et rappel backup local." : "Public state and local backup reminder."}
+            href="/admin/maintenance-cloudflare"
+            actionLabel={language === "fr" ? "Voir maintenance" : "View maintenance"}
+            items={healthActionItems}
+            emptyLabel={language === "fr" ? "Aucune alerte ops." : "No ops alert."}
+            tone={maintenanceEnabled || todayCockpit.backup.status !== "ok" ? "warn" : "default"}
+          />
         </div>
       </section>
 
