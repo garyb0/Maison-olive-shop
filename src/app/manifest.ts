@@ -45,6 +45,13 @@ export default function manifest(): MetadataRoute.Manifest {
         icons: [{ src: "/pwa-icon-192.png", sizes: "192x192", type: "image/png" }],
       },
       {
+        name: "Support",
+        short_name: "Support",
+        description: "Ouvrir le support Chez Olive.",
+        url: "/account/support",
+        icons: [{ src: "/pwa-icon-192.png", sizes: "192x192", type: "image/png" }],
+      },
+      {
         name: "Mes commandes",
         short_name: "Commandes",
         description: "Voir le suivi de mes commandes.",

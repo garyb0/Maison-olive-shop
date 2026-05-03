@@ -3,6 +3,7 @@ import { jsonError, jsonOk } from "@/lib/http";
 import { logApiEvent } from "@/lib/observability";
 import { requireAdmin } from "@/lib/permissions";
 import { adminStockAdjustmentSchema } from "@/lib/validators";
+import { createAdminAppNotification } from "@/lib/app-notifications";
 
 export async function POST(request: Request) {
   try {
@@ -16,6 +17,15 @@ export async function POST(request: Request) {
 
     const { productId, quantityChange, reason } = parsed.data;
     const result = await adjustAdminProductStock(productId, quantityChange, admin.id, reason);
+    if (result.product.isActive && result.product.stock <= 0) {
+      createAdminAppNotification({
+        type: "ADMIN_STOCK",
+        title: "Stock à zéro",
+        body: `${result.product.nameFr} est maintenant en rupture.`,
+        href: "/admin/products",
+        metadata: { productId: result.product.id, slug: result.product.slug },
+      }).catch(() => undefined);
+    }
 
     logApiEvent({
       level: "INFO",

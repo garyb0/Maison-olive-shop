@@ -1,0 +1,123 @@
+export {};
+
+const sendNotificationMock = vi.fn();
+
+const prismaMock = {
+  $queryRaw: vi.fn(),
+  appNotification: {
+    create: vi.fn(),
+    findFirst: vi.fn(),
+  },
+  notificationPreference: {
+    findUnique: vi.fn(),
+  },
+  webPushSubscription: {
+    findMany: vi.fn(),
+    updateMany: vi.fn(),
+  },
+};
+
+vi.mock("web-push", () => ({
+  sendNotification: (...args: unknown[]) => sendNotificationMock(...args),
+}));
+
+vi.mock("@/lib/env", () => ({
+  env: {
+    webPushPublicKey: "public-key",
+    webPushPrivateKey: "private-key",
+    webPushSubject: "mailto:support@chezolive.ca",
+  },
+}));
+
+vi.mock("@/lib/prisma", () => ({
+  prisma: prismaMock,
+}));
+
+describe("app notifications", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.clearAllMocks();
+    prismaMock.$queryRaw.mockResolvedValue([
+      { name: "WebPushSubscription" },
+      { name: "NotificationPreference" },
+      { name: "AppNotification" },
+    ]);
+    prismaMock.appNotification.create.mockResolvedValue({
+      id: "notif_1",
+      type: "ORDER_UPDATE",
+      audience: "CUSTOMER",
+      title: "Commande creee",
+      body: "Ta commande est bien enregistree.",
+      href: null,
+      readAt: null,
+      createdAt: new Date("2026-05-03T12:00:00.000Z"),
+    });
+    prismaMock.notificationPreference.findUnique.mockResolvedValue({
+      pushEnabled: true,
+      orderUpdates: true,
+      deliveryUpdates: true,
+      supportUpdates: true,
+      dogQrUpdates: true,
+      adminAlerts: true,
+      driverRunUpdates: true,
+    });
+    prismaMock.webPushSubscription.findMany.mockResolvedValue([
+      {
+        id: "push_1",
+        endpointHash: "hash_1",
+        endpoint: "https://push.example.test/sub/1",
+        p256dh: "p256dh-key",
+        auth: "auth-key",
+        userId: "user_1",
+      },
+    ]);
+    sendNotificationMock.mockResolvedValue(undefined);
+  });
+
+  it("garde les payloads push minimaux et rejette les liens externes", async () => {
+    const { createAppNotification } = await import("@/lib/app-notifications");
+
+    await createAppNotification({
+      userId: "user_1",
+      audience: "CUSTOMER",
+      type: "ORDER_UPDATE",
+      title: "Commande creee",
+      body: "Ta commande est bien enregistree.",
+      href: "https://evil.example.test/account/orders/order_1?address=secret",
+      metadata: { orderId: "order_1" },
+    });
+
+    expect(prismaMock.appNotification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          href: null,
+          metadataJson: JSON.stringify({ orderId: "order_1" }),
+        }),
+      }),
+    );
+    expect(sendNotificationMock).toHaveBeenCalledTimes(1);
+
+    const payload = JSON.parse(sendNotificationMock.mock.calls[0][1] as string) as Record<string, unknown>;
+    expect(payload).toEqual({
+      type: "ORDER_UPDATE",
+      title: "Commande creee",
+      body: "Ta commande est bien enregistree.",
+      href: "/app",
+    });
+    expect(payload).not.toHaveProperty("metadata");
+  });
+
+  it("deduplique les notifications QR chien recentes", async () => {
+    prismaMock.appNotification.findFirst.mockResolvedValueOnce({ id: "notif_existing" });
+    const { createDogQrScanNotification } = await import("@/lib/app-notifications");
+
+    const notification = await createDogQrScanNotification({
+      userId: "user_1",
+      dogId: "dog_1",
+      dogName: "Kratos",
+    });
+
+    expect(notification).toBeNull();
+    expect(prismaMock.appNotification.create).not.toHaveBeenCalled();
+  });
+});

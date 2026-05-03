@@ -411,6 +411,31 @@ export const driverFinishRunSchema = z
     },
   );
 
+export const webPushSubscriptionSchema = z.object({
+  endpoint: z.string().url().max(1200),
+  expirationTime: z.number().nullable().optional(),
+  keys: z.object({
+    p256dh: z.string().trim().min(20).max(500),
+    auth: z.string().trim().min(8).max(200),
+  }),
+});
+
+export const notificationPreferencePatchSchema = z.object({
+  pushEnabled: z.boolean().optional(),
+  orderUpdates: z.boolean().optional(),
+  deliveryUpdates: z.boolean().optional(),
+  supportUpdates: z.boolean().optional(),
+  dogQrUpdates: z.boolean().optional(),
+  adminAlerts: z.boolean().optional(),
+  driverRunUpdates: z.boolean().optional(),
+});
+
+export const notificationsPatchSchema = z.object({
+  ids: z.array(z.string().trim().min(1).max(191)).max(100).optional(),
+  all: z.boolean().optional(),
+  read: z.boolean().default(true),
+});
+
 export const adminOrderUpdateSchema = z
   .object({
     orderId: z.string().min(1).max(191),

@@ -73,6 +73,9 @@ export const env = {
   deliveryDepotRegion: process.env.DELIVERY_DEPOT_REGION ?? "",
   deliveryDepotPostal: process.env.DELIVERY_DEPOT_POSTAL ?? "",
   deliveryDepotCountry: process.env.DELIVERY_DEPOT_COUNTRY ?? "",
+  webPushPublicKey: process.env.WEB_PUSH_PUBLIC_KEY ?? process.env.NEXT_PUBLIC_WEB_PUSH_PUBLIC_KEY ?? "",
+  webPushPrivateKey: process.env.WEB_PUSH_PRIVATE_KEY ?? "",
+  webPushSubject: process.env.WEB_PUSH_SUBJECT ?? `mailto:${process.env.BUSINESS_SUPPORT_EMAIL ?? "support@chezolive.ca"}`,
 } as const;
 
 export type EnvValidationReport = {
@@ -244,6 +247,14 @@ export function validateEnv(target: "development" | "production" = "development"
     if (env.deliveryGpsTrackingEnabled && !env.deliveryExperimentalRoutingEnabled) {
       warnings.push(
         "DELIVERY_GPS_TRACKING_ENABLED=true is set while DELIVERY_EXPERIMENTAL_ROUTING_ENABLED=false. GPS capture will stay dormant until the experimental delivery module is enabled."
+      );
+    }
+
+    const hasAnyWebPush = Boolean(env.webPushPublicKey || env.webPushPrivateKey || process.env.NEXT_PUBLIC_WEB_PUSH_PUBLIC_KEY);
+    const hasCompleteWebPush = Boolean(env.webPushPublicKey && env.webPushPrivateKey && process.env.NEXT_PUBLIC_WEB_PUSH_PUBLIC_KEY);
+    if (hasAnyWebPush && !hasCompleteWebPush) {
+      warnings.push(
+        "Web Push is partially configured. Set WEB_PUSH_PUBLIC_KEY, NEXT_PUBLIC_WEB_PUSH_PUBLIC_KEY, WEB_PUSH_PRIVATE_KEY, and WEB_PUSH_SUBJECT for push delivery."
       );
     }
   }

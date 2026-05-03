@@ -1,6 +1,7 @@
 import { jsonError, jsonOk } from "@/lib/http";
 import { requireAdmin } from "@/lib/permissions";
 import { mapDeliveryRunError, publishDeliveryRun } from "@/lib/delivery-runs";
+import { createAppNotification } from "@/lib/app-notifications";
 
 type RouteContext = {
   params: Promise<{ runId: string }>;
@@ -14,6 +15,15 @@ export async function POST(_request: Request, context: RouteContext) {
       runId,
       actorUserId: admin.id,
     });
+    createAppNotification({
+      driverRunId: result.run.id,
+      audience: "DRIVER",
+      type: "DRIVER_RUN",
+      title: "Tournée publiée",
+      body: `Tournée ${result.run.dateKey} prête pour le chauffeur.`,
+      href: result.driverUrl ? new URL(result.driverUrl).pathname : `/admin/delivery/runs`,
+      metadata: { runId: result.run.id },
+    }).catch(() => undefined);
     return jsonOk(result);
   } catch (error) {
     if (error instanceof Error && error.message === "UNAUTHORIZED") {

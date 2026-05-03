@@ -7,6 +7,8 @@ const logApiEventMock = vi.fn();
 const stripeSessionsCreateMock = vi.fn();
 const buildCheckoutConfirmationMock = vi.fn();
 const recordOrderCreatedConversionMock = vi.fn();
+const createAdminAppNotificationMock = vi.fn();
+const createAppNotificationMock = vi.fn();
 
 const prismaMock = {
   order: {
@@ -45,6 +47,11 @@ vi.mock("@/lib/checkout-confirmation", () => ({
 
 vi.mock("@/lib/conversion-analytics", () => ({
   recordOrderCreatedConversion: (...args: unknown[]) => recordOrderCreatedConversionMock(...args),
+}));
+
+vi.mock("@/lib/app-notifications", () => ({
+  createAdminAppNotification: (...args: unknown[]) => createAdminAppNotificationMock(...args),
+  createAppNotification: (...args: unknown[]) => createAppNotificationMock(...args),
 }));
 
 vi.mock("@/lib/prisma", () => ({
@@ -119,6 +126,8 @@ describe("POST /api/orders", () => {
       client_secret: "cs_test_secret_1",
     });
     recordOrderCreatedConversionMock.mockResolvedValue(undefined);
+    createAdminAppNotificationMock.mockResolvedValue([]);
+    createAppNotificationMock.mockResolvedValue(null);
   });
 
   it("returns an inline Stripe checkout session instead of a hosted checkout URL", async () => {
@@ -178,6 +187,19 @@ describe("POST /api/orders", () => {
         orderId: "order_1",
         orderNumber: "MO-20260420-1234",
         paymentMethod: "STRIPE",
+      }),
+    );
+    expect(createAppNotificationMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "user_1",
+        type: "ORDER_UPDATE",
+        href: "/account/orders/order_1",
+      }),
+    );
+    expect(createAdminAppNotificationMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "ADMIN_ORDER",
+        href: "/admin/orders/order_1",
       }),
     );
   });

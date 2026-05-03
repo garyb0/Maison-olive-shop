@@ -4,10 +4,20 @@ import { getCurrentUser } from "@/lib/auth";
 import { getDictionary } from "@/lib/i18n";
 import { getCurrentLanguage } from "@/lib/language";
 import { getOwnerTodaySnapshot } from "@/lib/owner-dashboard";
+import {
+  getAppNotificationPreferences,
+  getWebPushPublicKey,
+  listAppNotificationsForUser,
+  type AppNotificationDTO,
+  type AppNotificationPreferencesDTO,
+} from "@/lib/app-notifications";
 import { prisma } from "@/lib/prisma";
 import { Navigation } from "@/components/Navigation";
+import { AppMobileNav } from "./app-mobile-nav";
+import { AppNotificationCenter } from "./app-notification-center";
 import { PwaDriverAccessCard } from "./pwa-driver-access-card";
 import { PwaInstallPanel } from "./pwa-install-panel";
+import { PwaServiceWorkerRegister } from "./pwa-service-worker-register";
 import { PwaSupportButton } from "./pwa-support-button";
 
 export const dynamic = "force-dynamic";
@@ -30,12 +40,20 @@ type HubLink = {
 type CustomerSnapshot = {
   orderCount: number;
   dogCount: number;
+  dogWithoutPhoneCount: number;
+  deliveryAddressCount: number;
   activeSupportCount: number;
   latestOrder: {
     orderNumber: string;
     status: string;
     totalCents: number;
   } | null;
+};
+
+type NotificationSnapshot = {
+  notifications: AppNotificationDTO[];
+  unreadCount: number;
+  preferences: AppNotificationPreferencesDTO;
 };
 
 type AdminSnapshot = {
@@ -194,21 +212,29 @@ function supportStatusLabel(status: string, language: "fr" | "en") {
   return (language === "fr" ? fr : en)[status] ?? status.toLowerCase();
 }
 
-async function getCustomerSnapshot(userId?: string): Promise<CustomerSnapshot | null> {
-  if (!userId) return null;
+async function getCustomerSnapshot(user?: { id: string }): Promise<CustomerSnapshot | null> {
+  if (!user?.id) return null;
 
   try {
-    const [orderCount, dogCount, activeSupportCount, latestOrder] = await Promise.all([
-      prisma.order.count({ where: { userId } }),
-      prisma.dogProfile.count({ where: { userId, isActive: true } }),
+    const [orderCount, dogCount, dogWithoutPhoneCount, deliveryAddressCount, activeSupportCount, latestOrder] = await Promise.all([
+      prisma.order.count({ where: { userId: user.id } }),
+      prisma.dogProfile.count({ where: { userId: user.id, isActive: true } }),
+      prisma.dogProfile.count({
+        where: {
+          userId: user.id,
+          isActive: true,
+          OR: [{ ownerPhone: null }, { ownerPhone: "" }],
+        },
+      }),
+      prisma.userDeliveryAddress.count({ where: { userId: user.id } }),
       prisma.supportConversation.count({
         where: {
-          customerUserId: userId,
+          customerUserId: user.id,
           status: { in: ["WAITING", "OPEN", "ASSIGNED"] },
         },
       }),
       prisma.order.findFirst({
-        where: { userId },
+        where: { userId: user.id },
         orderBy: { createdAt: "desc" },
         select: {
           orderNumber: true,
@@ -218,11 +244,24 @@ async function getCustomerSnapshot(userId?: string): Promise<CustomerSnapshot | 
       }),
     ]);
 
-    return { orderCount, dogCount, activeSupportCount, latestOrder };
+    return { orderCount, dogCount, dogWithoutPhoneCount, deliveryAddressCount, activeSupportCount, latestOrder };
   } catch (error) {
     console.error("Unable to load PWA customer snapshot", error);
     return null;
   }
+}
+
+async function getNotificationSnapshot(user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>): Promise<NotificationSnapshot> {
+  const [notificationResult, preferences] = await Promise.all([
+    listAppNotificationsForUser(user, 8).catch(() => ({ notifications: [], unreadCount: 0 })),
+    getAppNotificationPreferences(user.id),
+  ]);
+
+  return {
+    notifications: notificationResult.notifications,
+    unreadCount: notificationResult.unreadCount,
+    preferences,
+  };
 }
 
 async function getAdminSnapshot(): Promise<AdminSnapshot | null> {
@@ -289,10 +328,12 @@ async function getAdminSnapshot(): Promise<AdminSnapshot | null> {
 export default async function PwaAppPage() {
   const [language, user] = await Promise.all([getCurrentLanguage(), getCurrentUser()]);
   const t = getDictionary(language);
-  const [customerSnapshot, adminSnapshot] = await Promise.all([
-    getCustomerSnapshot(user?.id),
+  const [customerSnapshot, adminSnapshot, notificationSnapshot] = await Promise.all([
+    getCustomerSnapshot(user ?? undefined),
     user?.role === "ADMIN" ? getAdminSnapshot() : Promise.resolve(null),
+    user ? getNotificationSnapshot(user) : Promise.resolve(null),
   ]);
+  const webPushPublicKey = getWebPushPublicKey();
 
   const customerLinks: HubLink[] = [
     {
@@ -362,6 +403,7 @@ export default async function PwaAppPage() {
 
   return (
     <div className="app-shell pwa-app-shell">
+      <PwaServiceWorkerRegister />
       <header className="topbar">
         <Navigation language={language} t={t} user={user} />
       </header>
@@ -394,6 +436,16 @@ export default async function PwaAppPage() {
         </section>
 
         <PwaInstallPanel language={language} />
+
+        {user && notificationSnapshot ? (
+          <AppNotificationCenter
+            language={language}
+            publicKey={webPushPublicKey}
+            initialNotifications={notificationSnapshot.notifications}
+            initialUnreadCount={notificationSnapshot.unreadCount}
+            initialPreferences={notificationSnapshot.preferences}
+          />
+        ) : null}
 
         {user ? (
           <section className="pwa-hub-section pwa-account-snapshot" aria-label={language === "fr" ? "Resume du compte" : "Account summary"}>
@@ -437,7 +489,15 @@ export default async function PwaAppPage() {
                 href="/account/dogs"
                 label={language === "fr" ? "Profils chiens" : "Dog profiles"}
                 value={String(customerSnapshot?.dogCount ?? 0)}
-                help={language === "fr" ? "Colliers QR actifs dans ton compte." : "Active QR collars in your account."}
+                help={
+                  (customerSnapshot?.dogWithoutPhoneCount ?? 0) > 0
+                    ? language === "fr"
+                      ? `${customerSnapshot?.dogWithoutPhoneCount} profil(s) sans telephone.`
+                      : `${customerSnapshot?.dogWithoutPhoneCount} profile(s) missing phone.`
+                    : language === "fr"
+                      ? "Colliers QR actifs dans ton compte."
+                      : "Active QR collars in your account."
+                }
               />
               <StatCard
                 href="/account/support"
@@ -445,6 +505,19 @@ export default async function PwaAppPage() {
                 value={String(customerSnapshot?.activeSupportCount ?? 0)}
                 help={language === "fr" ? "Conversation ouverte ou en attente." : "Open or waiting conversation."}
               />
+            </div>
+            <div className="pwa-action-strip">
+              <Link className="pwa-action-pill" href="/cart">
+                {language === "fr" ? "Reprendre mon panier" : "Resume cart"}
+              </Link>
+              <Link className="pwa-action-pill" href="/account/orders">
+                {language === "fr" ? "Commander encore" : "Order again"}
+              </Link>
+              <Link className="pwa-action-pill" href="/account/profile">
+                {(customerSnapshot?.deliveryAddressCount ?? 0) > 0
+                  ? language === "fr" ? "Gerer mes adresses" : "Manage addresses"
+                  : language === "fr" ? "Ajouter une adresse" : "Add address"}
+              </Link>
             </div>
           </section>
         ) : null}
@@ -570,6 +643,7 @@ export default async function PwaAppPage() {
           </section>
         ) : null}
       </main>
+      <AppMobileNav language={language} userRole={user?.role ?? null} />
     </div>
   );
 }

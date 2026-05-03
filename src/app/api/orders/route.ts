@@ -12,6 +12,7 @@ import { applyRateLimit } from "@/lib/rate-limit";
 import { buildCheckoutConfirmation } from "@/lib/checkout-confirmation";
 import { resolvePublicSiteUrl } from "@/lib/site-url";
 import { recordOrderCreatedConversion } from "@/lib/conversion-analytics";
+import { createAdminAppNotification, createAppNotification } from "@/lib/app-notifications";
 
 const stripeMinimumAmountMessage =
   "Le paiement par carte exige un total d'au moins 0,50 $ CAD. Augmente légèrement le montant de la commande ou retire le rabais de test.";
@@ -137,6 +138,29 @@ export async function POST(request: Request) {
       paymentMethod: input.paymentMethod,
       deliveryMode: input.deliverySlotId ? "legacy" : input.deliveryWindowStartAt ? "dynamic" : null,
       language: customerLanguage,
+    }).catch(() => undefined);
+
+    if (user) {
+      createAppNotification({
+        userId: user.id,
+        audience: "CUSTOMER",
+        type: "ORDER_UPDATE",
+        title: customerLanguage === "fr" ? "Commande reçue" : "Order received",
+        body:
+          customerLanguage === "fr"
+            ? `Commande #${order.orderNumber} créée.`
+            : `Order #${order.orderNumber} was created.`,
+        href: `/account/orders/${order.id}`,
+        metadata: { orderId: order.id, orderNumber: order.orderNumber },
+      }).catch(() => undefined);
+    }
+
+    createAdminAppNotification({
+      type: "ADMIN_ORDER",
+      title: "Nouvelle commande",
+      body: `Commande #${order.orderNumber} à vérifier.`,
+      href: `/admin/orders/${order.id}`,
+      metadata: { orderId: order.id, orderNumber: order.orderNumber },
     }).catch(() => undefined);
 
     if (input.paymentMethod === "STRIPE" && stripeEnabled && stripe) {

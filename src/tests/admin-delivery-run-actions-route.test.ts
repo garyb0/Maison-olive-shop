@@ -7,6 +7,7 @@ const publishDeliveryRunMock = vi.fn();
 const optimizeDeliveryRunMock = vi.fn();
 const reorderDeliveryRunMock = vi.fn();
 const completeDeliveryRunFromAdminMock = vi.fn();
+const createAppNotificationMock = vi.fn();
 
 vi.mock("@/lib/permissions", () => ({
   requireAdmin: (...args: unknown[]) => requireAdminMock(...args),
@@ -25,11 +26,16 @@ vi.mock("@/lib/delivery-runs", () => ({
   }),
 }));
 
+vi.mock("@/lib/app-notifications", () => ({
+  createAppNotification: (...args: unknown[]) => createAppNotificationMock(...args),
+}));
+
 describe("admin delivery run action routes", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
     requireAdminMock.mockResolvedValue({ id: "admin_1" });
+    createAppNotificationMock.mockResolvedValue(null);
   });
 
   it("retourne le detail JSON d'une tournee", async () => {
@@ -85,6 +91,14 @@ describe("admin delivery run action routes", () => {
       runId: "run_1",
       actorUserId: "admin_1",
     });
+    expect(createAppNotificationMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        driverRunId: "run_1",
+        audience: "DRIVER",
+        type: "DRIVER_RUN",
+        href: "/driver/run/token",
+      }),
+    );
   });
 
   it("optimise une tournee et transmet l'avertissement de fallback", async () => {

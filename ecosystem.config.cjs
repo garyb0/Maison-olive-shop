@@ -8,8 +8,54 @@ const dataRoot = process.env.CHEZOLIVE_DATA_ROOT
 const logDir = process.env.CHEZOLIVE_LOG_DIR
   ? path.resolve(__dirname, process.env.CHEZOLIVE_LOG_DIR)
   : path.join(dataRoot, "logs");
+const secretsFile = process.env.CHEZOLIVE_SECRETS_FILE
+  ? path.resolve(__dirname, process.env.CHEZOLIVE_SECRETS_FILE)
+  : path.join(dataRoot, "secrets", "chez-olive.production.env");
 
 fs.mkdirSync(logDir, { recursive: true });
+
+function loadEnvFileIfExists(filePath) {
+  if (!fs.existsSync(filePath)) return;
+
+  const content = fs.readFileSync(filePath, "utf8");
+  for (const rawLine of content.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) continue;
+
+    const equalIndex = line.indexOf("=");
+    if (equalIndex <= 0) continue;
+
+    const key = line.slice(0, equalIndex).trim();
+    let value = line.slice(equalIndex + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+
+    if (!(key in process.env)) {
+      process.env[key] = value;
+    }
+  }
+}
+
+function pickEnv(keys) {
+  return Object.fromEntries(
+    keys
+      .map((key) => [key, process.env[key]])
+      .filter((entry) => typeof entry[1] === "string" && entry[1].length > 0),
+  );
+}
+
+loadEnvFileIfExists(secretsFile);
+
+const optionalAppEnv = pickEnv([
+  "WEB_PUSH_PUBLIC_KEY",
+  "WEB_PUSH_PRIVATE_KEY",
+  "WEB_PUSH_SUBJECT",
+  "NEXT_PUBLIC_WEB_PUSH_PUBLIC_KEY",
+]);
 
 module.exports = {
   apps: [
@@ -23,11 +69,13 @@ module.exports = {
         NODE_ENV: "production",
         NEXT_PUBLIC_SITE_URL: "https://chezolive.ca",
         BUSINESS_SUPPORT_EMAIL: "support@chezolive.ca",
+        ...optionalAppEnv,
       },
       env_production: {
         NODE_ENV: "production",
         NEXT_PUBLIC_SITE_URL: "https://chezolive.ca",
         BUSINESS_SUPPORT_EMAIL: "support@chezolive.ca",
+        ...optionalAppEnv,
       },
       autorestart: true,
       watch: false,

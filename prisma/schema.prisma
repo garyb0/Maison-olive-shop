@@ -113,12 +113,15 @@ model User {
   assignedSupportConversations SupportConversation[] @relation("AssignedSupportConversations")
   supportMessages              SupportMessage[]      @relation("SupportMessages")
   supportNotificationPreference SupportNotificationPreference?
+  notificationPreference        NotificationPreference?
   supportInternalNotes          SupportInternalNote[]
   supportQuickReplies           SupportQuickReply[]
   passwordResets               PasswordReset[]
   subscriptions                Subscription[]
   deliveryAddresses            UserDeliveryAddress[]
   dogProfiles                  DogProfile[]
+  webPushSubscriptions         WebPushSubscription[]
+  appNotifications             AppNotification[]
 }
 
 model DogProfile {
@@ -382,6 +385,8 @@ model DeliveryRun {
   stops        DeliveryStop[]
   accessTokens DeliveryRunAccessToken[]
   gpsSamples   DeliveryGpsSample[]
+  webPushSubscriptions WebPushSubscription[]
+  appNotifications     AppNotification[]
 
   @@unique([deliverySlotId])
   @@index([driverId, dateKey])
@@ -458,6 +463,68 @@ model DeliveryGpsSample {
   run DeliveryRun @relation(fields: [runId], references: [id], onDelete: Cascade)
 
   @@index([runId, recordedAt])
+}
+
+model WebPushSubscription {
+  id              String   @id @default(cuid())
+  userId          String?
+  driverRunId     String?
+  driverTokenHash String?
+  endpointHash    String   @unique
+  endpoint        String
+  p256dh          String
+  auth            String
+  audience        String   @default("CUSTOMER")
+  userAgent       String?
+  enabled         Boolean  @default(true)
+  lastSeenAt      DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user      User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  driverRun DeliveryRun? @relation(fields: [driverRunId], references: [id], onDelete: Cascade)
+
+  @@index([userId, enabled])
+  @@index([driverRunId, enabled])
+  @@index([audience, enabled])
+}
+
+model NotificationPreference {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  pushEnabled      Boolean  @default(false)
+  orderUpdates     Boolean  @default(true)
+  deliveryUpdates  Boolean  @default(true)
+  supportUpdates   Boolean  @default(true)
+  dogQrUpdates     Boolean  @default(true)
+  adminAlerts      Boolean  @default(true)
+  driverRunUpdates Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AppNotification {
+  id           String    @id @default(cuid())
+  userId       String?
+  driverRunId  String?
+  audience     String    @default("CUSTOMER")
+  type         String
+  title        String
+  body         String
+  href         String?
+  metadataJson String?
+  readAt       DateTime?
+  createdAt    DateTime  @default(now())
+
+  user      User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  driverRun DeliveryRun? @relation(fields: [driverRunId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt])
+  @@index([driverRunId, readAt, createdAt])
+  @@index([audience, createdAt])
+  @@index([type, createdAt])
 }
 
 model GeocodedAddressCache {

@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import manifest from "@/app/manifest";
 import { PwaDriverAccessCard } from "@/app/app/pwa-driver-access-card";
 import { PwaInstallPanel } from "@/app/app/pwa-install-panel";
+import { AppNotificationCenter } from "@/app/app/app-notification-center";
 import { PwaSupportButton } from "@/app/app/pwa-support-button";
 
 const prismaMock = vi.hoisted(() => ({
@@ -13,6 +14,9 @@ const prismaMock = vi.hoisted(() => ({
     aggregate: vi.fn(),
   },
   dogProfile: {
+    count: vi.fn(),
+  },
+  userDeliveryAddress: {
     count: vi.fn(),
   },
   supportConversation: {
@@ -40,6 +44,9 @@ vi.mock("next/link", () => ({
 
 const getCurrentUserMock = vi.fn();
 const getCurrentLanguageMock = vi.fn();
+const getAppNotificationPreferencesMock = vi.fn();
+const getWebPushPublicKeyMock = vi.fn();
+const listAppNotificationsForUserMock = vi.fn();
 
 vi.mock("@/lib/auth", () => ({
   getCurrentUser: (...args: unknown[]) => getCurrentUserMock(...args),
@@ -47,6 +54,12 @@ vi.mock("@/lib/auth", () => ({
 
 vi.mock("@/lib/language", () => ({
   getCurrentLanguage: (...args: unknown[]) => getCurrentLanguageMock(...args),
+}));
+
+vi.mock("@/lib/app-notifications", () => ({
+  getAppNotificationPreferences: (...args: unknown[]) => getAppNotificationPreferencesMock(...args),
+  getWebPushPublicKey: (...args: unknown[]) => getWebPushPublicKeyMock(...args),
+  listAppNotificationsForUser: (...args: unknown[]) => listAppNotificationsForUserMock(...args),
 }));
 
 vi.mock("@/lib/i18n", () => ({
@@ -78,6 +91,7 @@ describe("PWA Chez Olive", () => {
     prismaMock.order.findFirst.mockResolvedValue(null);
     prismaMock.order.aggregate.mockResolvedValue({ _sum: { totalCents: 0 } });
     prismaMock.dogProfile.count.mockResolvedValue(0);
+    prismaMock.userDeliveryAddress.count.mockResolvedValue(0);
     prismaMock.supportConversation.count.mockResolvedValue(0);
     prismaMock.supportConversation.findMany.mockResolvedValue([]);
     prismaMock.deliveryRun.count.mockResolvedValue(0);
@@ -85,6 +99,17 @@ describe("PWA Chez Olive", () => {
     prismaMock.deliveryRun.findFirst.mockResolvedValue(null);
     prismaMock.product.count.mockResolvedValue(0);
     prismaMock.product.findMany.mockResolvedValue([]);
+    getWebPushPublicKeyMock.mockReturnValue("");
+    getAppNotificationPreferencesMock.mockResolvedValue({
+      pushEnabled: false,
+      orderUpdates: true,
+      deliveryUpdates: true,
+      supportUpdates: true,
+      dogQrUpdates: true,
+      adminAlerts: true,
+      driverRunUpdates: true,
+    });
+    listAppNotificationsForUserMock.mockResolvedValue({ notifications: [], unreadCount: 0 });
   });
 
   afterEach(() => {
@@ -148,6 +173,45 @@ describe("PWA Chez Olive", () => {
     expect(screen.getByText("Derniere #CO-4242 - en preparation - 45,99 $")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Chiens QR/ })).toHaveAttribute("href", "/account/dogs");
     expect(prismaMock.dogProfile.count).toHaveBeenCalledWith({ where: { userId: "user_1", isActive: true } });
+  });
+
+  it("affiche le centre de notifications in-app sans forcer le push", () => {
+    render(
+      <AppNotificationCenter
+        language="fr"
+        publicKey=""
+        initialNotifications={[
+          {
+            id: "notif_1",
+            type: "ORDER_UPDATE",
+            audience: "CUSTOMER",
+            title: "Commande confirmee",
+            body: "Ta commande est bien creee.",
+            href: "/account/orders/order_1",
+            readAt: null,
+            createdAt: "2026-05-03T16:00:00.000Z",
+          },
+        ]}
+        initialUnreadCount={1}
+        initialPreferences={{
+          pushEnabled: false,
+          orderUpdates: true,
+          deliveryUpdates: true,
+          supportUpdates: true,
+          dogQrUpdates: true,
+          adminAlerts: true,
+          driverRunUpdates: true,
+        }}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "Centre d'actions" })).toBeInTheDocument();
+    expect(screen.getByText("1 non lue(s)")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Commande confirmee/ })).toHaveAttribute(
+      "href",
+      "/account/orders/order_1",
+    );
+    expect(screen.getByRole("button", { name: "Activer les alertes utiles" })).toBeDisabled();
   });
 
   it("affiche l'admin leger seulement pour un admin avec cockpit mobile", async () => {

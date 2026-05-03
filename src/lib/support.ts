@@ -1,6 +1,7 @@
 ﻿import { prisma } from "@/lib/prisma";
 import type { CurrentUser, SupportConversationCloseReason, SupportConversationPriority } from "@/lib/types";
 import { sendSmsNotification } from "@/lib/email";
+import { createAdminAppNotification, createAppNotification } from "@/lib/app-notifications";
 import { logApiEvent } from "@/lib/observability";
 import { sendConversationAssignedEmail, sendNewConversationEmail, sendNewMessageEmail } from "@/lib/support-email";
 import {
@@ -532,6 +533,14 @@ export async function createSupportConversation(input: {
       include: conversationInclude,
     });
   });
+  createAdminAppNotification({
+    type: "ADMIN_SUPPORT",
+    title: "Nouveau support",
+    body: `${result.customerName || result.customerEmail} attend une réponse.`,
+    href: "/admin/support",
+    metadata: { conversationId: result.id },
+  }).catch(() => undefined);
+
   return enrichSupportConversation(result, "customer");
 }
 
@@ -613,6 +622,27 @@ export async function createSupportMessageAsCustomer(conversationId: string, use
 
     return result;
   });
+
+  if (result.assignedAdminId) {
+    createAppNotification({
+      userId: result.assignedAdminId,
+      audience: "ADMIN",
+      type: "ADMIN_SUPPORT",
+      title: "Réponse client",
+      body: `${result.customerName || result.customerEmail} a répondu au support.`,
+      href: "/admin/support",
+      metadata: { conversationId },
+    }).catch(() => undefined);
+  } else {
+    createAdminAppNotification({
+      type: "ADMIN_SUPPORT",
+      title: "Réponse client",
+      body: `${result.customerName || result.customerEmail} a répondu au support.`,
+      href: "/admin/support",
+      metadata: { conversationId },
+    }).catch(() => undefined);
+  }
+
   return enrichSupportConversation(result, "customer");
 }
 
@@ -837,6 +867,27 @@ export async function createSupportMessageAsGuest(
 
     return result;
   });
+
+  if (result.assignedAdminId) {
+    createAppNotification({
+      userId: result.assignedAdminId,
+      audience: "ADMIN",
+      type: "ADMIN_SUPPORT",
+      title: "Réponse client",
+      body: `${result.customerName || result.customerEmail} a répondu au support.`,
+      href: "/admin/support",
+      metadata: { conversationId },
+    }).catch(() => undefined);
+  } else {
+    createAdminAppNotification({
+      type: "ADMIN_SUPPORT",
+      title: "Réponse client",
+      body: `${result.customerName || result.customerEmail} a répondu au support.`,
+      href: "/admin/support",
+      metadata: { conversationId },
+    }).catch(() => undefined);
+  }
+
   return enrichSupportConversation(result, "customer");
 }
 
@@ -888,6 +939,19 @@ export async function createSupportMessageAsAdmin(conversationId: string, admin:
       include: conversationInclude,
     });
   });
+
+  if (result.customerUserId) {
+    createAppNotification({
+      userId: result.customerUserId,
+      audience: "CUSTOMER",
+      type: "SUPPORT_UPDATE",
+      title: "Réponse du support",
+      body: "L'équipe Chez Olive a répondu à ta conversation.",
+      href: "/account/support",
+      metadata: { conversationId },
+    }).catch(() => undefined);
+  }
+
   return enrichSupportConversation(result, "admin", admin);
 }
 

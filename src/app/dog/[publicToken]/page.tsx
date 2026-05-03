@@ -4,6 +4,7 @@ import { getCurrentLanguage } from "@/lib/language";
 import { getCurrentUser } from "@/lib/auth";
 import { getDogProfileByPublicToken } from "@/lib/dogs";
 import { DogClaimClient } from "./dog-claim-client";
+import { DogQrViewTracker } from "./dog-qr-view-tracker";
 
 type DogPageProps = {
   params: Promise<{ publicToken: string }>;
@@ -150,6 +151,7 @@ export default async function DogPublicPage({ params }: DogPageProps) {
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,_#fffefb_0%,_#fbf2df_40%,_#eef4e3_100%)] px-4 py-10 text-stone-800">
+      {!isOwner ? <DogQrViewTracker publicToken={dog.publicToken} /> : null}
       <div className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-5xl items-center justify-center">
         <section className="grid w-full items-center gap-10 rounded-[40px] border border-white/75 bg-[rgba(255,255,255,0.9)] p-6 shadow-[0_28px_90px_rgba(80,67,36,0.14)] backdrop-blur md:grid-cols-[0.9fr_1.1fr] md:p-10">
           <div className="text-center">

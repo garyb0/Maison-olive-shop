@@ -116,7 +116,7 @@ test.describe("authenticated mobile account smoke", () => {
   test("connected cart and checkout are readable on mobile", async ({ page }) => {
     test.skip(!productId, "ACCOUNT_SMOKE_PRODUCT_ID is required for cart and checkout screenshots.");
 
-    await page.addInitScript(
+    await page.evaluate(
       ({ key, id }) => window.localStorage.setItem(key, JSON.stringify([{ productId: id, quantity: 1 }])),
       { key: CART_STORAGE_KEY, id: productId },
     );
