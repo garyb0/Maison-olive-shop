@@ -5,6 +5,7 @@ import {
   isDeliveryGpsTrackingEnabled,
   mapDeliveryRunError,
 } from "@/lib/delivery-runs";
+import { getWebPushPublicKey } from "@/lib/app-notifications";
 import { DriverRunClient } from "./run-client";
 
 type Props = {
@@ -66,6 +67,7 @@ export default async function DriverRunPage({ params }: Props) {
       language={language}
       token={token}
       gpsTrackingEnabled={isDeliveryGpsTrackingEnabled()}
+      pushPublicKey={getWebPushPublicKey()}
       initialRun={run}
     />
   );

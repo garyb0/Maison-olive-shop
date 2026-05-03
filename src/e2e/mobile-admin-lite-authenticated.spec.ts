@@ -61,6 +61,9 @@ test.describe("authenticated mobile admin lite smoke", () => {
     await page.goto("/app");
     await page.waitForLoadState("domcontentloaded");
 
+    await expect(page.getByRole("heading", { name: "Centre d'actions" })).toBeVisible();
+    await expect(page.getByText("In-app actif")).toBeVisible();
+    await expect(page.getByText("Alertes admin")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Admin quotidien" })).toBeVisible();
     await expect(page.getByRole("link", { name: /Admin complet/i })).toHaveAttribute("href", "/admin");
     await expect(page.locator('.pwa-admin-lite a[href="/admin/orders"]').first()).toBeVisible();

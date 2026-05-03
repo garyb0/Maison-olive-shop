@@ -8,8 +8,11 @@ type Props = {
   language: Language;
   token: string;
   gpsTrackingEnabled: boolean;
+  pushPublicKey: string;
   initialRun: DeliveryRunSummary;
 };
+
+type BrowserPushPermission = NotificationPermission | "unsupported";
 
 type DriverLocationPayload = {
   lat: number;
@@ -54,6 +57,43 @@ function createQueuedActionId() {
   return typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function urlBase64ToUint8Array(base64String: string) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+
+  for (let index = 0; index < rawData.length; index += 1) {
+    outputArray[index] = rawData.charCodeAt(index);
+  }
+
+  return outputArray;
+}
+
+function canUseDriverPush(publicKey: string) {
+  return Boolean(
+    publicKey &&
+      typeof window !== "undefined" &&
+      typeof navigator !== "undefined" &&
+      "serviceWorker" in navigator &&
+      "PushManager" in window &&
+      "Notification" in window,
+  );
+}
+
+function getDriverPushPermission(): BrowserPushPermission {
+  if (typeof window === "undefined" || !("Notification" in window)) return "unsupported";
+  return Notification.permission;
+}
+
+async function registerDriverServiceWorker() {
+  if (!("serviceWorker" in navigator)) return null;
+  return navigator.serviceWorker.register("/sw.js", {
+    scope: "/",
+    updateViaCache: "none",
+  });
 }
 
 function loadQueuedActions(token: string): QueuedDriverAction[] {
@@ -265,11 +305,16 @@ function formatEta(isoDate: string | null, language: Language) {
   });
 }
 
-export function DriverRunClient({ language, token, gpsTrackingEnabled, initialRun }: Props) {
+export function DriverRunClient({ language, token, gpsTrackingEnabled, pushPublicKey, initialRun }: Props) {
   const [run, setRun] = useState(initialRun);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushSupported, setPushSupported] = useState(false);
+  const [pushSubscribed, setPushSubscribed] = useState(false);
+  const [pushPermission, setPushPermission] = useState<BrowserPushPermission>("unsupported");
+  const [pushMessage, setPushMessage] = useState("");
   const [gpsStatus, setGpsStatus] = useState<"idle" | "watching" | "blocked" | "unsupported">("idle");
   const [odometerStartKm, setOdometerStartKm] = useState("");
   const [odometerEndKm, setOdometerEndKm] = useState("");
@@ -303,6 +348,31 @@ export function DriverRunClient({ language, token, gpsTrackingEnabled, initialRu
     nextStopDistanceMeters <= ARRIVAL_SUGGESTION_RADIUS_METERS;
   const nextStopDisplayDistance = formatDistanceMeters(nextStopDistanceMeters, language);
   const nextStopEta = formatEta(nextPendingStop?.plannedEta ?? null, language);
+  const pushOptInVisible = run.status === "PUBLISHED" || run.status === "IN_PROGRESS";
+  const pushStatus = useMemo(() => {
+    if (!pushSupported) {
+      return {
+        label: language === "fr" ? "Non supporte ici" : "Not supported here",
+        tone: "muted" as const,
+      };
+    }
+    if (pushPermission === "denied") {
+      return {
+        label: language === "fr" ? "Permission bloquee" : "Permission blocked",
+        tone: "warn" as const,
+      };
+    }
+    if (pushSubscribed) {
+      return {
+        label: language === "fr" ? "Push actif" : "Push active",
+        tone: "ok" as const,
+      };
+    }
+    return {
+      label: language === "fr" ? "Push desactive" : "Push disabled",
+      tone: "warn" as const,
+    };
+  }, [language, pushPermission, pushSubscribed, pushSupported]);
 
   const callApi = async (
     path: string,
@@ -373,6 +443,18 @@ export function DriverRunClient({ language, token, gpsTrackingEnabled, initialRu
       }
     };
   }, [gpsTrackingEnabled, run.status, token]);
+
+  useEffect(() => {
+    const supported = canUseDriverPush(pushPublicKey);
+    setPushSupported(supported);
+    setPushPermission(getDriverPushPermission());
+    if (!supported || !pushOptInVisible) return;
+
+    registerDriverServiceWorker()
+      .then((registration) => registration?.pushManager.getSubscription())
+      .then((subscription) => setPushSubscribed(Boolean(subscription)))
+      .catch(() => undefined);
+  }, [pushOptInVisible, pushPublicKey]);
 
   const withBusy = async (task: () => Promise<void>) => {
     setBusy(true);
@@ -603,6 +685,77 @@ export function DriverRunClient({ language, token, gpsTrackingEnabled, initialRu
     }
   };
 
+  const subscribeDriverPush = async () => {
+    if (!pushSupported) {
+      setPushMessage(
+        language === "fr"
+          ? "Alertes non disponibles ici. Sur iPhone, ajoute l'app a l'ecran d'accueil."
+          : "Alerts unavailable here. On iPhone, add the app to the Home Screen.",
+      );
+      return;
+    }
+
+    setPushBusy(true);
+    setPushMessage("");
+
+    try {
+      const nextPermission = await Notification.requestPermission();
+      setPushPermission(nextPermission);
+      if (nextPermission !== "granted") {
+        setPushMessage(language === "fr" ? "Permission bloquee dans le navigateur." : "Permission blocked in the browser.");
+        return;
+      }
+
+      const registration = await registerDriverServiceWorker();
+      if (!registration) {
+        setPushMessage(language === "fr" ? "Alertes non disponibles ici." : "Alerts unavailable here.");
+        return;
+      }
+
+      const existingSubscription = await registration.pushManager.getSubscription();
+      const subscription = existingSubscription ?? await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(pushPublicKey),
+      });
+
+      const response = await fetch(`/api/driver/run/${token}/push/subscribe`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(subscription),
+      });
+
+      if (!response.ok) {
+        setPushMessage(language === "fr" ? "Impossible d'activer les alertes." : "Unable to enable alerts.");
+        return;
+      }
+
+      setPushSubscribed(true);
+      setPushMessage(language === "fr" ? "Alertes de tournee activees." : "Run alerts enabled.");
+    } finally {
+      setPushBusy(false);
+    }
+  };
+
+  const unsubscribeDriverPush = async () => {
+    setPushBusy(true);
+    setPushMessage("");
+
+    try {
+      const registration = await navigator.serviceWorker?.ready.catch(() => null);
+      const subscription = await registration?.pushManager.getSubscription();
+      await subscription?.unsubscribe();
+      await fetch(`/api/driver/run/${token}/push/subscribe`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(subscription ?? {}),
+      });
+      setPushSubscribed(false);
+      setPushMessage(language === "fr" ? "Alertes de tournee desactivees." : "Run alerts disabled.");
+    } finally {
+      setPushBusy(false);
+    }
+  };
+
   return (
     <main className="section driver-run-shell">
       {message ? <div className="admin-callout admin-callout--ok">{message}</div> : null}
@@ -623,6 +776,42 @@ export function DriverRunClient({ language, token, gpsTrackingEnabled, initialRu
                 ? "Synchroniser"
                 : "Sync"}
           </button>
+        </div>
+      ) : null}
+
+      {pushOptInVisible ? (
+        <div className="admin-card driver-push-card">
+          <div className="driver-push-card__head">
+            <div>
+              <span className="admin-page-header__eyebrow">
+                {language === "fr" ? "Alertes optionnelles" : "Optional alerts"}
+              </span>
+              <h2>{language === "fr" ? "Recevoir les alertes de cette tournee" : "Receive alerts for this run"}</h2>
+              <p className="small">
+                {language === "fr"
+                  ? "Utile si la tournee est modifiee. Tu peux livrer meme sans l'activer."
+                  : "Useful if the run changes. You can deliver without enabling it."}
+              </p>
+            </div>
+            <span className={`driver-push-status driver-push-status--${pushStatus.tone}`}>{pushStatus.label}</span>
+          </div>
+          <div className="driver-push-actions">
+            {pushSubscribed ? (
+              <button className="btn btn-secondary" type="button" onClick={() => void unsubscribeDriverPush()} disabled={pushBusy}>
+                {language === "fr" ? "Desactiver les alertes" : "Disable alerts"}
+              </button>
+            ) : (
+              <button className="btn" type="button" onClick={() => void subscribeDriverPush()} disabled={pushBusy || !pushSupported}>
+                {language === "fr" ? "Recevoir les alertes" : "Receive alerts"}
+              </button>
+            )}
+            <span className="small">
+              {language === "fr"
+                ? "iPhone: ajoute l'app a l'ecran d'accueil pour le push web."
+                : "iPhone: add the app to the Home Screen for web push."}
+            </span>
+          </div>
+          {pushMessage ? <p className="small driver-push-message">{pushMessage}</p> : null}
         </div>
       ) : null}
 

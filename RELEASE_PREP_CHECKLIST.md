@@ -57,6 +57,31 @@ npm run host:pm2:restart
 - Si un secret est affiche dans un log, le considerer compromis et le remplacer.
 - Les vrais secrets Stripe, OpenAI, email et session doivent rester serveur-only.
 
+## Recette telephone PWA
+
+Cette recette complete les tests Playwright; elle ne remplace pas les smokes automatises.
+
+1. Android Chrome:
+   - Ouvrir `https://chezolive.ca/app`.
+   - Installer avec le bouton navigateur ou le CTA Chez Olive.
+   - Ouvrir l'app installee, verifier `/app`, boutique, panier et support.
+   - Connecter un compte smoke/client, cliquer `Tester une notification`, puis verifier le centre d'actions.
+
+2. iPhone Safari:
+   - Ouvrir `https://chezolive.ca/app`.
+   - Utiliser Partager > Sur l'ecran d'accueil.
+   - Ouvrir l'icone installee, verifier que l'app reste optionnelle et que le site navigateur fonctionne encore.
+   - Tester une notification depuis l'app installee si le push web est supporte et autorise.
+
+3. Livreur:
+   - Ouvrir un lien `/driver/run/<token>` sandbox.
+   - Verifier Waze, demarrage, arrivee GPS suggeree et file hors ligne.
+   - Activer `Recevoir les alertes de cette tournee` seulement en opt-in; la tournee doit rester livrable sans push.
+
+4. Admin mobile:
+   - Ouvrir `/app` avec le compte smoke admin.
+   - Verifier Admin quotidien, centre d'actions, support, stock, livraison et sante.
+
 ## Reste a finaliser
 
 - Remplacer les fichiers secrets locaux par un vrai gestionnaire hote/PM2/Windows env si le serveur est transfere a une autre machine.

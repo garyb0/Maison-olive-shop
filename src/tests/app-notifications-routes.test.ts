@@ -3,6 +3,8 @@ export {};
 const applyRateLimitMock = vi.fn();
 const requireUserMock = vi.fn();
 const getAppNotificationPreferencesMock = vi.fn();
+const createAppNotificationMock = vi.fn();
+const isWebPushConfiguredMock = vi.fn();
 const listAppNotificationsForUserMock = vi.fn();
 const markAppNotificationsReadMock = vi.fn();
 const registerWebPushSubscriptionForUserMock = vi.fn();
@@ -18,7 +20,9 @@ vi.mock("@/lib/permissions", () => ({
 }));
 
 vi.mock("@/lib/app-notifications", () => ({
+  createAppNotification: (...args: unknown[]) => createAppNotificationMock(...args),
   getAppNotificationPreferences: (...args: unknown[]) => getAppNotificationPreferencesMock(...args),
+  isWebPushConfigured: (...args: unknown[]) => isWebPushConfiguredMock(...args),
   listAppNotificationsForUser: (...args: unknown[]) => listAppNotificationsForUserMock(...args),
   markAppNotificationsRead: (...args: unknown[]) => markAppNotificationsReadMock(...args),
   registerWebPushSubscriptionForUser: (...args: unknown[]) => registerWebPushSubscriptionForUserMock(...args),
@@ -52,6 +56,17 @@ describe("notification and push routes", () => {
     registerWebPushSubscriptionForUserMock.mockResolvedValue({ id: "push_1", enabled: true });
     unregisterWebPushSubscriptionForUserMock.mockResolvedValue({ ok: true });
     getAppNotificationPreferencesMock.mockResolvedValue({ pushEnabled: false, orderUpdates: true });
+    createAppNotificationMock.mockResolvedValue({
+      id: "notif_test",
+      type: "SYSTEM",
+      audience: "CUSTOMER",
+      title: "Notification test",
+      body: "Ton centre d'actions Chez Olive fonctionne.",
+      href: "/app",
+      readAt: null,
+      createdAt: "2026-05-03T16:00:00.000Z",
+    });
+    isWebPushConfiguredMock.mockReturnValue(true);
     updateAppNotificationPreferencesMock.mockResolvedValue({ pushEnabled: true, orderUpdates: true });
     listAppNotificationsForUserMock.mockResolvedValue({
       notifications: [{ id: "notif_1", title: "Commande", readAt: null }],
@@ -150,5 +165,34 @@ describe("notification and push routes", () => {
     expect(response.status).toBe(200);
     expect(payload.unreadCount).toBe(0);
     expect(markAppNotificationsReadMock).toHaveBeenCalledWith(user, { all: true, read: true });
+  });
+
+  it("cree une notification test protegee pour l'utilisateur courant", async () => {
+    getAppNotificationPreferencesMock.mockResolvedValueOnce({ pushEnabled: true });
+    const { POST } = await import("@/app/api/notifications/test/route");
+
+    const response = await POST(
+      new Request("http://localhost:3101/api/notifications/test", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    const payload = (await response.json()) as {
+      notification?: { id?: string };
+      pushConfigured?: boolean;
+      pushAttempted?: boolean;
+    };
+
+    expect(response.status).toBe(200);
+    expect(payload.notification?.id).toBe("notif_test");
+    expect(payload.pushConfigured).toBe(true);
+    expect(payload.pushAttempted).toBe(true);
+    expect(createAppNotificationMock).toHaveBeenCalledWith(expect.objectContaining({
+      userId: "user_1",
+      audience: "CUSTOMER",
+      type: "SYSTEM",
+      href: "/app",
+      metadata: { test: true },
+    }));
   });
 });

@@ -907,8 +907,90 @@ h1, h2, h3 {
   color: var(--brand);
 }
 
+.pwa-notification-status-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.55rem;
+}
+
+.pwa-notification-status {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  padding: 0.35rem 0.65rem;
+  border: 1px solid rgba(84, 93, 46, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--brand-2);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.pwa-notification-status--ok {
+  border-color: rgba(84, 93, 46, 0.24);
+  background: rgba(222, 235, 204, 0.62);
+}
+
+.pwa-notification-status--warn {
+  border-color: rgba(171, 117, 66, 0.22);
+  background: rgba(255, 247, 230, 0.88);
+  color: #7c4a14;
+}
+
+.pwa-notification-status--muted {
+  border-color: rgba(148, 163, 184, 0.2);
+  background: rgba(248, 250, 252, 0.9);
+  color: var(--muted);
+}
+
 .pwa-notification-actions .btn {
   min-height: 44px;
+}
+
+.pwa-notification-preferences {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 0.85rem;
+}
+
+.pwa-notification-preferences > strong {
+  color: var(--brand-2);
+}
+
+.pwa-notification-toggle-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11.5rem, 1fr));
+  gap: 0.5rem;
+}
+
+.pwa-notification-toggle {
+  display: flex;
+  min-height: 54px;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid rgba(84, 93, 46, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.88);
+  cursor: pointer;
+}
+
+.pwa-notification-toggle input {
+  width: 1.1rem;
+  height: 1.1rem;
+  accent-color: var(--brand);
+}
+
+.pwa-notification-toggle span {
+  display: grid;
+  gap: 0.08rem;
+}
+
+.pwa-notification-toggle small {
+  color: var(--muted);
+  font-size: 0.75rem;
 }
 
 .pwa-notification-message {
@@ -9852,6 +9934,73 @@ tr:last-child td {
   background: #fffdf9;
 }
 
+.driver-push-card {
+  display: grid;
+  gap: 0.8rem;
+  border-color: rgba(84, 93, 46, 0.16);
+  background: rgba(255, 253, 249, 0.96);
+}
+
+.driver-push-card__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.driver-push-card__head h2 {
+  margin: 0.1rem 0 0.25rem;
+}
+
+.driver-push-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.driver-push-actions .btn {
+  min-height: 44px;
+}
+
+.driver-push-status {
+  display: inline-flex;
+  min-height: 36px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  padding: 0.35rem 0.65rem;
+  border: 1px solid rgba(84, 93, 46, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--brand-2);
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.driver-push-status--ok {
+  border-color: rgba(84, 93, 46, 0.24);
+  background: rgba(222, 235, 204, 0.62);
+}
+
+.driver-push-status--warn {
+  border-color: rgba(171, 117, 66, 0.22);
+  background: rgba(255, 247, 230, 0.88);
+  color: #7c4a14;
+}
+
+.driver-push-status--muted {
+  border-color: rgba(148, 163, 184, 0.2);
+  background: rgba(248, 250, 252, 0.9);
+  color: var(--muted);
+}
+
+.driver-push-message {
+  margin: 0;
+  color: var(--brand-2);
+  font-weight: 800;
+}
+
 .driver-primary-action {
   min-height: 46px;
   width: fit-content;
@@ -9914,10 +10063,16 @@ tr:last-child td {
     min-height: auto;
   }
 
+  .driver-push-card__head {
+    flex-direction: column;
+  }
+
   .admin-page-header__summary,
   .admin-toolbar,
   .admin-pagination,
   .admin-action-row,
+  .driver-push-card__head,
+  .driver-push-actions,
   .driver-run-pills,
   .delivery-run-stop__links,
   .driver-stop-actions,
@@ -9961,6 +10116,7 @@ tr:last-child td {
   .admin-pagination .btn,
   .admin-action-row .btn,
   .admin-action-row a,
+  .driver-push-actions .btn,
   .driver-stop-actions .btn,
   .driver-copilot-actions .btn,
   .driver-proof-button,

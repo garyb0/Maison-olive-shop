@@ -114,6 +114,7 @@ describe("PWA Chez Olive", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
     Object.defineProperty(navigator, "onLine", { configurable: true, value: true });
   });
 
@@ -207,11 +208,77 @@ describe("PWA Chez Olive", () => {
 
     expect(screen.getByRole("heading", { name: "Centre d'actions" })).toBeInTheDocument();
     expect(screen.getByText("1 non lue(s)")).toBeInTheDocument();
+    expect(screen.getByText("In-app actif")).toBeInTheDocument();
+    expect(screen.getByText("Non supporte ici")).toBeInTheDocument();
+    expect(screen.getByText("Types d'alertes")).toBeInTheDocument();
+    expect(screen.getByText("Commandes").closest("label")?.querySelector("input")).toBeChecked();
+    expect(screen.getByRole("button", { name: "Actualiser" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Tester une notification" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Commande confirmee/ })).toHaveAttribute(
       "href",
       "/account/orders/order_1",
     );
     expect(screen.getByRole("button", { name: "Activer les alertes utiles" })).toBeDisabled();
+  });
+
+  it("permet de creer une notification test in-app", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/notifications/test")) {
+        return Response.json({
+          notification: { id: "notif_test" },
+          pushConfigured: false,
+          pushAttempted: false,
+        });
+      }
+      if (url.endsWith("/api/notifications")) {
+        return Response.json({
+          notifications: [
+            {
+              id: "notif_test",
+              type: "SYSTEM",
+              audience: "CUSTOMER",
+              title: "Notification test",
+              body: "Ton centre d'actions Chez Olive fonctionne.",
+              href: "/app",
+              readAt: null,
+              createdAt: "2026-05-03T16:01:00.000Z",
+            },
+          ],
+          unreadCount: 1,
+        });
+      }
+      return Response.json({});
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <AppNotificationCenter
+        language="fr"
+        publicKey=""
+        userRole="CUSTOMER"
+        initialNotifications={[]}
+        initialUnreadCount={0}
+        initialPreferences={{
+          pushEnabled: false,
+          orderUpdates: true,
+          deliveryUpdates: true,
+          supportUpdates: true,
+          dogQrUpdates: true,
+          adminAlerts: true,
+          driverRunUpdates: true,
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Tester une notification" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      "/api/notifications/test",
+      expect.objectContaining({ method: "POST" }),
+    ));
+    expect(await screen.findByText("Notification test creee dans l'app. Le push n'a pas ete tente.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Notification test/ })).toHaveAttribute("href", "/app");
   });
 
   it("affiche l'admin leger seulement pour un admin avec cockpit mobile", async () => {

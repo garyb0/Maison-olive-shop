@@ -73,6 +73,19 @@ test.describe("authenticated mobile account smoke", () => {
     await loginCustomer(page);
   });
 
+  test("app connected notification center stays optional and testable", async ({ page }) => {
+    await page.goto("/app");
+    await page.waitForLoadState("domcontentloaded");
+
+    await expect(page.getByRole("heading", { name: "Centre d'actions" })).toBeVisible();
+    await expect(page.getByText("In-app actif")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Tester une notification" })).toBeVisible();
+    await page.getByRole("button", { name: "Tester une notification" }).click();
+    await expect(page.getByText(/Notification test creee/i)).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+    await screenshot(page, "app-client-notifications.png");
+  });
+
   test("dashboard, orders and dog profile are visible", async ({ page }) => {
     await openAccountPage(page, "/account", /bonjour|hello/i);
     await expect(page.getByText(email)).toBeVisible();

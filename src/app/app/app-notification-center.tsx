@@ -11,6 +11,7 @@ import type { Language } from "@/lib/i18n";
 type Props = {
   language: Language;
   publicKey: string;
+  userRole?: string | null;
   initialNotifications: AppNotificationDTO[];
   initialUnreadCount: number;
   initialPreferences: AppNotificationPreferencesDTO;
@@ -20,6 +21,8 @@ type NavigatorWithBadges = Navigator & {
   setAppBadge?: (contents?: number) => Promise<void>;
   clearAppBadge?: () => Promise<void>;
 };
+
+type BrowserPushPermission = NotificationPermission | "unsupported";
 
 const defaultHeaders = { "Content-Type": "application/json" };
 
@@ -36,18 +39,34 @@ function urlBase64ToUint8Array(base64String: string) {
   return outputArray;
 }
 
+function canUsePush(publicKey: string) {
+  return Boolean(
+    publicKey &&
+      typeof window !== "undefined" &&
+      typeof navigator !== "undefined" &&
+      "serviceWorker" in navigator &&
+      "PushManager" in window &&
+      "Notification" in window,
+  );
+}
+
+function getBrowserPermission(): BrowserPushPermission {
+  if (typeof window === "undefined" || !("Notification" in window)) return "unsupported";
+  return Notification.permission;
+}
+
 async function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) return null;
-  const registration = await navigator.serviceWorker.register("/sw.js", {
+  return navigator.serviceWorker.register("/sw.js", {
     scope: "/",
     updateViaCache: "none",
   });
-  return registration;
 }
 
 export function AppNotificationCenter({
   language,
   publicKey,
+  userRole,
   initialNotifications,
   initialUnreadCount,
   initialPreferences,
@@ -57,6 +76,7 @@ export function AppNotificationCenter({
   const [preferences, setPreferences] = useState(initialPreferences);
   const [isSupported, setIsSupported] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
+  const [permission, setPermission] = useState<BrowserPushPermission>("unsupported");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -64,18 +84,81 @@ export function AppNotificationCenter({
     title: language === "fr" ? "Centre d'actions" : "Action center",
     unread: language === "fr" ? "non lue(s)" : "unread",
     enable: language === "fr" ? "Activer les alertes utiles" : "Enable useful alerts",
-    disable: language === "fr" ? "Désactiver push" : "Disable push",
+    disable: language === "fr" ? "Desactiver push" : "Disable push",
     markAll: language === "fr" ? "Tout marquer lu" : "Mark all read",
-    empty: language === "fr" ? "Rien à signaler pour l'instant." : "Nothing to review right now.",
+    refresh: language === "fr" ? "Actualiser" : "Refresh",
+    test: language === "fr" ? "Tester une notification" : "Test notification",
+    empty: language === "fr" ? "Rien a signaler pour l'instant." : "Nothing to review right now.",
     unsupported: language === "fr" ? "Alertes push non disponibles ici." : "Push alerts unavailable here.",
     inApp: language === "fr" ? "Les alertes restent visibles dans l'app." : "Alerts still appear in the app.",
-    enabled: language === "fr" ? "Alertes utiles activées." : "Useful alerts enabled.",
-    denied: language === "fr" ? "Permission refusée dans le navigateur." : "Permission denied in the browser.",
+    enabled: language === "fr" ? "Alertes utiles activees." : "Useful alerts enabled.",
+    denied: language === "fr" ? "Permission bloquee dans le navigateur." : "Permission blocked in the browser.",
+    refreshed: language === "fr" ? "Centre d'actions actualise." : "Action center refreshed.",
+    tested: language === "fr" ? "Notification test creee." : "Test notification created.",
+    testNoPush: language === "fr"
+      ? "Notification test creee dans l'app. Le push n'a pas ete tente."
+      : "Test notification created in-app. Push was not attempted.",
+    failed: language === "fr" ? "Impossible de mettre a jour les alertes." : "Unable to update alerts.",
+    preferences: language === "fr" ? "Types d'alertes" : "Alert types",
+    inAppActive: language === "fr" ? "In-app actif" : "In-app active",
+    pushActive: language === "fr" ? "Push actif" : "Push active",
+    pushDisabled: language === "fr" ? "Push desactive" : "Push disabled",
+    blocked: language === "fr" ? "Permission bloquee" : "Permission blocked",
+    notSupported: language === "fr" ? "Non supporte ici" : "Not supported here",
   }), [language]);
 
+  const pushStatus = useMemo(() => {
+    if (!isSupported) {
+      return { label: copy.notSupported, tone: "muted" as const };
+    }
+    if (permission === "denied") {
+      return { label: copy.blocked, tone: "warn" as const };
+    }
+    if (isSubscribed && preferences.pushEnabled) {
+      return { label: copy.pushActive, tone: "ok" as const };
+    }
+    return { label: copy.pushDisabled, tone: "warn" as const };
+  }, [copy.blocked, copy.notSupported, copy.pushActive, copy.pushDisabled, isSubscribed, isSupported, permission, preferences.pushEnabled]);
+
+  const preferenceItems: Array<{ key: keyof AppNotificationPreferencesDTO; label: string; description: string }> = useMemo(() => {
+    const items: Array<{ key: keyof AppNotificationPreferencesDTO; label: string; description: string }> = [
+      {
+        key: "orderUpdates",
+        label: language === "fr" ? "Commandes" : "Orders",
+        description: language === "fr" ? "Creation et changements importants." : "Creation and important changes.",
+      },
+      {
+        key: "deliveryUpdates",
+        label: language === "fr" ? "Livraison" : "Delivery",
+        description: language === "fr" ? "Suivi local et tournees." : "Local tracking and runs.",
+      },
+      {
+        key: "supportUpdates",
+        label: "Support",
+        description: language === "fr" ? "Reponses de l'equipe." : "Team replies.",
+      },
+      {
+        key: "dogQrUpdates",
+        label: language === "fr" ? "Chiens QR" : "QR dogs",
+        description: language === "fr" ? "Consultation d'un profil QR." : "QR profile views.",
+      },
+    ];
+
+    if (userRole === "ADMIN") {
+      items.push({
+        key: "adminAlerts",
+        label: language === "fr" ? "Alertes admin" : "Admin alerts",
+        description: language === "fr" ? "Stock, support et commandes." : "Stock, support, and orders.",
+      });
+    }
+
+    return items;
+  }, [language, userRole]);
+
   useEffect(() => {
-    const supported = Boolean("serviceWorker" in navigator && "PushManager" in window && "Notification" in window && publicKey);
+    const supported = canUsePush(publicKey);
     setIsSupported(supported);
+    setPermission(getBrowserPermission());
     if (!supported) return;
 
     registerServiceWorker()
@@ -97,15 +180,19 @@ export function AppNotificationCenter({
     }
   }, [unreadCount]);
 
-  const refreshNotifications = async () => {
+  const refreshNotifications = async (showMessage = false) => {
     const response = await fetch("/api/notifications", { cache: "no-store" });
-    if (!response.ok) return;
+    if (!response.ok) {
+      if (showMessage) setMessage(copy.failed);
+      return;
+    }
     const payload = (await response.json()) as {
       notifications?: AppNotificationDTO[];
       unreadCount?: number;
     };
     setNotifications(Array.isArray(payload.notifications) ? payload.notifications : []);
     setUnreadCount(typeof payload.unreadCount === "number" ? payload.unreadCount : 0);
+    if (showMessage) setMessage(copy.refreshed);
   };
 
   const updatePreferences = async (patch: Partial<AppNotificationPreferencesDTO>) => {
@@ -114,9 +201,21 @@ export function AppNotificationCenter({
       headers: defaultHeaders,
       body: JSON.stringify(patch),
     });
-    if (!response.ok) return;
+    if (!response.ok) {
+      setMessage(copy.failed);
+      return false;
+    }
     const payload = (await response.json()) as { preferences?: AppNotificationPreferencesDTO };
     if (payload.preferences) setPreferences(payload.preferences);
+    return true;
+  };
+
+  const togglePreference = async (key: keyof AppNotificationPreferencesDTO) => {
+    const nextValue = !preferences[key];
+    const previous = preferences;
+    setPreferences((current) => ({ ...current, [key]: nextValue }));
+    const ok = await updatePreferences({ [key]: nextValue });
+    if (!ok) setPreferences(previous);
   };
 
   const subscribe = async () => {
@@ -129,8 +228,9 @@ export function AppNotificationCenter({
     setMessage("");
 
     try {
-      const permission = await Notification.requestPermission();
-      if (permission !== "granted") {
+      const nextPermission = await Notification.requestPermission();
+      setPermission(nextPermission);
+      if (nextPermission !== "granted") {
         setMessage(copy.denied);
         return;
       }
@@ -141,7 +241,8 @@ export function AppNotificationCenter({
         return;
       }
 
-      const subscription = await registration.pushManager.subscribe({
+      const existingSubscription = await registration.pushManager.getSubscription();
+      const subscription = existingSubscription ?? await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(publicKey),
       });
@@ -168,7 +269,7 @@ export function AppNotificationCenter({
   const unsubscribe = async () => {
     setBusy(true);
     try {
-      const registration = await navigator.serviceWorker.ready.catch(() => null);
+      const registration = await navigator.serviceWorker?.ready.catch(() => null);
       const subscription = await registration?.pushManager.getSubscription();
       await subscription?.unsubscribe();
       await fetch("/api/push/subscribe", {
@@ -191,8 +292,31 @@ export function AppNotificationCenter({
       body: JSON.stringify({ all: true, read: true }),
     });
 
-    if (!response.ok) return;
+    if (!response.ok) {
+      setMessage(copy.failed);
+      return;
+    }
     await refreshNotifications();
+  };
+
+  const testNotification = async () => {
+    setBusy(true);
+    setMessage("");
+    try {
+      const response = await fetch("/api/notifications/test", {
+        method: "POST",
+        headers: defaultHeaders,
+      });
+      if (!response.ok) {
+        setMessage(copy.failed);
+        return;
+      }
+      const payload = (await response.json()) as { pushAttempted?: boolean };
+      await refreshNotifications();
+      setMessage(payload.pushAttempted ? copy.tested : copy.testNoPush);
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -207,19 +331,50 @@ export function AppNotificationCenter({
         </span>
       </div>
 
+      <div className="pwa-notification-status-grid" aria-label={language === "fr" ? "Etat des alertes" : "Alert status"}>
+        <span className="pwa-notification-status pwa-notification-status--ok">{copy.inAppActive}</span>
+        <span className={`pwa-notification-status pwa-notification-status--${pushStatus.tone}`}>{pushStatus.label}</span>
+      </div>
+
       <div className="pwa-notification-actions">
         {isSubscribed && preferences.pushEnabled ? (
           <button className="btn btn-secondary" type="button" onClick={() => void unsubscribe()} disabled={busy}>
             {copy.disable}
           </button>
         ) : (
-          <button className="btn" type="button" onClick={() => void subscribe()} disabled={busy || !publicKey}>
+          <button className="btn" type="button" onClick={() => void subscribe()} disabled={busy || !isSupported}>
             {copy.enable}
           </button>
         )}
-        <button className="btn btn-secondary" type="button" onClick={() => void markAllRead()} disabled={unreadCount < 1}>
+        <button className="btn btn-secondary" type="button" onClick={() => void refreshNotifications(true)} disabled={busy}>
+          {copy.refresh}
+        </button>
+        <button className="btn btn-secondary" type="button" onClick={() => void markAllRead()} disabled={busy || unreadCount < 1}>
           {copy.markAll}
         </button>
+        <button className="btn btn-secondary" type="button" onClick={() => void testNotification()} disabled={busy}>
+          {copy.test}
+        </button>
+      </div>
+
+      <div className="pwa-notification-preferences" aria-label={copy.preferences}>
+        <strong>{copy.preferences}</strong>
+        <div className="pwa-notification-toggle-grid">
+          {preferenceItems.map((item) => (
+            <label className="pwa-notification-toggle" key={item.key}>
+              <input
+                type="checkbox"
+                checked={Boolean(preferences[item.key])}
+                onChange={() => void togglePreference(item.key)}
+                disabled={busy}
+              />
+              <span>
+                <strong>{item.label}</strong>
+                <small>{item.description}</small>
+              </span>
+            </label>
+          ))}
+        </div>
       </div>
 
       {message ? <p className="small pwa-notification-message">{message}</p> : null}

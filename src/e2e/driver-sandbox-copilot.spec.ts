@@ -118,6 +118,8 @@ test("recette visuelle journee complete du copilote livreur sandbox", async ({ c
   await page.goto(state.driverUrl);
 
   await expect(page.getByRole("heading", { name: /Sandbox chauffeur Waze/i })).toBeVisible();
+  await expect(page.getByText(/Recevoir les alertes de cette tournee/i)).toBeVisible();
+  await expect(page.getByText(/Tu peux livrer meme sans l'activer/i)).toBeVisible();
   await expect(page.getByRole("button", { name: /Démarrer la tournée/i })).toBeVisible();
   await capture(page, testInfo, "01-before-start-desktop");
 

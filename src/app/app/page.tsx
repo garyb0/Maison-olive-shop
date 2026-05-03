@@ -441,6 +441,7 @@ export default async function PwaAppPage() {
           <AppNotificationCenter
             language={language}
             publicKey={webPushPublicKey}
+            userRole={user.role}
             initialNotifications={notificationSnapshot.notifications}
             initialUnreadCount={notificationSnapshot.unreadCount}
             initialPreferences={notificationSnapshot.preferences}

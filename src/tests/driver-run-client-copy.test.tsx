@@ -109,7 +109,15 @@ describe("DriverRunClient French copy", () => {
   });
 
   it("affiche les libelles chauffeur en francais clair", () => {
-    render(<DriverRunClient language="fr" token="token_1" gpsTrackingEnabled={false} initialRun={baseRun} />);
+    render(
+      <DriverRunClient
+        language="fr"
+        token="token_1"
+        gpsTrackingEnabled={false}
+        pushPublicKey=""
+        initialRun={baseRun}
+      />,
+    );
 
     expect(screen.getByText("Prête")).toBeInTheDocument();
     expect(screen.getByText("GPS en attente")).toBeInTheDocument();
@@ -167,6 +175,7 @@ describe("DriverRunClient French copy", () => {
         language="fr"
         token="token_1"
         gpsTrackingEnabled
+        pushPublicKey=""
         initialRun={{ ...baseRun, status: "IN_PROGRESS" }}
       />,
     );
@@ -205,6 +214,7 @@ describe("DriverRunClient French copy", () => {
         language="fr"
         token="token_1"
         gpsTrackingEnabled={false}
+        pushPublicKey=""
         initialRun={{ ...baseRun, status: "IN_PROGRESS" }}
       />,
     );
@@ -273,6 +283,7 @@ describe("DriverRunClient French copy", () => {
         language="fr"
         token="token_1"
         gpsTrackingEnabled={false}
+        pushPublicKey=""
         initialRun={{ ...baseRun, status: "IN_PROGRESS" }}
       />,
     );
@@ -297,5 +308,66 @@ describe("DriverRunClient French copy", () => {
       expect(openMock).toHaveBeenCalledWith("https://www.waze.com/ul?q=Client%20Reordonne&navigate=yes", "_self"),
     );
     expect(screen.getByText("Client Reordonne")).toBeInTheDocument();
+  });
+
+  it("active les alertes push tokenisees de la tournee sans les rendre obligatoires", async () => {
+    const subscription = {
+      endpoint: "https://push.example.test/driver/subscription",
+      keys: {
+        p256dh: "abcdefghijklmnopqrstuvwxyz123456",
+        auth: "auth-token-123",
+      },
+      toJSON() {
+        return {
+          endpoint: this.endpoint,
+          keys: this.keys,
+        };
+      },
+    };
+    const pushManager = {
+      getSubscription: vi.fn().mockResolvedValue(null),
+      subscribe: vi.fn().mockResolvedValue(subscription),
+    };
+    const registration = { pushManager };
+    const requestPermission = vi.fn().mockResolvedValue("granted");
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({ ok: true, subscription: { enabled: true } }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    vi.stubGlobal("PushManager", function PushManager() {});
+    vi.stubGlobal("Notification", { permission: "default", requestPermission });
+    vi.stubGlobal("fetch", fetchMock);
+    Object.defineProperty(navigator, "serviceWorker", {
+      configurable: true,
+      value: {
+        register: vi.fn().mockResolvedValue(registration),
+        ready: Promise.resolve(registration),
+      },
+    });
+
+    render(
+      <DriverRunClient
+        language="fr"
+        token="token_1"
+        gpsTrackingEnabled={false}
+        pushPublicKey="AQIDBA"
+        initialRun={baseRun}
+      />,
+    );
+
+    expect(screen.getByText("Recevoir les alertes de cette tournee")).toBeInTheDocument();
+    expect(screen.getByText(/Tu peux livrer meme sans l'activer/i)).toBeInTheDocument();
+    const enableButton = await screen.findByRole("button", { name: "Recevoir les alertes" });
+    fireEvent.click(enableButton);
+
+    await waitFor(() => expect(requestPermission).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      "/api/driver/run/token_1/push/subscribe",
+      expect.objectContaining({ method: "POST" }),
+    ));
+    expect(await screen.findByText("Alertes de tournee activees.")).toBeInTheDocument();
   });
 });
