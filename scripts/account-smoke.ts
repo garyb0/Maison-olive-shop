@@ -685,6 +685,7 @@ async function runPlaywrightMobileAccount(config: ScriptConfig, state: SmokeStat
       "--reporter=list",
       "--workers=1",
       "--global-timeout=180000",
+      `--output=${path.join(config.artifactDir, "playwright-output")}`,
     ],
     {
       cwd: process.cwd(),
