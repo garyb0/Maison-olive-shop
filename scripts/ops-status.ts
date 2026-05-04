@@ -426,7 +426,9 @@ async function checkBusinessSignals(): Promise<Check> {
     }
     if (criticalStockCount > 0) {
       const examples = criticalProducts.map((product) => `${product.slug}(${product.stock})`).join(", ");
-      warnings.push(`${criticalStockCount} active product(s) out of stock${examples ? `: ${examples}` : ""}`);
+      warnings.push(
+        `${criticalStockCount} stock action(s) to review: active product(s) visible but not buyable${examples ? `: ${examples}` : ""}`,
+      );
     }
 
     return {

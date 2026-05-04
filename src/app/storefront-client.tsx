@@ -283,16 +283,24 @@ export function StorefrontClient({
   }, [products, search, categoryFilter, sortBy, language]);
 
   const addToCart = (product: ProductCard, x: number, y: number) => {
-    const quantity = Math.max(1, quantities[product.id] ?? 1);
+    if (product.stock <= 0) return;
+
+    const requestedQuantity = Math.max(1, quantities[product.id] ?? 1);
+    const existingQuantity = cart.find((line) => line.productId === product.id)?.quantity ?? 0;
+    const quantity = Math.min(requestedQuantity, Math.max(0, product.stock - existingQuantity));
+    if (quantity <= 0) return;
 
     setCart((current) => {
       const existing = current.find((line) => line.productId === product.id);
+      const addedQuantity = Math.min(quantity, Math.max(0, product.stock - (existing?.quantity ?? 0)));
+      if (addedQuantity <= 0) return current;
+      const nextQuantity = existing ? existing.quantity + addedQuantity : addedQuantity;
       if (existing) {
         return current.map((line) =>
-          line.productId === product.id ? { ...line, quantity: line.quantity + quantity } : line,
+          line.productId === product.id ? { ...line, quantity: nextQuantity } : line,
         );
       }
-      return [...current, { productId: product.id, name: product.name, quantity }];
+      return [...current, { productId: product.id, name: product.name, quantity: nextQuantity }];
     });
 
     const flyId = `fly-${product.id}-${Date.now()}`;
@@ -1044,7 +1052,7 @@ export function StorefrontClient({
                         onChange={(e) =>
                           setQuantities((current) => ({
                             ...current,
-                            [product.id]: Math.max(1, Number(e.target.value) || 1),
+                            [product.id]: Math.min(Math.max(1, product.stock), Math.max(1, Number(e.target.value) || 1)),
                           }))
                         }
                         disabled={product.stock === 0}

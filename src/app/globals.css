@@ -6377,6 +6377,43 @@ tr:last-child td {
   justify-content: center;
 }
 
+.admin-conversion-focus {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 0.75rem;
+  margin: 0.85rem 0;
+}
+
+.admin-conversion-focus-card {
+  display: grid;
+  gap: 0.35rem;
+  min-height: 44px;
+  padding: 0.85rem;
+  border: 1px solid rgba(84, 93, 46, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 253, 248, 0.92);
+}
+
+.admin-conversion-focus-card span {
+  color: var(--brand);
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.admin-conversion-focus-card strong {
+  color: var(--olive-900);
+  font-size: 1.45rem;
+  line-height: 1;
+}
+
+.admin-conversion-focus-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
 .admin-today-card {
   display: grid;
   gap: 0.35rem;
@@ -10773,6 +10810,11 @@ button.home-category-chip:hover,
   background: rgba(255, 247, 237, 0.9);
 }
 
+.cart-checkout-btn--disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
 .cart-item-main {
   display: flex;
   min-width: 0;
@@ -11675,6 +11717,11 @@ button.home-category-chip:hover,
   padding: 1rem;
 }
 
+.checkout-step-card--summary .cart-row--blocked {
+  border-color: rgba(200, 100, 71, 0.28);
+  background: rgba(255, 247, 237, 0.94);
+}
+
 .checkout-step-card--summary .cart-row:hover {
   background: rgba(255, 253, 248, 0.98);
 }
@@ -11686,7 +11733,34 @@ button.home-category-chip:hover,
 }
 
 .checkout-step-card--summary .cart-td-name {
+  display: grid;
+  gap: 0.3rem;
   min-width: 0;
+}
+
+.checkout-stock-alert,
+.checkout-stock-line-note {
+  color: var(--terracotta);
+}
+
+.checkout-stock-alert {
+  display: grid;
+  gap: 0.2rem;
+  margin-bottom: 0.85rem;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid rgba(200, 100, 71, 0.26);
+  border-radius: 8px;
+  background: rgba(255, 247, 237, 0.96);
+  font-size: 0.86rem;
+}
+
+.checkout-stock-alert--compact {
+  margin: 0 0 0.85rem;
+}
+
+.checkout-stock-line-note {
+  font-size: 0.78rem;
+  font-weight: 700;
 }
 
 .checkout-step-card--summary .cart-td-price,

@@ -13,6 +13,7 @@ type ProductInfo = {
   priceCents: number;
   currency: string;
   priceLabel: string;
+  stock: number;
 };
 
 type ProductIndex = Record<string, ProductInfo>;
@@ -82,7 +83,9 @@ export function CartClient({
     if (qty <= 0) {
       saveCart(cart.filter((l) => l.productId !== productId));
     } else {
-      saveCart(cart.map((l) => (l.productId === productId ? { ...l, quantity: qty } : l)));
+      const maxStock = productIndex[productId]?.stock;
+      const nextQty = typeof maxStock === "number" && maxStock > 0 ? Math.min(qty, maxStock) : qty;
+      saveCart(cart.map((l) => (l.productId === productId ? { ...l, quantity: nextQty } : l)));
     }
   };
 
@@ -95,6 +98,13 @@ export function CartClient({
     const currency = product?.currency ?? "CAD";
     const priceCents = product?.priceCents ?? 0;
     const subtotalCents = priceCents * line.quantity;
+    const unavailableReason = !product
+      ? "missing"
+      : product.stock <= 0
+        ? "out-of-stock"
+        : line.quantity > product.stock
+          ? "quantity-over-stock"
+          : null;
     return {
       ...line,
       name: product?.name ?? line.name ?? (language === "fr" ? "Produit indisponible" : "Unavailable product"),
@@ -102,8 +112,12 @@ export function CartClient({
       subtotalLabel: fmt(subtotalCents, currency, locale),
       subtotalCents,
       currency,
+      stock: product?.stock ?? 0,
+      unavailableReason,
     };
   });
+  const blockedRows = rows.filter((row) => row.unavailableReason);
+  const hasBlockedRows = blockedRows.length > 0;
 
   const itemCount = rows.reduce((sum, row) => sum + row.quantity, 0);
   const itemCountLabel = language === "fr"
@@ -134,7 +148,8 @@ export function CartClient({
   }, []);
 
   useEffect(() => {
-    if (!cart.length) {
+    if (!cart.length || hasBlockedRows) {
+      setQuote(null);
       return;
     }
 
@@ -168,7 +183,7 @@ export function CartClient({
     void loadQuote();
 
     return () => controller.abort();
-  }, [cart]);
+  }, [cart, hasBlockedRows]);
 
   const visibleQuote = rows.length > 0 ? quote : null;
   const pricedSubtotalCents = visibleQuote?.subtotalCents ?? totalCents;
@@ -274,7 +289,10 @@ export function CartClient({
 
               <div className="cart-items-list">
                 {rows.map((row) => {
-                  const isUnavailable = !productIndex[row.productId];
+                  const isUnavailable = Boolean(row.unavailableReason);
+                  const isOutOfStock = row.unavailableReason === "out-of-stock";
+                  const isMissing = row.unavailableReason === "missing";
+                  const isOverStock = row.unavailableReason === "quantity-over-stock";
 
                   return (
                     <article key={row.productId} className={`cart-item-card${isUnavailable ? " cart-item-card--unavailable" : ""}`}>
@@ -285,12 +303,28 @@ export function CartClient({
                             <h3 className="cart-product-name">{row.name}</h3>
                             {isUnavailable ? (
                               <span className="cart-item-status">
-                                {language === "fr" ? "À vérifier" : "To review"}
+                                {isOutOfStock
+                                  ? language === "fr" ? "Rupture" : "Out"
+                                  : isOverStock
+                                    ? language === "fr" ? "Stock limité" : "Limited stock"
+                                    : language === "fr" ? "À vérifier" : "To review"}
                               </span>
                             ) : null}
                           </div>
                           <p className="cart-item-meta">
-                            {language === "fr" ? "Vendu par Chez Olive · Rimouski" : "Sold by Chez Olive · Rimouski"}
+                            {isOutOfStock
+                              ? language === "fr"
+                                ? "Ce produit reste visible, mais il doit être retiré ou réapprovisionné avant le checkout."
+                                : "This product remains visible, but must be removed or restocked before checkout."
+                              : isOverStock
+                                ? language === "fr"
+                                  ? `Ajuste la quantité à ${row.stock} ou moins pour continuer.`
+                                  : `Adjust quantity to ${row.stock} or less to continue.`
+                                : isMissing
+                                  ? language === "fr"
+                                    ? "Ce produit n'est plus disponible dans la boutique."
+                                    : "This product is no longer available in the shop."
+                                  : language === "fr" ? "Vendu par Chez Olive · Rimouski" : "Sold by Chez Olive · Rimouski"}
                           </p>
                         </div>
                       </div>
@@ -322,6 +356,7 @@ export function CartClient({
                             className="cart-qty-btn"
                             type="button"
                             onClick={() => updateQty(row.productId, row.quantity + 1)}
+                            disabled={row.stock <= 0 || row.quantity >= row.stock}
                             aria-label={language === "fr" ? "Augmenter" : "Increase"}
                           >
                             +
@@ -442,9 +477,13 @@ export function CartClient({
                   </div>
                 ) : null}
                 <p className="small cart-summary-note">
-                  {language === "fr"
-                    ? "Estimation avant confirmation de livraison au checkout."
-                    : "Estimate shown before delivery confirmation at checkout."}
+                  {hasBlockedRows
+                    ? language === "fr"
+                      ? "Retire ou ajuste les articles en rupture avant de passer au checkout."
+                      : "Remove or adjust out-of-stock items before checkout."
+                    : language === "fr"
+                      ? "Estimation avant confirmation de livraison au checkout."
+                      : "Estimate shown before delivery confirmation at checkout."}
                 </p>
                 <div className="cart-summary-next-steps" aria-label={language === "fr" ? "Prochaines étapes" : "Next steps"}>
                   <strong>{language === "fr" ? "Ensuite au checkout" : "Next in checkout"}</strong>
@@ -478,9 +517,15 @@ export function CartClient({
                   </Link>
                 </div>
                 <div className="cart-summary-actions">
-                  <Link className="btn cart-checkout-btn" href="/checkout">
-                    {language === "fr" ? "Passer à la caisse" : "Proceed to checkout"}
-                  </Link>
+                  {hasBlockedRows ? (
+                    <button className="btn cart-checkout-btn cart-checkout-btn--disabled" type="button" disabled>
+                      {language === "fr" ? "Checkout bloqué par le stock" : "Checkout blocked by stock"}
+                    </button>
+                  ) : (
+                    <Link className="btn cart-checkout-btn" href="/checkout">
+                      {language === "fr" ? "Passer à la caisse" : "Proceed to checkout"}
+                    </Link>
+                  )}
                   <Link className="cart-continue-link" href="/">
                     {language === "fr" ? "Retour à l’accueil" : "Back to home"}
                   </Link>

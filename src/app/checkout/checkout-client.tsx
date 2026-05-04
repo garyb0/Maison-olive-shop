@@ -33,6 +33,7 @@ type ProductIndex = Record<
     priceCents: number;
     currency: string;
     priceLabel: string;
+    stock: number;
   }
 >;
 
@@ -345,10 +346,13 @@ export function CheckoutClient({
       return;
     }
 
+    const maxStock = productIndex[productId]?.stock;
+    const nextQty = typeof maxStock === "number" && maxStock > 0 ? Math.min(qty, maxStock) : qty;
+
     saveCart(
       cart.map((line) => (
         line.productId === productId
-          ? { ...line, quantity: qty }
+          ? { ...line, quantity: nextQty }
           : line
       )),
     );
@@ -393,6 +397,13 @@ export function CheckoutClient({
   const cartRows = useMemo(() => cart.map((line) => {
     const product = productIndex[line.productId];
     const lineSubtotalCents = (product?.priceCents ?? 0) * line.quantity;
+    const unavailableReason = !product
+      ? "missing"
+      : product.stock <= 0
+        ? "out-of-stock"
+        : line.quantity > product.stock
+          ? "quantity-over-stock"
+          : null;
     return {
       ...line,
       name: product?.name ?? line.name ?? (language === "fr" ? "Produit indisponible" : "Unavailable product"),
@@ -402,8 +413,12 @@ export function CheckoutClient({
         style: "currency",
         currency: product?.currency ?? "CAD",
       }).format(lineSubtotalCents / 100),
+      stock: product?.stock ?? 0,
+      unavailableReason,
     };
   }), [cart, language, productIndex]);
+  const blockedCartRows = cartRows.filter((row) => row.unavailableReason);
+  const hasBlockedCartRows = blockedCartRows.length > 0;
 
   const subtotalCents = cartRows.reduce((acc, row) => acc + row.lineSubtotalCents, 0);
   const summaryItemCount = cartRows.reduce((acc, row) => acc + row.quantity, 0);
@@ -677,7 +692,7 @@ export function CheckoutClient({
   }, [checkoutFingerprint, language, stripeSession]);
 
   useEffect(() => {
-    if (!cart.length) {
+    if (!cart.length || hasBlockedCartRows) {
       setQuote(null);
       return;
     }
@@ -715,7 +730,7 @@ export function CheckoutClient({
     void loadQuote();
 
     return () => controller.abort();
-  }, [cart, shippingCountry, shippingPostal, trimmedPromoCode]);
+  }, [cart, hasBlockedCartRows, shippingCountry, shippingPostal, trimmedPromoCode]);
 
   useEffect(() => {
     const postal = shippingPostal.trim();
@@ -859,6 +874,16 @@ export function CheckoutClient({
     if (!cartRows.length) {
       trackCheckoutError("empty_cart");
       setError(language === "fr" ? "Panier vide." : "Cart is empty.");
+      return;
+    }
+
+    if (hasBlockedCartRows) {
+      trackCheckoutError("stock_blocked_cart");
+      setError(
+        language === "fr"
+          ? "Ton panier contient un article en rupture ou une quantité plus grande que le stock disponible. Retourne au panier pour l'ajuster."
+          : "Your cart contains an out-of-stock item or a quantity above available stock. Go back to cart to adjust it.",
+      );
       return;
     }
 
@@ -1158,6 +1183,17 @@ export function CheckoutClient({
                 </h2>
               </div>
 
+              {hasBlockedCartRows ? (
+                <div className="checkout-stock-alert" role="alert">
+                  <strong>{language === "fr" ? "Stock à ajuster" : "Stock to adjust"}</strong>
+                  <span>
+                    {language === "fr"
+                      ? "Un article est en rupture ou dépasse le stock disponible. Retire-le ou ajuste la quantité avant de confirmer."
+                      : "One item is out of stock or above available stock. Remove it or adjust quantity before confirming."}
+                  </span>
+                </div>
+              ) : null}
+
               <div className="cart-table-wrap">
                 <table className="cart-table">
                   <thead>
@@ -1170,57 +1206,75 @@ export function CheckoutClient({
                     </tr>
                   </thead>
                   <tbody>
-                    {cartRows.map((row) => (
-                      <tr key={row.productId} className="cart-row">
-                        <td className="cart-td-name">
-                          <span className="cart-product-name">{row.name}</span>
-                        </td>
-                        <td className="cart-td-price">
-                          <span className="cart-price-badge">{row.priceLabel}</span>
-                        </td>
-                        <td className="cart-td-qty">
-                          <div className="cart-qty-control">
+                    {cartRows.map((row) => {
+                      const isOutOfStock = row.unavailableReason === "out-of-stock";
+                      const isMissing = row.unavailableReason === "missing";
+                      const isOverStock = row.unavailableReason === "quantity-over-stock";
+
+                      return (
+                        <tr key={row.productId} className={`cart-row${row.unavailableReason ? " cart-row--blocked" : ""}`}>
+                          <td className="cart-td-name">
+                            <span className="cart-product-name">{row.name}</span>
+                            {row.unavailableReason ? (
+                              <span className="checkout-stock-line-note">
+                                {isOutOfStock
+                                  ? language === "fr" ? "Rupture: retire cet article pour continuer." : "Out of stock: remove this item to continue."
+                                  : isOverStock
+                                    ? language === "fr" ? `Stock disponible: ${row.stock}.` : `Available stock: ${row.stock}.`
+                                    : isMissing
+                                      ? language === "fr" ? "Produit retiré de la boutique." : "Product removed from the shop."
+                                      : null}
+                              </span>
+                            ) : null}
+                          </td>
+                          <td className="cart-td-price">
+                            <span className="cart-price-badge">{row.priceLabel}</span>
+                          </td>
+                          <td className="cart-td-qty">
+                            <div className="cart-qty-control">
+                              <button
+                                className="cart-qty-btn"
+                                type="button"
+                                onClick={() => updateQty(row.productId, row.quantity - 1)}
+                                aria-label={language === "fr" ? "Diminuer" : "Decrease"}
+                              >
+                                -
+                              </button>
+                              <input
+                                className="cart-qty-input"
+                                type="number"
+                                min={1}
+                                value={row.quantity}
+                                onChange={(e) => updateQty(row.productId, Math.max(1, Number(e.target.value) || 1))}
+                              />
+                              <button
+                                className="cart-qty-btn"
+                                type="button"
+                                onClick={() => updateQty(row.productId, row.quantity + 1)}
+                                disabled={row.stock <= 0 || row.quantity >= row.stock}
+                                aria-label={language === "fr" ? "Augmenter" : "Increase"}
+                              >
+                                +
+                              </button>
+                            </div>
+                          </td>
+                          <td className="cart-td-subtotal">
+                            <strong className="cart-subtotal-value">{row.lineSubtotalLabel}</strong>
+                          </td>
+                          <td className="cart-td-action">
                             <button
-                              className="cart-qty-btn"
+                              className="cart-remove-btn"
                               type="button"
-                              onClick={() => updateQty(row.productId, row.quantity - 1)}
-                              aria-label={language === "fr" ? "Diminuer" : "Decrease"}
+                              onClick={() => remove(row.productId)}
+                              aria-label={language === "fr" ? "Retirer" : "Remove"}
+                              title={language === "fr" ? "Retirer" : "Remove"}
                             >
-                              -
+                              X
                             </button>
-                            <input
-                              className="cart-qty-input"
-                              type="number"
-                              min={1}
-                              value={row.quantity}
-                              onChange={(e) => updateQty(row.productId, Math.max(1, Number(e.target.value) || 1))}
-                            />
-                            <button
-                              className="cart-qty-btn"
-                              type="button"
-                              onClick={() => updateQty(row.productId, row.quantity + 1)}
-                              aria-label={language === "fr" ? "Augmenter" : "Increase"}
-                            >
-                              +
-                            </button>
-                          </div>
-                        </td>
-                        <td className="cart-td-subtotal">
-                          <strong className="cart-subtotal-value">{row.lineSubtotalLabel}</strong>
-                        </td>
-                        <td className="cart-td-action">
-                          <button
-                            className="cart-remove-btn"
-                            type="button"
-                            onClick={() => remove(row.productId)}
-                            aria-label={language === "fr" ? "Retirer" : "Remove"}
-                            title={language === "fr" ? "Retirer" : "Remove"}
-                          >
-                            X
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -2274,6 +2328,13 @@ export function CheckoutClient({
                 </div>
               ) : (
                 <>
+                  {hasBlockedCartRows ? (
+                    <div className="checkout-stock-alert checkout-stock-alert--compact" role="alert">
+                      {language === "fr"
+                        ? "Paiement bloqué: ajuste le panier avant de confirmer."
+                        : "Payment blocked: adjust the cart before confirming."}
+                    </div>
+                  ) : null}
                   <p className="checkout-final-action-note">
                     {paymentMethod === "STRIPE"
                       ? language === "fr"
@@ -2285,7 +2346,7 @@ export function CheckoutClient({
                   </p>
                   <button
                     className="btn btn-full checkout-place-order-btn"
-                    disabled={loading}
+                    disabled={loading || hasBlockedCartRows}
                     onClick={() => void submitOrder()}
                     type="button"
                     suppressHydrationWarning

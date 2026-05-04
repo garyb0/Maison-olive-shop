@@ -42,6 +42,19 @@ const productIndex = {
     priceCents: 6999,
     currency: "CAD",
     priceLabel: "69,99 $",
+    stock: 5,
+  },
+};
+
+const blockedProductIndex = {
+  ...productIndex,
+  prod_out: {
+    id: "prod_out",
+    name: "Collier en pause",
+    priceCents: 2499,
+    currency: "CAD",
+    priceLabel: "24,99 $",
+    stock: 0,
   },
 };
 
@@ -164,6 +177,28 @@ describe("public cart and checkout flow", () => {
     expect(screen.getByRole("link", { name: "Paiement" })).toHaveAttribute("href", "/faq#paiement");
   });
 
+  it("bloque le checkout du panier si un article stocke est maintenant en rupture", async () => {
+    window.localStorage.setItem("chezolive_cart_v1", JSON.stringify([{ productId: "prod_out", quantity: 1 }]));
+
+    render(
+      <CartClient
+        language="fr"
+        t={getDictionary("fr")}
+        user={null}
+        productIndex={blockedProductIndex}
+        shippingFlatCents={899}
+        shippingFreeThresholdCents={7500}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getAllByText("Collier en pause").length).toBeGreaterThan(0));
+    expect(screen.getByText("Rupture")).toBeInTheDocument();
+    expect(screen.getByText(/Ce produit reste visible/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Checkout bloqué par le stock" })).toBeDisabled();
+    expect(screen.queryByRole("link", { name: "Passer à la caisse" })).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([url]) => String(url).startsWith("/api/orders/quote"))).toBe(false);
+  });
+
   it("garde le bouton produit clair selon la disponibilite", async () => {
     const { rerender } = render(
       <ProductAddToCartButton
@@ -245,5 +280,31 @@ describe("public cart and checkout flow", () => {
     expect(manualPayment).toBeDisabled();
     expect(stripePayment).not.toBeNull();
     expect(stripePayment).toBeChecked();
+  });
+
+  it("bloque le checkout si le panier contient un article en rupture", async () => {
+    window.localStorage.setItem("chezolive_cart_v1", JSON.stringify([{ productId: "prod_out", quantity: 1 }]));
+
+    render(
+      <CheckoutClient
+        language="fr"
+        t={getDictionary("fr")}
+        user={null}
+        productIndex={blockedProductIndex}
+        initialDeliveryAddresses={[]}
+        shippingFlatCents={899}
+        shippingFreeThresholdCents={7500}
+        initialConfirmation={null}
+        initialPaymentMode="stripe"
+        initialStripeNotice={null}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getAllByText("Collier en pause").length).toBeGreaterThan(0));
+    expect(screen.getByText("Stock à ajuster")).toBeInTheDocument();
+    expect(screen.getByText("Rupture: retire cet article pour continuer.")).toBeInTheDocument();
+    expect(screen.getByText("Paiement bloqué: ajuste le panier avant de confirmer.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Préparer le paiement/i })).toBeDisabled();
+    expect(fetchMock.mock.calls.some(([url]) => String(url).startsWith("/api/orders/quote"))).toBe(false);
   });
 });

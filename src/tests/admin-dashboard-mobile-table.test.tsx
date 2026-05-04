@@ -201,6 +201,10 @@ describe("AdminDashboardClient mobile table labels", () => {
     expect(screen.getByText("Backup")).toBeInTheDocument();
     expect(screen.getByText("Produit rupture")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Conversion" })).toBeInTheDocument();
+    expect(screen.getByText("Vus sans ajout")).toBeInTheDocument();
+    expect(screen.getByText("Paniers sans checkout")).toBeInTheDocument();
+    expect(screen.getByText("Checkouts sans commande")).toBeInTheDocument();
+    expect(screen.getByText(/Regarde ces fiches/)).toBeInTheDocument();
     expect(screen.getAllByText("Visiteurs boutique").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Produit vers panier").length).toBeGreaterThan(0);
     expect(screen.getByText("Produits les plus ajoutés")).toBeInTheDocument();

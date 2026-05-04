@@ -62,6 +62,7 @@ export default async function CheckoutPage({ searchParams }: CheckoutPageProps) 
         priceCents: product.priceCents,
         currency: product.currency,
         priceLabel: formatCurrency(product.priceCents, product.currency, language === "fr" ? "fr-CA" : "en-CA"),
+        stock: product.stock,
       },
     ]),
   );

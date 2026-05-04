@@ -35,6 +35,11 @@ vi.mock("@/components/StripeInlineCheckoutSurface", () => ({
   ),
 }));
 
+vi.mock("@/lib/conversion-tracker", () => ({
+  trackConversionEvent: vi.fn(),
+  getConversionSessionKey: () => "checkout-stripe-test-session",
+}));
+
 const user: CurrentUser = {
   id: "user_1",
   email: "gary@example.com",
@@ -192,6 +197,7 @@ describe("checkout stripe status", () => {
             priceCents: 50,
             currency: "CAD",
             priceLabel: "0,50 $",
+            stock: 10,
           },
         }}
         initialDeliveryAddresses={[address]}
@@ -243,6 +249,7 @@ describe("checkout stripe status", () => {
             priceCents: 50,
             currency: "CAD",
             priceLabel: "0,50 $",
+            stock: 10,
           },
         }}
         initialDeliveryAddresses={[address]}
@@ -295,6 +302,7 @@ describe("checkout stripe status", () => {
             priceCents: 50,
             currency: "CAD",
             priceLabel: "0,50 $",
+            stock: 10,
           },
         }}
         initialDeliveryAddresses={[address]}
@@ -336,6 +344,7 @@ describe("checkout stripe status", () => {
             priceCents: 50,
             currency: "CAD",
             priceLabel: "0,50 $",
+            stock: 10,
           },
         }}
         initialDeliveryAddresses={[address]}

@@ -34,6 +34,7 @@ export default async function CartPage() {
           priceCents,
           currency,
           priceLabel,
+          stock: p.stock,
         },
       ];
     }),

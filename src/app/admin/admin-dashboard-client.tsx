@@ -559,6 +559,32 @@ export function AdminDashboardClient({
     badge: product.stock <= 0 ? (language === "fr" ? "Rupture" : "Out") : language === "fr" ? "Bas" : "Low",
   }));
   const lowButAvailableCount = Math.max(0, todayCockpit.lowStockCount - todayCockpit.outOfStockCount);
+  const conversionFocusItems = [
+    {
+      id: "product-drop-off",
+      label: language === "fr" ? "Vus sans ajout" : "Viewed, not added",
+      value: todayCockpit.conversion.sevenDays.productViewDropOffCount,
+      detail: language === "fr"
+        ? "Regarde ces fiches: photo, prix, disponibilité ou promesse peuvent manquer de clarté."
+        : "Review these product pages: photo, price, availability, or promise may be unclear.",
+    },
+    {
+      id: "cart-drop-off",
+      label: language === "fr" ? "Paniers sans checkout" : "Carts, no checkout",
+      value: todayCockpit.conversion.sevenDays.cartToCheckoutDropOffCount,
+      detail: language === "fr"
+        ? "Clarifie livraison, paiement et aide avant le bouton checkout."
+        : "Clarify delivery, payment, and help before the checkout button.",
+    },
+    {
+      id: "checkout-drop-off",
+      label: language === "fr" ? "Checkouts sans commande" : "Checkouts, no order",
+      value: todayCockpit.conversion.sevenDays.checkoutToOrderDropOffCount,
+      detail: language === "fr"
+        ? "Priorise les erreurs checkout, le paiement et les champs d'adresse."
+        : "Prioritize checkout errors, payment, and address fields.",
+    },
+  ];
   const healthActionItems: AdminActionItem[] = [
     {
       id: "site",
@@ -780,6 +806,15 @@ export function AdminDashboardClient({
           <Link className="btn btn-secondary" href="/boutique">
             {language === "fr" ? "Voir boutique" : "View shop"}
           </Link>
+        </div>
+        <div className="admin-conversion-focus" aria-label={language === "fr" ? "Actions conversion prioritaires" : "Priority conversion actions"}>
+          {conversionFocusItems.map((item) => (
+            <article className="admin-conversion-focus-card" key={item.id}>
+              <span>{item.label}</span>
+              <strong>{item.value}</strong>
+              <p>{item.detail}</p>
+            </article>
+          ))}
         </div>
         <div className="admin-conversion-grid">
           <ConversionMetricCard
