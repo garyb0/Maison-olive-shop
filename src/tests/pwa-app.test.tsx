@@ -44,8 +44,10 @@ vi.mock("next/link", () => ({
 }));
 
 vi.mock("next/image", () => ({
-  default: ({ alt, src, priority: _priority, ...props }: ImgHTMLAttributes<HTMLImageElement> & { src: string; priority?: boolean }) =>
-    createElement("img", { alt, src, ...props }),
+  default: ({ alt, src, priority, ...props }: ImgHTMLAttributes<HTMLImageElement> & { src: string; priority?: boolean }) => {
+    void priority;
+    return createElement("img", { alt, src, ...props });
+  },
 }));
 
 const getCurrentUserMock = vi.fn();

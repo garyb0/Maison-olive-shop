@@ -55,7 +55,7 @@ export type HelpQuestion = {
   topicId?: HelpTopicId;
 };
 
-export function getHelpQuickActions(language: Language, _business: BusinessInfo): HelpQuickAction[] {
+export function getHelpQuickActions(language: Language): HelpQuickAction[] {
   if (language === "fr") {
     return [
       {

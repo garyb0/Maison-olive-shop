@@ -149,8 +149,8 @@ export function CartClient({
 
   useEffect(() => {
     if (!cart.length || hasBlockedRows) {
-      setQuote(null);
-      return;
+      const id = window.setTimeout(() => setQuote(null), 0);
+      return () => window.clearTimeout(id);
     }
 
     const controller = new AbortController();

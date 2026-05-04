@@ -50,7 +50,11 @@ export function PwaDriverAccessCard({ language }: Props) {
   }), [language]);
 
   useEffect(() => {
-    setSavedHref(localStorage.getItem(STORAGE_KEY) ?? "");
+    const id = window.setTimeout(() => {
+      setSavedHref(localStorage.getItem(STORAGE_KEY) ?? "");
+    }, 0);
+
+    return () => window.clearTimeout(id);
   }, []);
 
   const saveHref = () => {

@@ -14,10 +14,14 @@ export function AppMobileNav({ language, userRole }: Props) {
   const [driverHref, setDriverHref] = useState<string | null>(null);
 
   useEffect(() => {
-    const saved = window.localStorage.getItem("chezolive_last_driver_run_href");
-    if (saved?.startsWith("/driver/run/")) {
-      setDriverHref(saved);
-    }
+    const id = window.setTimeout(() => {
+      const saved = window.localStorage.getItem("chezolive_last_driver_run_href");
+      if (saved?.startsWith("/driver/run/")) {
+        setDriverHref(saved);
+      }
+    }, 0);
+
+    return () => window.clearTimeout(id);
   }, []);
 
   const items = [

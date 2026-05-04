@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Image from "next/image";
 import type { Language } from "@/lib/i18n";
 import type { DeliveryDriver, DeliveryRunSummary } from "@/lib/types";
 
@@ -514,10 +515,13 @@ export function AdminDeliveryRunsClient({
                       {stop.deliveryPhone ? <a href={`tel:${stop.deliveryPhone.replace(/[^\d+]/g, "")}`}>{language === "fr" ? "Appeler" : "Call"}</a> : null}
                     </div>
                     {stop.hasProofPhoto && stop.proofPhotoUrl ? (
-                      <img
+                      <Image
+                        unoptimized
                         className="delivery-run-proof-thumb"
                         src={stop.proofPhotoUrl}
                         alt={language === "fr" ? "Preuve de livraison" : "Delivery proof"}
+                        width={76}
+                        height={76}
                       />
                     ) : null}
                   </div>

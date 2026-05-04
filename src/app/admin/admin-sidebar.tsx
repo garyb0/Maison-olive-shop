@@ -90,7 +90,8 @@ export function AdminSidebar({ language }: Props) {
   }, [language, mobileItems, pathname]);
 
   useEffect(() => {
-    setMobileMenuOpen(false);
+    const id = window.setTimeout(() => setMobileMenuOpen(false), 0);
+    return () => window.clearTimeout(id);
   }, [pathname]);
 
   useEffect(() => {

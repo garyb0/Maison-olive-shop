@@ -58,9 +58,11 @@ export function PwaInstallPanel({ language }: Props) {
       setIsStandalone(true);
     };
 
-    updateStandalone();
-    updateOnline();
-    setIsIos(isAppleMobile(navigator.userAgent));
+    const initialStatusId = window.setTimeout(() => {
+      updateStandalone();
+      updateOnline();
+      setIsIos(isAppleMobile(navigator.userAgent));
+    }, 0);
 
     media.addEventListener("change", updateStandalone);
     window.addEventListener("online", updateOnline);
@@ -69,6 +71,7 @@ export function PwaInstallPanel({ language }: Props) {
     window.addEventListener("appinstalled", onInstalled);
 
     return () => {
+      window.clearTimeout(initialStatusId);
       media.removeEventListener("change", updateStandalone);
       window.removeEventListener("online", updateOnline);
       window.removeEventListener("offline", updateOnline);

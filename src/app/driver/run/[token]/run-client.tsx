@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Language } from "@/lib/i18n";
 import type { DeliveryRunSummary } from "@/lib/types";
 
@@ -325,6 +325,7 @@ export function DriverRunClient({ language, token, gpsTrackingEnabled, pushPubli
   const [syncingQueue, setSyncingQueue] = useState(false);
   const [proofUploadingStopId, setProofUploadingStopId] = useState<string | null>(null);
   const watchIdRef = useRef<number | null>(null);
+  const syncingQueueRef = useRef(false);
 
   const nextPendingStop = useMemo(
     () => run.stops.find((stop) => stop.status === "PENDING") ?? null,
@@ -374,7 +375,7 @@ export function DriverRunClient({ language, token, gpsTrackingEnabled, pushPubli
     };
   }, [language, pushPermission, pushSubscribed, pushSupported]);
 
-  const callApi = async (
+  const callApi = useCallback(async (
     path: string,
     init?: RequestInit,
   ): Promise<{ run?: DeliveryRunSummary; accepted?: boolean; navigationHref?: string | null; warning?: string | null; error?: string }> => {
@@ -394,7 +395,7 @@ export function DriverRunClient({ language, token, gpsTrackingEnabled, pushPubli
       setRun(payload.run);
     }
     return payload;
-  };
+  }, []);
 
   useEffect(() => {
     if (!gpsTrackingEnabled || run.status !== "IN_PROGRESS") {
@@ -442,7 +443,7 @@ export function DriverRunClient({ language, token, gpsTrackingEnabled, pushPubli
         watchIdRef.current = null;
       }
     };
-  }, [gpsTrackingEnabled, run.status, token]);
+  }, [callApi, gpsTrackingEnabled, run.status, token]);
 
   useEffect(() => {
     const supported = canUseDriverPush(pushPublicKey);
@@ -524,10 +525,10 @@ export function DriverRunClient({ language, token, gpsTrackingEnabled, pushPubli
     }
   };
 
-  const persistQueuedActions = (nextActions: QueuedDriverAction[]) => {
+  const persistQueuedActions = useCallback((nextActions: QueuedDriverAction[]) => {
     saveQueuedActions(token, nextActions);
     setQueuedActions(nextActions);
-  };
+  }, [token]);
 
   const enqueueAction = (action: QueuedDriverAction) => {
     const nextActions = [...loadQueuedActions(token), action];
@@ -535,7 +536,7 @@ export function DriverRunClient({ language, token, gpsTrackingEnabled, pushPubli
     setMessage(language === "fr" ? "Action en attente de synchronisation." : "Action queued for sync.");
   };
 
-  const sendQueuedAction = async (action: QueuedDriverAction) => {
+  const sendQueuedAction = useCallback(async (action: QueuedDriverAction) => {
     if (action.type === "arrive") {
       await callApi(`/api/driver/run/${token}/stops/${action.stopId}/arrive`, {
         method: "POST",
@@ -562,12 +563,13 @@ export function DriverRunClient({ language, token, gpsTrackingEnabled, pushPubli
       method: "POST",
       body: buildProofFormData(file, action.location),
     });
-  };
+  }, [callApi, token]);
 
-  const replayQueuedActions = async () => {
+  const replayQueuedActions = useCallback(async () => {
     const currentQueue = loadQueuedActions(token);
-    if (!currentQueue.length || syncingQueue) return;
+    if (!currentQueue.length || syncingQueueRef.current) return;
 
+    syncingQueueRef.current = true;
     setSyncingQueue(true);
     const remaining: QueuedDriverAction[] = [];
 
@@ -588,15 +590,20 @@ export function DriverRunClient({ language, token, gpsTrackingEnabled, pushPubli
       }
     } finally {
       persistQueuedActions(remaining);
+      syncingQueueRef.current = false;
       setSyncingQueue(false);
       if (currentQueue.length && remaining.length === 0) {
         setMessage(language === "fr" ? "Actions synchronisees." : "Queued actions synced.");
       }
     }
-  };
+  }, [language, persistQueuedActions, sendQueuedAction, token]);
 
   useEffect(() => {
-    setQueuedActions(loadQueuedActions(token));
+    const id = window.setTimeout(() => {
+      setQueuedActions(loadQueuedActions(token));
+    }, 0);
+
+    return () => window.clearTimeout(id);
   }, [token]);
 
   useEffect(() => {
@@ -608,7 +615,7 @@ export function DriverRunClient({ language, token, gpsTrackingEnabled, pushPubli
     void replayQueuedActions();
 
     return () => window.removeEventListener("online", handleOnline);
-  }, [token]);
+  }, [replayQueuedActions]);
 
   const markArrived = async (stop: DeliveryRunSummary["stops"][number]) => {
     const location = await getStartLocationPayload();

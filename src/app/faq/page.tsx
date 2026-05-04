@@ -12,7 +12,7 @@ export default async function FaqPage() {
   const t = getDictionary(language);
   const business = getBusinessInfo(language);
   const user = await getCurrentUser();
-  const quickActions = getHelpQuickActions(language, business);
+  const quickActions = getHelpQuickActions(language);
   const topics = getHelpTopics(language, business);
   const questions = getHelpCenterQuestions(language, business);
 
