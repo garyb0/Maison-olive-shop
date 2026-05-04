@@ -4,6 +4,10 @@ import {
   getEmptyConversionDashboardSnapshot,
   type ConversionDashboardSnapshot,
 } from "@/lib/conversion-analytics";
+import {
+  getAdminNotificationOpsSnapshot,
+  type AdminNotificationOpsSnapshot,
+} from "@/lib/app-notifications";
 
 export type OwnerTodaySnapshot = {
   dateKey: string;
@@ -76,6 +80,7 @@ export type OwnerTodaySnapshot = {
     ageHours: number | null;
   };
   conversion: ConversionDashboardSnapshot;
+  notifications: AdminNotificationOpsSnapshot;
 };
 
 function localDateKey(date = new Date()) {
@@ -120,6 +125,7 @@ export async function getOwnerTodaySnapshot(): Promise<OwnerTodaySnapshot> {
     lowStockCount,
     lowStockProducts,
     conversion,
+    notifications,
   ] = await Promise.all([
     prisma.order.count({ where: { createdAt: { gte: startOfDay } } }),
     prisma.order.count({
@@ -248,6 +254,11 @@ export async function getOwnerTodaySnapshot(): Promise<OwnerTodaySnapshot> {
       },
     }),
     getConversionDashboardSnapshot().catch(() => getEmptyConversionDashboardSnapshot()),
+    getAdminNotificationOpsSnapshot().catch(() => ({
+      recent: [],
+      unreadCount: 0,
+      disabledPushSubscriptionCount: 0,
+    })),
   ]);
 
   return {
@@ -304,5 +315,6 @@ export async function getOwnerTodaySnapshot(): Promise<OwnerTodaySnapshot> {
     lowStockProducts,
     backup: readBackupSnapshot(),
     conversion,
+    notifications,
   };
 }

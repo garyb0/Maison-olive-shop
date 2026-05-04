@@ -103,7 +103,7 @@ describe("admin delivery run action routes", () => {
 
   it("optimise une tournee et transmet l'avertissement de fallback", async () => {
     optimizeDeliveryRunMock.mockResolvedValueOnce({
-      run: { id: "run_1", plannedKm: null },
+      run: { id: "run_1", dateKey: "2026-05-03", status: "PUBLISHED", plannedKm: null },
       warning: "Google Maps indisponible",
     });
     const { POST } = await import("@/app/api/admin/delivery/runs/[runId]/optimize/route");
@@ -123,11 +123,19 @@ describe("admin delivery run action routes", () => {
       runId: "run_1",
       actorUserId: "admin_1",
     });
+    expect(createAppNotificationMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        driverRunId: "run_1",
+        audience: "DRIVER",
+        type: "DRIVER_RUN",
+        href: "/app",
+      }),
+    );
   });
 
   it("reordonne les arrets d'une tournee", async () => {
     reorderDeliveryRunMock.mockResolvedValueOnce({
-      run: { id: "run_1" },
+      run: { id: "run_1", dateKey: "2026-05-03", status: "IN_PROGRESS" },
       warning: null,
     });
     const { PATCH } = await import("@/app/api/admin/delivery/runs/[runId]/reorder/route");
@@ -151,6 +159,14 @@ describe("admin delivery run action routes", () => {
       stopIds: ["stop_2", "stop_1"],
       actorUserId: "admin_1",
     });
+    expect(createAppNotificationMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        driverRunId: "run_1",
+        audience: "DRIVER",
+        type: "DRIVER_RUN",
+        href: "/app",
+      }),
+    );
   });
 
   it("cloture une tournee depuis l'admin", async () => {

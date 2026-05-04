@@ -13,6 +13,16 @@ type AdminActionItem = {
   badge?: string;
 };
 
+type AdminNotificationItem = {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  href: string | null;
+  read: boolean;
+  createdAtLabel: string;
+};
+
 type Props = {
   language: Language;
   t: Dictionary;
@@ -68,6 +78,11 @@ type Props = {
       topAbandonedProducts: AdminConversionProduct[];
       topViewedNotAddedProducts: AdminConversionProduct[];
       checkoutErrorReasons: AdminConversionReason[];
+    };
+    notifications: {
+      unreadCount: number;
+      disabledPushSubscriptionCount: number;
+      recent: AdminNotificationItem[];
     };
     siteStatus: string;
   };
@@ -665,6 +680,90 @@ export function AdminDashboardClient({
             emptyLabel={language === "fr" ? "Aucune alerte ops." : "No ops alert."}
             tone={maintenanceEnabled || todayCockpit.backup.status !== "ok" ? "warn" : "default"}
           />
+        </div>
+      </section>
+
+      <section
+        className="section admin-notifications-section"
+        aria-label={language === "fr" ? "Notifications admin" : "Admin notifications"}
+      >
+        <div className="admin-section-head">
+          <div>
+            <h2>{language === "fr" ? "Notifications et push" : "Notifications and push"}</h2>
+            <p className="small">
+              {language === "fr"
+                ? "Derniers signaux envoyés aux clients, à l'admin et au terrain."
+                : "Recent signals sent to customers, admins, and field devices."}
+            </p>
+          </div>
+          <Link className="btn btn-secondary" href="/app">
+            {language === "fr" ? "Centre notifications" : "Notification center"}
+          </Link>
+        </div>
+
+        <div className="admin-conversion-grid">
+          <article className="admin-conversion-card">
+            <div className="admin-conversion-card__head">
+              <span>{language === "fr" ? "In-app admin" : "Admin in-app"}</span>
+              <strong>{todayCockpit.notifications.unreadCount}</strong>
+            </div>
+            <div className="admin-conversion-metrics">
+              <span>
+                {language === "fr" ? "Non lues" : "Unread"}{" "}
+                <strong>{todayCockpit.notifications.unreadCount}</strong>
+              </span>
+              <span>
+                {language === "fr" ? "Push désactivés" : "Disabled push"}{" "}
+                <strong>{todayCockpit.notifications.disabledPushSubscriptionCount}</strong>
+              </span>
+              <span>
+                {language === "fr" ? "Etat" : "State"}{" "}
+                <strong>
+                  {todayCockpit.notifications.disabledPushSubscriptionCount > 0
+                    ? language === "fr"
+                      ? "A surveiller"
+                      : "Watch"
+                    : "OK"}
+                </strong>
+              </span>
+            </div>
+          </article>
+
+          <article className="admin-conversion-card admin-conversion-card--list">
+            <h3>{language === "fr" ? "Récentes" : "Recent"}</h3>
+            {todayCockpit.notifications.recent.length > 0 ? (
+              <div className="admin-action-list">
+                {todayCockpit.notifications.recent.map((notification) => {
+                  const content = (
+                    <>
+                      <span className="admin-action-item__title">{notification.title}</span>
+                      <span className="admin-action-item__meta">
+                        {notification.type} - {notification.createdAtLabel}
+                      </span>
+                      <span className="admin-action-item__detail">{notification.body}</span>
+                      <span className="admin-action-item__badge">
+                        {notification.read ? (language === "fr" ? "Lue" : "Read") : (language === "fr" ? "Non lue" : "Unread")}
+                      </span>
+                    </>
+                  );
+
+                  return notification.href ? (
+                    <Link className="admin-action-item" href={notification.href} key={notification.id}>
+                      {content}
+                    </Link>
+                  ) : (
+                    <div className="admin-action-item" key={notification.id}>
+                      {content}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="admin-action-empty">
+                {language === "fr" ? "Aucune notification récente." : "No recent notification."}
+              </p>
+            )}
+          </article>
         </div>
       </section>
 

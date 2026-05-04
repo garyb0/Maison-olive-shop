@@ -5,6 +5,7 @@ import { logApiEvent } from '@/lib/observability';
 import { requireAdmin } from '@/lib/permissions';
 import { adminOrderUpdateSchema, adminOrdersQuerySchema } from '@/lib/validators';
 import { prisma } from '@/lib/prisma';
+import { createAppNotification } from '@/lib/app-notifications';
 
 function datesMatch(a: Date | null, b: Date | null) {
   if (!a && !b) return true;
@@ -52,6 +53,76 @@ function mapAdminOrderForResponse(order: {
     deliveryInstructions: order.deliveryInstructions,
     dateKey: order.deliveryWindowStartAt ? toDateKey(order.deliveryWindowStartAt) : null,
   };
+}
+
+const orderStatusLabelsFr: Record<string, string> = {
+  PENDING: "a verifier",
+  PAID: "payee",
+  PROCESSING: "en preparation",
+  SHIPPED: "expediee",
+  DELIVERED: "livree",
+  CANCELLED: "annulee",
+};
+
+const deliveryStatusLabelsFr: Record<string, string> = {
+  SCHEDULED: "planifiee",
+  OUT_FOR_DELIVERY: "sur la route",
+  DELIVERED: "livree",
+  FAILED: "en probleme",
+  RESCHEDULED: "replanifiee",
+  UNSCHEDULED: "a planifier",
+};
+
+function notifyCustomerOrderStatus(input: {
+  userId: string | null;
+  orderId: string;
+  orderNumber: string;
+  status: string;
+  fromStatus?: string;
+}) {
+  if (!input.userId) return;
+
+  createAppNotification({
+    userId: input.userId,
+    audience: "CUSTOMER",
+    type: "ORDER_UPDATE",
+    title: "Commande mise a jour",
+    body: `Commande #${input.orderNumber}: statut ${orderStatusLabelsFr[input.status] ?? input.status}.`,
+    href: `/account/orders/${input.orderId}`,
+    metadata: {
+      orderId: input.orderId,
+      orderNumber: input.orderNumber,
+      fromStatus: input.fromStatus ?? null,
+      toStatus: input.status,
+    },
+  }).catch(() => undefined);
+}
+
+function notifyCustomerDeliveryStatus(input: {
+  userId: string | null;
+  orderId: string;
+  orderNumber: string;
+  deliveryStatus: string;
+  fromDeliveryStatus?: string;
+  scheduleChanged?: boolean;
+}) {
+  if (!input.userId) return;
+
+  createAppNotification({
+    userId: input.userId,
+    audience: "CUSTOMER",
+    type: "DELIVERY_UPDATE",
+    title: "Livraison mise a jour",
+    body: `Commande #${input.orderNumber}: livraison ${deliveryStatusLabelsFr[input.deliveryStatus] ?? input.deliveryStatus}.`,
+    href: `/account/orders/${input.orderId}`,
+    metadata: {
+      orderId: input.orderId,
+      orderNumber: input.orderNumber,
+      fromDeliveryStatus: input.fromDeliveryStatus ?? null,
+      toDeliveryStatus: input.deliveryStatus,
+      scheduleChanged: input.scheduleChanged ?? false,
+    },
+  }).catch(() => undefined);
 }
 
 function mapDeliverySelectionError(error: unknown) {
@@ -193,6 +264,8 @@ export async function PATCH(request: Request) {
           where: { id: orderId },
           select: {
             id: true,
+            orderNumber: true,
+            userId: true,
             deliverySlotId: true,
             deliveryWindowStartAt: true,
             deliveryWindowEndAt: true,
@@ -230,6 +303,8 @@ export async function PATCH(request: Request) {
           },
           select: {
             id: true,
+            orderNumber: true,
+            userId: true,
             deliverySlotId: true,
             deliveryWindowStartAt: true,
             deliveryWindowEndAt: true,
@@ -260,8 +335,19 @@ export async function PATCH(request: Request) {
           },
         });
 
-        return { order, nextOrder };
+        return { order, nextOrder, scheduleChanged };
       });
+
+      if (updated.scheduleChanged || updated.order.deliveryStatus !== updated.nextOrder.deliveryStatus) {
+        notifyCustomerDeliveryStatus({
+          userId: updated.nextOrder.userId,
+          orderId: updated.nextOrder.id,
+          orderNumber: updated.nextOrder.orderNumber,
+          deliveryStatus: updated.nextOrder.deliveryStatus,
+          fromDeliveryStatus: updated.order.deliveryStatus,
+          scheduleChanged: updated.scheduleChanged,
+        });
+      }
 
       logApiEvent({
         level: 'INFO',
@@ -284,6 +370,8 @@ export async function PATCH(request: Request) {
         where: { id: orderId },
         select: {
           id: true,
+          orderNumber: true,
+          userId: true,
           status: true,
           paymentStatus: true,
           deliveryStatus: true,
@@ -322,6 +410,8 @@ export async function PATCH(request: Request) {
         data: patch,
         select: {
           id: true,
+          orderNumber: true,
+          userId: true,
           status: true,
           paymentStatus: true,
           deliveryStatus: true,
@@ -392,6 +482,14 @@ export async function PATCH(request: Request) {
     });
 
     if (status !== undefined && status !== updated.order.status) {
+      notifyCustomerOrderStatus({
+        userId: updated.nextOrder.userId,
+        orderId: updated.nextOrder.id,
+        orderNumber: updated.nextOrder.orderNumber,
+        status,
+        fromStatus: updated.order.status,
+      });
+
       logApiEvent({
         level: 'INFO',
         route: '/api/admin/orders',
@@ -412,6 +510,14 @@ export async function PATCH(request: Request) {
     }
 
     if (deliveryStatus !== undefined && deliveryStatus !== updated.order.deliveryStatus) {
+      notifyCustomerDeliveryStatus({
+        userId: updated.nextOrder.userId,
+        orderId: updated.nextOrder.id,
+        orderNumber: updated.nextOrder.orderNumber,
+        deliveryStatus,
+        fromDeliveryStatus: updated.order.deliveryStatus,
+      });
+
       logApiEvent({
         level: 'INFO',
         route: '/api/admin/orders',

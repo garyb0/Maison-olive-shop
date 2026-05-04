@@ -17,13 +17,24 @@ export async function POST(request: Request) {
 
     const { productId, quantityChange, reason } = parsed.data;
     const result = await adjustAdminProductStock(productId, quantityChange, admin.id, reason);
-    if (result.product.isActive && result.product.stock <= 0) {
+    const crossedCriticalThreshold =
+      result.previousStock > 3 && result.product.stock > 0 && result.product.stock <= 3;
+    const crossedOutOfStockThreshold = result.previousStock > 0 && result.product.stock <= 0;
+    if (result.product.isActive && crossedOutOfStockThreshold) {
       createAdminAppNotification({
         type: "ADMIN_STOCK",
         title: "Stock à zéro",
         body: `${result.product.nameFr} est maintenant en rupture.`,
         href: "/admin/products",
         metadata: { productId: result.product.id, slug: result.product.slug },
+      }).catch(() => undefined);
+    } else if (result.product.isActive && crossedCriticalThreshold) {
+      createAdminAppNotification({
+        type: "ADMIN_STOCK",
+        title: "Stock critique",
+        body: `${result.product.nameFr} est maintenant a ${result.product.stock} unite(s).`,
+        href: "/admin/products",
+        metadata: { productId: result.product.id, slug: result.product.slug, stock: result.product.stock },
       }).catch(() => undefined);
     }
 

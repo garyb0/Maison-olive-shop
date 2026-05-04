@@ -41,6 +41,12 @@ export type AppNotificationPreferencesDTO = {
   driverRunUpdates: boolean;
 };
 
+export type AdminNotificationOpsSnapshot = {
+  recent: AppNotificationDTO[];
+  unreadCount: number;
+  disabledPushSubscriptionCount: number;
+};
+
 type PushSubscriptionInput = z.infer<typeof webPushSubscriptionSchema>;
 
 type NotificationRecord = {
@@ -217,6 +223,53 @@ export async function listAppNotificationsForUser(user: CurrentUser, take = 20) 
   return {
     notifications: rows.map(serializeNotification),
     unreadCount,
+  };
+}
+
+export async function getAdminNotificationOpsSnapshot(take = 8): Promise<AdminNotificationOpsSnapshot> {
+  if (!(await hasAppNotificationSchemaTables())) {
+    return {
+      recent: [],
+      unreadCount: 0,
+      disabledPushSubscriptionCount: 0,
+    };
+  }
+
+  const where = {
+    audience: "ADMIN",
+  };
+
+  const [rows, unreadCount, disabledPushSubscriptionCount] = await Promise.all([
+    prisma.appNotification.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      take,
+      select: {
+        id: true,
+        type: true,
+        audience: true,
+        title: true,
+        body: true,
+        href: true,
+        readAt: true,
+        createdAt: true,
+      },
+    }),
+    prisma.appNotification.count({
+      where: {
+        ...where,
+        readAt: null,
+      },
+    }),
+    prisma.webPushSubscription.count({
+      where: { enabled: false },
+    }),
+  ]);
+
+  return {
+    recent: rows.map(serializeNotification),
+    unreadCount,
+    disabledPushSubscriptionCount,
   };
 }
 

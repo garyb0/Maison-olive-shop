@@ -576,7 +576,7 @@ export async function adjustAdminProductStock(
       },
     });
 
-    return { product: updatedProduct, movement };
+    return { product: updatedProduct, movement, previousStock: product.stock };
   });
 }
 

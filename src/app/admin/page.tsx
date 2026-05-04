@@ -277,6 +277,19 @@ export default async function AdminDashboardPage() {
           })),
           checkoutErrorReasons: todaySnapshot.conversion.sevenDays.checkoutErrorReasons,
         },
+        notifications: {
+          unreadCount: todaySnapshot.notifications.unreadCount,
+          disabledPushSubscriptionCount: todaySnapshot.notifications.disabledPushSubscriptionCount,
+          recent: todaySnapshot.notifications.recent.map((notification) => ({
+            id: notification.id,
+            type: notification.type,
+            title: notification.title,
+            body: notification.body,
+            href: notification.href,
+            read: Boolean(notification.readAt),
+            createdAtLabel: formatShortDateTime(new Date(notification.createdAt)),
+          })),
+        },
         siteStatus: maintenanceState.enabled
           ? language === "fr"
             ? "Maintenance active"

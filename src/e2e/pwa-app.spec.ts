@@ -36,6 +36,29 @@ test.describe("Chez Olive PWA app hub", () => {
   });
 
   test("mobile hub renders, installs through simulated prompt and saves driver link", async ({ page }) => {
+    await page.addInitScript(() => {
+      const originalAddEventListener = window.addEventListener.bind(window);
+      const patchedAddEventListener = (
+        type: string,
+        listener: EventListenerOrEventListenerObject,
+        options?: boolean | AddEventListenerOptions,
+      ) => {
+        originalAddEventListener(type, listener as EventListener, options);
+        if (type !== "beforeinstallprompt" || typeof listener !== "function") return;
+
+        const event = new Event("beforeinstallprompt", { cancelable: true }) as Event & {
+          prompt: () => Promise<void>;
+          userChoice: Promise<{ outcome: "accepted"; platform: string }>;
+        };
+        Object.defineProperty(event, "prompt", { value: async () => undefined });
+        Object.defineProperty(event, "userChoice", {
+          value: Promise.resolve({ outcome: "accepted", platform: "web" }),
+        });
+        window.setTimeout(() => listener(event), 0);
+      };
+      window.addEventListener = patchedAddEventListener as typeof window.addEventListener;
+    });
+
     await page.goto("/app");
     await page.waitForLoadState("domcontentloaded");
 
@@ -45,18 +68,6 @@ test.describe("Chez Olive PWA app hub", () => {
     await expect(page.locator(".pwa-app-header")).toBeVisible();
     await expect(page.getByRole("link", { name: "Ouvrir la boutique" })).toHaveAttribute("href", "/boutique");
     await expectNoHorizontalOverflow(page);
-
-    await page.evaluate(() => {
-      const event = new Event("beforeinstallprompt", { cancelable: true }) as Event & {
-        prompt: () => Promise<void>;
-        userChoice: Promise<{ outcome: "accepted"; platform: string }>;
-      };
-      Object.defineProperty(event, "prompt", { value: async () => undefined });
-      Object.defineProperty(event, "userChoice", {
-        value: Promise.resolve({ outcome: "accepted", platform: "web" }),
-      });
-      window.dispatchEvent(event);
-    });
 
     await expect(page.getByRole("button", { name: "Installer l'app" })).toBeVisible();
     await page.getByRole("button", { name: "Installer l'app" }).click();

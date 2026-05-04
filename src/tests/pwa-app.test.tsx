@@ -53,6 +53,7 @@ const getCurrentLanguageMock = vi.fn();
 const getAppNotificationPreferencesMock = vi.fn();
 const getWebPushPublicKeyMock = vi.fn();
 const listAppNotificationsForUserMock = vi.fn();
+const getAdminNotificationOpsSnapshotMock = vi.fn();
 
 vi.mock("@/lib/auth", () => ({
   getCurrentUser: (...args: unknown[]) => getCurrentUserMock(...args),
@@ -66,6 +67,7 @@ vi.mock("@/lib/app-notifications", () => ({
   getAppNotificationPreferences: (...args: unknown[]) => getAppNotificationPreferencesMock(...args),
   getWebPushPublicKey: (...args: unknown[]) => getWebPushPublicKeyMock(...args),
   listAppNotificationsForUser: (...args: unknown[]) => listAppNotificationsForUserMock(...args),
+  getAdminNotificationOpsSnapshot: (...args: unknown[]) => getAdminNotificationOpsSnapshotMock(...args),
 }));
 
 vi.mock("@/lib/i18n", () => ({
@@ -116,6 +118,11 @@ describe("PWA Chez Olive", () => {
       driverRunUpdates: true,
     });
     listAppNotificationsForUserMock.mockResolvedValue({ notifications: [], unreadCount: 0 });
+    getAdminNotificationOpsSnapshotMock.mockResolvedValue({
+      recent: [],
+      unreadCount: 0,
+      disabledPushSubscriptionCount: 0,
+    });
   });
 
   afterEach(() => {

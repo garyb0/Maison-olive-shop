@@ -6,6 +6,7 @@ const findUniqueMock = vi.fn();
 const updateMock = vi.fn();
 const createAuditLogMock = vi.fn();
 const resolveDeliverySelectionForOrderMock = vi.fn();
+const createAppNotificationMock = vi.fn();
 
 vi.mock("@/lib/permissions", () => ({
   requireAdmin: (...args: unknown[]) => requireAdminMock(...args),
@@ -34,6 +35,10 @@ vi.mock("@/lib/observability", () => ({
   logApiEvent: vi.fn(),
 }));
 
+vi.mock("@/lib/app-notifications", () => ({
+  createAppNotification: (...args: unknown[]) => createAppNotificationMock(...args),
+}));
+
 describe("PATCH /api/admin/orders updates", () => {
   beforeEach(() => {
     vi.resetModules();
@@ -42,6 +47,8 @@ describe("PATCH /api/admin/orders updates", () => {
     requireAdminMock.mockResolvedValue({ id: "admin_1" });
     findUniqueMock.mockResolvedValue({
       id: "order_1",
+      orderNumber: "MO-20260428-0001",
+      userId: "user_1",
       status: "PENDING",
       paymentStatus: "PENDING",
       deliveryStatus: "SCHEDULED",
@@ -53,6 +60,8 @@ describe("PATCH /api/admin/orders updates", () => {
     });
     updateMock.mockResolvedValue({
       id: "order_1",
+      orderNumber: "MO-20260428-0001",
+      userId: "user_1",
       status: "PENDING",
       paymentStatus: "PENDING",
       deliveryStatus: "OUT_FOR_DELIVERY",
@@ -63,6 +72,7 @@ describe("PATCH /api/admin/orders updates", () => {
       deliveryInstructions: null,
     });
     createAuditLogMock.mockResolvedValue({});
+    createAppNotificationMock.mockResolvedValue(null);
     transactionMock.mockImplementation(async (callback: (tx: unknown) => unknown) =>
       callback({
         order: {
@@ -100,11 +110,21 @@ describe("PATCH /api/admin/orders updates", () => {
       }),
     );
     expect(createAuditLogMock).toHaveBeenCalledTimes(1);
+    expect(createAppNotificationMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "user_1",
+        audience: "CUSTOMER",
+        type: "DELIVERY_UPDATE",
+        href: "/account/orders/order_1",
+      }),
+    );
   });
 
   it("met a jour le statut de commande", async () => {
     updateMock.mockResolvedValueOnce({
       id: "order_1",
+      orderNumber: "MO-20260428-0001",
+      userId: "user_1",
       status: "PROCESSING",
       paymentStatus: "PENDING",
       deliveryStatus: "SCHEDULED",
@@ -144,11 +164,21 @@ describe("PATCH /api/admin/orders updates", () => {
         }),
       }),
     );
+    expect(createAppNotificationMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "user_1",
+        audience: "CUSTOMER",
+        type: "ORDER_UPDATE",
+        href: "/account/orders/order_1",
+      }),
+    );
   });
 
   it("met a jour le statut de paiement", async () => {
     updateMock.mockResolvedValueOnce({
       id: "order_1",
+      orderNumber: "MO-20260428-0001",
+      userId: "user_1",
       status: "PENDING",
       paymentStatus: "PAID",
       deliveryStatus: "SCHEDULED",
@@ -188,11 +218,14 @@ describe("PATCH /api/admin/orders updates", () => {
         }),
       }),
     );
+    expect(createAppNotificationMock).not.toHaveBeenCalled();
   });
 
   it("replanifie une commande sur un autre creneau", async () => {
     findUniqueMock.mockResolvedValueOnce({
       id: "order_1",
+      orderNumber: "MO-20260428-0001",
+      userId: "user_1",
       deliverySlotId: "slot_old",
       deliveryWindowStartAt: new Date("2026-04-10T08:00:00.000Z"),
       deliveryWindowEndAt: new Date("2026-04-10T10:00:00.000Z"),
@@ -206,6 +239,8 @@ describe("PATCH /api/admin/orders updates", () => {
     });
     updateMock.mockResolvedValueOnce({
       id: "order_1",
+      orderNumber: "MO-20260428-0001",
+      userId: "user_1",
       deliverySlotId: "slot_new",
       deliveryWindowStartAt: new Date("2026-04-11T10:00:00.000Z"),
       deliveryWindowEndAt: new Date("2026-04-11T12:00:00.000Z"),
@@ -253,6 +288,14 @@ describe("PATCH /api/admin/orders updates", () => {
       }),
     );
     expect(createAuditLogMock).toHaveBeenCalledTimes(1);
+    expect(createAppNotificationMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "user_1",
+        audience: "CUSTOMER",
+        type: "DELIVERY_UPDATE",
+        href: "/account/orders/order_1",
+      }),
+    );
   });
 
   it("retourne 400 quand le payload est invalide", async () => {

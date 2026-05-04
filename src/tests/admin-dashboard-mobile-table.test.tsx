@@ -146,6 +146,21 @@ describe("AdminDashboardClient mobile table labels", () => {
               { reason: "payment_declined", count: 2 },
             ],
           },
+          notifications: {
+            unreadCount: 1,
+            disabledPushSubscriptionCount: 1,
+            recent: [
+              {
+                id: "notif_admin_1",
+                type: "ADMIN_ORDER",
+                title: "Nouvelle commande",
+                body: "Commande #MO-20260428-0001 recue.",
+                href: "/admin/orders/order_1",
+                read: false,
+                createdAtLabel: "3 mai, 08 h 30",
+              },
+            ],
+          },
           siteStatus: "Site ouvert",
         }}
         profitabilitySummary={{
@@ -193,6 +208,9 @@ describe("AdminDashboardClient mobile table labels", () => {
     expect(screen.getByText("Produits vus sans ajout")).toBeInTheDocument();
     expect(screen.getByText("Produit regarde")).toBeInTheDocument();
     expect(screen.getByText("payment_declined")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Notifications et push" })).toBeInTheDocument();
+    expect(screen.getByText("Nouvelle commande")).toBeInTheDocument();
+    expect(screen.getByText("Push désactivés")).toBeInTheDocument();
     expect(container.querySelectorAll(".admin-dashboard-table-wrap")).toHaveLength(2);
     expect(container.querySelectorAll(".admin-dashboard-table")).toHaveLength(2);
     const productTableCell = screen.getAllByText("Produit test").find((element) => element.closest("td"))?.closest("td");

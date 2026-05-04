@@ -7,12 +7,15 @@ const prismaMock = {
   appNotification: {
     create: vi.fn(),
     findFirst: vi.fn(),
+    findMany: vi.fn(),
+    count: vi.fn(),
   },
   notificationPreference: {
     findUnique: vi.fn(),
   },
   webPushSubscription: {
     findMany: vi.fn(),
+    count: vi.fn(),
     updateMany: vi.fn(),
   },
 };
@@ -71,6 +74,7 @@ describe("app notifications", () => {
         userId: "user_1",
       },
     ]);
+    prismaMock.webPushSubscription.count.mockResolvedValue(0);
     sendNotificationMock.mockResolvedValue(undefined);
   });
 
@@ -119,5 +123,35 @@ describe("app notifications", () => {
 
     expect(notification).toBeNull();
     expect(prismaMock.appNotification.create).not.toHaveBeenCalled();
+  });
+
+  it("resume les notifications admin recentes et les abonnements push invalides", async () => {
+    prismaMock.appNotification.findMany.mockResolvedValueOnce([
+      {
+        id: "notif_admin_1",
+        type: "ADMIN_ORDER",
+        audience: "ADMIN",
+        title: "Nouvelle commande",
+        body: "Commande recue.",
+        href: "/admin/orders/order_1",
+        readAt: null,
+        createdAt: new Date("2026-05-03T13:00:00.000Z"),
+      },
+    ]);
+    prismaMock.appNotification.count.mockResolvedValueOnce(1);
+    prismaMock.webPushSubscription.count.mockResolvedValueOnce(2);
+    const { getAdminNotificationOpsSnapshot } = await import("@/lib/app-notifications");
+
+    const snapshot = await getAdminNotificationOpsSnapshot();
+
+    expect(snapshot.unreadCount).toBe(1);
+    expect(snapshot.disabledPushSubscriptionCount).toBe(2);
+    expect(snapshot.recent[0]).toEqual(
+      expect.objectContaining({
+        id: "notif_admin_1",
+        type: "ADMIN_ORDER",
+        href: "/admin/orders/order_1",
+      }),
+    );
   });
 });

@@ -2,6 +2,7 @@ import { jsonError, jsonOk } from "@/lib/http";
 import { requireAdmin } from "@/lib/permissions";
 import { mapDeliveryRunError, reorderDeliveryRun } from "@/lib/delivery-runs";
 import { reorderDeliveryRunSchema } from "@/lib/validators";
+import { createAppNotification } from "@/lib/app-notifications";
 
 type RouteContext = {
   params: Promise<{ runId: string }>;
@@ -23,6 +24,17 @@ export async function PATCH(request: Request, context: RouteContext) {
       stopIds: parsed.data.stopIds,
       actorUserId: admin.id,
     });
+    if (result.run.status === "PUBLISHED" || result.run.status === "IN_PROGRESS") {
+      createAppNotification({
+        driverRunId: result.run.id,
+        audience: "DRIVER",
+        type: "DRIVER_RUN",
+        title: "Tournee mise a jour",
+        body: `Tournee ${result.run.dateKey}: ordre ajuste par l'admin.`,
+        href: "/app",
+        metadata: { runId: result.run.id, action: "reordered" },
+      }).catch(() => undefined);
+    }
 
     return jsonOk(result);
   } catch (error) {
