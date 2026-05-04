@@ -59,12 +59,15 @@ npm run seed
 
 - [ ] Lint passe sans erreur
 - [ ] Build production passe
+- [ ] Gate solide passe (`npm run release:solid`)
+- [ ] Captures mobile/PWA revues dans `test-results/solid-release/<runId>/`
 - [ ] Health check API répond OK (`/api/health`)
 - [ ] Erreurs runtime surveillées (logs)
 
 ### Commandes utiles
 
 ```bash
+npm run release:solid
 npm run lint
 npm run build
 npm run start
@@ -124,6 +127,7 @@ Note:
 - [ ] Procédure de maintenance Cloudflare de secours documentée
 - [ ] Worker Cloudflare de maintenance prêt à activer en cas de panne origin
 - [ ] `npm run ops:status` passe sans `FAIL`
+- [ ] `ops:status` confirme PM2, release, backups, push/env et dernier smoke account
 - [ ] Backup horaire Windows actif et caché (`MaisonOlive-DB-Backup-Hourly`)
 - [ ] Diagnostic backup horaire OK: `npm run ops:backup-hourly:diagnose`
 - [ ] Aucun popup CMD/PowerShell visible après lancement manuel de la tâche horaire

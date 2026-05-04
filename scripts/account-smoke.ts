@@ -106,6 +106,7 @@ type ScriptConfig = {
   envTarget: "development" | "production";
   keepArtifacts: boolean;
   runId: string;
+  smokeClientIp: string;
   adminEmail: string;
   adminPassword: string;
   accountEmail: string;
@@ -143,7 +144,10 @@ class SmokeError extends Error {
 class HttpSession {
   private readonly cookies = new Map<string, string>();
 
-  constructor(private readonly baseUrl: string) {}
+  constructor(
+    private readonly baseUrl: string,
+    private readonly smokeClientIp: string,
+  ) {}
 
   async request<T = unknown>(
     requestPath: string,
@@ -165,6 +169,9 @@ class HttpSession {
     const cookieHeader = this.getCookieHeader();
     if (cookieHeader) {
       headers.set("cookie", cookieHeader);
+    }
+    if (this.smokeClientIp && !headers.has("x-forwarded-for")) {
+      headers.set("x-forwarded-for", this.smokeClientIp);
     }
 
     const response = await fetch(url, {
@@ -346,6 +353,14 @@ function createRunId() {
   return `${timestamp}-${randomBytes(3).toString("hex")}`;
 }
 
+function createSmokeClientIp(runId: string) {
+  let hash = 0;
+  for (const character of runId) {
+    hash = (hash * 31 + character.charCodeAt(0)) % 240;
+  }
+  return `198.51.100.${hash + 10}`;
+}
+
 function createPassword() {
   return `Smoke-${randomBytes(12).toString("base64url")}9a`;
 }
@@ -401,6 +416,8 @@ function resolveConfig(): ScriptConfig {
     ? true
     : parseEnvBoolean(process.env.ACCOUNT_SMOKE_ALLOW_REMOTE) ?? false;
   const runId = parseOptionalFlagValue("--run-id") ?? process.env.ACCOUNT_SMOKE_RUN_ID ?? createRunId();
+  const smokeClientIp = process.env.ACCOUNT_SMOKE_CLIENT_IP ?? createSmokeClientIp(runId);
+  process.env.ACCOUNT_SMOKE_CLIENT_IP = smokeClientIp;
   const baseUrl = stripTrailingSlash(
     parseOptionalFlagValue("--base-url") ??
       process.env.ACCOUNT_SMOKE_BASE_URL ??
@@ -463,6 +480,7 @@ function resolveConfig(): ScriptConfig {
     envTarget,
     keepArtifacts,
     runId,
+    smokeClientIp,
     adminEmail,
     adminPassword,
     accountEmail,
@@ -678,6 +696,7 @@ async function runPlaywrightMobileAccount(config: ScriptConfig, state: SmokeStat
         ACCOUNT_SMOKE_ADMIN_EMAIL: config.adminEmail,
         ACCOUNT_SMOKE_ADMIN_PASSWORD: config.adminPassword,
         ACCOUNT_SMOKE_RUN_ID: config.runId,
+        ACCOUNT_SMOKE_CLIENT_IP: config.smokeClientIp,
         ACCOUNT_SMOKE_ARTIFACT_DIR: config.artifactDir,
         ACCOUNT_SMOKE_ORDER_NUMBER: state.orderNumber ?? "",
         ACCOUNT_SMOKE_DOG_NAME: state.dogName ?? "",
@@ -699,6 +718,7 @@ async function runPlaywrightMobileAccount(config: ScriptConfig, state: SmokeStat
 
 async function cleanupDirect(config: ScriptConfig, results: CheckResult[], state: SmokeState) {
   const { prisma } = await import("../src/lib/prisma");
+  let accountGone = false;
 
   try {
     if (state.supportConversationId) {
@@ -760,7 +780,10 @@ async function cleanupDirect(config: ScriptConfig, results: CheckResult[], state
       },
     });
 
-    if (!user) return;
+    if (!user) {
+      accountGone = true;
+      return accountGone;
+    }
 
     const accountDeletable = isSafeSmokeAccountEmail(user.email, config.runId);
     const unsafeRole = user.role !== "CUSTOMER";
@@ -789,15 +812,17 @@ async function cleanupDirect(config: ScriptConfig, results: CheckResult[], state
         "cleanup:account",
         "smoke account was kept because safety guards found role/subscription/order or untagged data risk",
       );
-      return;
+      return accountGone;
     }
 
     await prisma.user.delete({ where: { id: user.id } });
+    accountGone = true;
     printResult({
       name: "cleanup:account",
       level: "pass",
       details: `deleted=${user.email} sessions=${user.sessions.length} addresses=${user.deliveryAddresses.length}`,
     });
+    return accountGone;
   } finally {
     await prisma.$disconnect();
   }
@@ -809,8 +834,8 @@ async function main() {
   const cleanupTasks: Array<() => Promise<void>> = [];
   const state: SmokeState = {};
 
-  const adminSession = new HttpSession(config.baseUrl);
-  const accountSession = new HttpSession(config.baseUrl);
+  const adminSession = new HttpSession(config.baseUrl, config.smokeClientIp);
+  const accountSession = new HttpSession(config.baseUrl, config.smokeClientIp);
 
   console.log(
     `Account smoke target: ${config.baseUrl} (env=${config.envTarget}, remote=${config.allowRemote ? "allowed" : "blocked"}, cleanup=${config.cleanupMode})`,
@@ -1162,20 +1187,28 @@ async function main() {
     if (!shouldCleanup) {
       pushWarning(results, "cleanup", `skipped because cleanup=${config.cleanupMode}`);
     } else {
+      const cleanupTaskErrors: string[] = [];
       while (cleanupTasks.length > 0) {
         const task = cleanupTasks.pop();
         if (!task) continue;
         try {
           await task();
         } catch (error) {
-          pushWarning(results, "cleanup", formatError(error));
+          cleanupTaskErrors.push(formatError(error));
         }
       }
 
+      let directCleanupConfirmed = false;
       try {
-        await cleanupDirect(config, results, state);
+        directCleanupConfirmed = await cleanupDirect(config, results, state);
       } catch (error) {
         pushWarning(results, "cleanup:direct", formatError(error));
+      }
+
+      if (cleanupTaskErrors.length > 0 && !directCleanupConfirmed) {
+        for (const error of cleanupTaskErrors) {
+          pushWarning(results, "cleanup", error);
+        }
       }
     }
   }

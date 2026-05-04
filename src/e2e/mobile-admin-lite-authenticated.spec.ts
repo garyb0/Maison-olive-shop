@@ -8,6 +8,7 @@ const adminEmail = process.env.ACCOUNT_SMOKE_ADMIN_EMAIL ?? "";
 const adminPassword = process.env.ACCOUNT_SMOKE_ADMIN_PASSWORD ?? "";
 const runId = process.env.ACCOUNT_SMOKE_RUN_ID ?? "manual";
 const artifactDir = process.env.ACCOUNT_SMOKE_ARTIFACT_DIR ?? path.join("test-results", "account-smoke", runId);
+const smokeClientIp = process.env.ACCOUNT_SMOKE_CLIENT_IP ?? "198.51.100.78";
 
 test.use({
   viewport: MOBILE_VIEWPORT,
@@ -42,6 +43,7 @@ async function screenshot(page: Page, fileName: string) {
 
 async function loginAdmin(page: Page) {
   const loginResponse = await page.request.post("/api/auth/login", {
+    headers: { "x-forwarded-for": smokeClientIp },
     data: { email: adminEmail, password: adminPassword },
   });
   expect(loginResponse.status(), "admin login response").toBe(200);

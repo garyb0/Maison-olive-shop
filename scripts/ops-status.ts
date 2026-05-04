@@ -317,6 +317,56 @@ function checkLatestAccountSmokeArtifact(): Check {
   };
 }
 
+function checkPushEnv(): Check {
+  const publicServer = process.env.WEB_PUSH_PUBLIC_KEY?.trim() ?? "";
+  const publicClient = process.env.NEXT_PUBLIC_WEB_PUSH_PUBLIC_KEY?.trim() ?? "";
+  const privateKey = process.env.WEB_PUSH_PRIVATE_KEY?.trim() ?? "";
+  const subject = process.env.WEB_PUSH_SUBJECT?.trim() ?? "";
+  const configured = Boolean(publicServer && publicClient && privateKey && subject);
+  const partiallyConfigured = Boolean(publicServer || publicClient || privateKey || subject);
+
+  if (configured) {
+    return {
+      level: "pass",
+      name: "push-env",
+      details: "WEB_PUSH_PUBLIC_KEY, NEXT_PUBLIC_WEB_PUSH_PUBLIC_KEY, WEB_PUSH_PRIVATE_KEY, WEB_PUSH_SUBJECT set",
+    };
+  }
+
+  if (partiallyConfigured) {
+    return {
+      level: "warn",
+      name: "push-env",
+      details: [
+        `WEB_PUSH_PUBLIC_KEY=${Boolean(publicServer)}`,
+        `NEXT_PUBLIC_WEB_PUSH_PUBLIC_KEY=${Boolean(publicClient)}`,
+        `WEB_PUSH_PRIVATE_KEY=${Boolean(privateKey)}`,
+        `WEB_PUSH_SUBJECT=${Boolean(subject)}`,
+      ].join(", "),
+    };
+  }
+
+  return {
+    level: "warn",
+    name: "push-env",
+    details: "web push not configured; in-app notifications still work",
+  };
+}
+
+function checkReleaseIdentity(): Check {
+  const commit = run("git", ["rev-parse", "--short", "HEAD"]);
+  const branch = run("git", ["branch", "--show-current"]);
+  if (!commit.ok) {
+    return { level: "warn", name: "release-identity", details: "unable to read git commit" };
+  }
+
+  return {
+    level: "pass",
+    name: "release-identity",
+    details: `branch=${branch.ok ? branch.output.trim() || "unknown" : "unknown"}, commit=${commit.output.trim()}`,
+  };
+}
+
 async function checkBusinessSignals(): Promise<Check> {
   const target = flagEnvTarget();
   const noOrderWarnHours = Number(flagValue("--no-order-warn-hours", process.env.OPS_NO_ORDER_WARN_HOURS ?? "24"));
@@ -397,8 +447,11 @@ async function checkBusinessSignals(): Promise<Check> {
 
 async function main() {
   const baseUrl = flagValue("--base-url", "https://chezolive.ca");
+  const target = flagEnvTarget();
+  loadDatabaseEnvForTarget(target);
   const checks: Check[] = [
     checkGit(),
+    checkReleaseIdentity(),
     await checkHealth(baseUrl),
     checkPm2(),
     checkBackupHealth(),
@@ -407,10 +460,11 @@ async function main() {
     checkHourlyBackupLogs(),
     checkSmokeAdminEnv(),
     checkLatestAccountSmokeArtifact(),
+    checkPushEnv(),
     await checkBusinessSignals(),
   ];
 
-  console.log(`Ops status for ${baseUrl}`);
+  console.log(`Ops status for ${baseUrl} (env=${target})`);
   for (const check of checks) print(check);
 
   process.exit(checks.some((check) => check.level === "fail") ? 1 : 0);

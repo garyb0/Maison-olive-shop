@@ -13,6 +13,7 @@ const orderNumber = process.env.ACCOUNT_SMOKE_ORDER_NUMBER ?? "";
 const dogName = process.env.ACCOUNT_SMOKE_DOG_NAME ?? "";
 const dogToken = process.env.ACCOUNT_SMOKE_DOG_TOKEN ?? "";
 const productId = process.env.ACCOUNT_SMOKE_PRODUCT_ID ?? "";
+const smokeClientIp = process.env.ACCOUNT_SMOKE_CLIENT_IP ?? "198.51.100.77";
 
 test.use({
   viewport: MOBILE_VIEWPORT,
@@ -47,6 +48,7 @@ async function screenshot(page: Page, fileName: string) {
 
 async function loginCustomer(page: Page) {
   const loginResponse = await page.request.post("/api/auth/login", {
+    headers: { "x-forwarded-for": smokeClientIp },
     data: { email, password },
   });
   expect(loginResponse.status(), "customer login response").toBe(200);

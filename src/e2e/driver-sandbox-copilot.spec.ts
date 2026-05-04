@@ -18,7 +18,9 @@ const sandboxStatePath = process.env.DELIVERY_SANDBOX_STATE_PATH
   ? path.resolve(process.env.DELIVERY_SANDBOX_STATE_PATH)
   : path.join(process.cwd(), ".delivery-sandbox", "latest.json");
 
-const screenshotDir = path.join(process.cwd(), "test-results", "delivery-driver-full-day");
+const screenshotDir = process.env.SOLID_RELEASE_ARTIFACT_DIR
+  ? path.join(path.resolve(process.env.SOLID_RELEASE_ARTIFACT_DIR), "delivery")
+  : path.join(process.cwd(), "test-results", "delivery-driver-full-day");
 
 function readSandboxState(): SandboxState {
   if (!fs.existsSync(sandboxStatePath)) {
@@ -126,7 +128,7 @@ test("recette visuelle journee complete du copilote livreur sandbox", async ({ c
   await page.getByRole("button", { name: /Démarrer la tournée/i }).click();
   await expect(page.getByRole("link", { name: /Ouvrir Waze/i })).toHaveAttribute("href", /waze\.com/);
   await expect(page.getByText(/Prochain arrêt/i)).toBeVisible();
-  const runResponse = await page.request.get(`/api/driver/run/${state.token}`);
+  const runResponse = await page.request.get(`${origin}/api/driver/run/${state.token}`);
   expect(runResponse.ok(), "driver run API response").toBe(true);
   const runPayload = (await runResponse.json()) as {
     run?: {

@@ -37,6 +37,9 @@ Objectif: garder le code, les donnees et les secrets separes pour qu'une reprise
 ## Commandes utiles
 
 ```bash
+npm run release:solid
+npm run test:e2e:mobile-solid
+npm run test:e2e:delivery-solid
 npm run validate:env:prod
 npm run db:backup -- release-check
 npm run db:backup:hourly
@@ -44,6 +47,31 @@ npm run db:backup:health
 npm run ops:status
 npm run build
 npm run host:pm2:restart
+```
+
+## Gate version solide
+
+Avant une release visible, lancer:
+
+```bash
+npm run release:solid
+```
+
+La gate execute audit release, TypeScript, modules critiques, Playwright mobile/PWA, build et `ops:status`.
+Les captures sont conservees dans `test-results/solid-release/<runId>/`.
+Le smoke compte prod reste volontairement separe:
+
+```bash
+npm run db:backup -- --env=production before-solid-release
+npm run smoke:account -- --env=production --base-url=https://chezolive.ca --allow-remote --cleanup=always
+```
+
+Pour la recette livreur sandbox complete:
+
+```bash
+npm run delivery:sandbox:setup
+npm run delivery:sandbox:dev
+npm run test:e2e:delivery-solid
 ```
 
 ## Regles de securite
