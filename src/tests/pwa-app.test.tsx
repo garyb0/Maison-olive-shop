@@ -1,7 +1,8 @@
-import type { AnchorHTMLAttributes } from "react";
+import { createElement, type AnchorHTMLAttributes, type ImgHTMLAttributes } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import manifest from "@/app/manifest";
 import { PwaDriverAccessCard } from "@/app/app/pwa-driver-access-card";
+import { PwaAppHeader } from "@/app/app/pwa-app-header";
 import { PwaInstallPanel } from "@/app/app/pwa-install-panel";
 import { AppNotificationCenter } from "@/app/app/app-notification-center";
 import { PwaSupportButton } from "@/app/app/pwa-support-button";
@@ -40,6 +41,11 @@ vi.mock("next/link", () => ({
       {children}
     </a>
   ),
+}));
+
+vi.mock("next/image", () => ({
+  default: ({ alt, src, priority: _priority, ...props }: ImgHTMLAttributes<HTMLImageElement> & { src: string; priority?: boolean }) =>
+    createElement("img", { alt, src, ...props }),
 }));
 
 const getCurrentUserMock = vi.fn();
@@ -139,7 +145,8 @@ describe("PWA Chez Olive", () => {
     const { container } = render(await PwaAppPage());
     const hrefs = Array.from(container.querySelectorAll("a")).map((link) => link.getAttribute("href"));
 
-    expect(screen.getByTestId("pwa-navigation")).toBeInTheDocument();
+    expect(screen.getByRole("banner", { name: "En-tete application" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Chez Olive App/ })).toHaveAttribute("href", "/app");
     expect(screen.getByRole("heading", { name: "Chez Olive" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Ouvrir la boutique" })).toHaveAttribute("href", "/boutique");
     expect(screen.getByRole("link", { name: "Se connecter" })).toHaveAttribute("href", "/login");
@@ -147,6 +154,18 @@ describe("PWA Chez Olive", () => {
     expect(hrefs).toContain("/login");
     expect(screen.queryByText("Admin leger")).not.toBeInTheDocument();
     expect(prismaMock.order.count).not.toHaveBeenCalled();
+  });
+
+  it("rend un header app compact avec panier, compte et admin optionnel", async () => {
+    window.localStorage.setItem("chezolive_cart_v1", JSON.stringify([{ productId: "prod_1", quantity: 2 }]));
+
+    render(<PwaAppHeader language="fr" userRole="ADMIN" />);
+
+    expect(screen.getByRole("banner", { name: "En-tete application" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Chez Olive App/ })).toHaveAttribute("href", "/app");
+    expect(screen.getByRole("link", { name: "Compte" })).toHaveAttribute("href", "/account");
+    expect(screen.getByRole("link", { name: "Admin" })).toHaveAttribute("href", "/admin");
+    await waitFor(() => expect(screen.getByRole("link", { name: "Panier 2" })).toHaveAttribute("href", "/cart"));
   });
 
   it("affiche un resume connecte avec les dernieres infos client", async () => {

@@ -86,6 +86,15 @@ test.describe("authenticated mobile admin lite smoke", () => {
       await page.goto(item.route);
       await page.waitForLoadState("domcontentloaded");
       await expect(page.getByRole("heading", { name: item.title }).first()).toBeVisible();
+      if (item.route === "/admin") {
+        const adminMenuButton = page.locator(".admin-mobile-menu-button").first();
+        await expect(adminMenuButton).toBeVisible();
+        await adminMenuButton.click();
+        await expect(page.locator('.admin-mobile-drawer__link[href="/admin/delivery/runs"]').first()).toBeVisible();
+        await expectMinTapSize(page.locator(".admin-mobile-drawer__link").first(), "admin drawer first link");
+        await page.screenshot({ path: path.join(artifactDir, "admin-mobile-drawer.png"), fullPage: true });
+        await page.getByRole("button", { name: /Fermer le menu admin|Close admin menu/i }).click();
+      }
       await expectNoHorizontalOverflow(page);
       await screenshot(page, item.file);
     }

@@ -40,6 +40,9 @@ test.describe("Chez Olive PWA app hub", () => {
     await page.waitForLoadState("domcontentloaded");
 
     await expect(page.getByRole("heading", { name: "Chez Olive" })).toBeVisible();
+    await expect(page.getByRole("banner", { name: "En-tete application" })).toBeVisible();
+    await expect(page.locator(".nav-marketplace")).toHaveCount(0);
+    await expect(page.locator(".pwa-app-header")).toBeVisible();
     await expect(page.getByRole("link", { name: "Ouvrir la boutique" })).toHaveAttribute("href", "/boutique");
     await expectNoHorizontalOverflow(page);
 

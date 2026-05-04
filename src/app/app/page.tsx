@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
-import { getDictionary } from "@/lib/i18n";
 import { getCurrentLanguage } from "@/lib/language";
 import { getOwnerTodaySnapshot } from "@/lib/owner-dashboard";
 import {
@@ -12,8 +11,8 @@ import {
   type AppNotificationPreferencesDTO,
 } from "@/lib/app-notifications";
 import { prisma } from "@/lib/prisma";
-import { Navigation } from "@/components/Navigation";
 import { AppMobileNav } from "./app-mobile-nav";
+import { PwaAppHeader } from "./pwa-app-header";
 import { AppNotificationCenter } from "./app-notification-center";
 import { PwaDriverAccessCard } from "./pwa-driver-access-card";
 import { PwaInstallPanel } from "./pwa-install-panel";
@@ -327,7 +326,6 @@ async function getAdminSnapshot(): Promise<AdminSnapshot | null> {
 
 export default async function PwaAppPage() {
   const [language, user] = await Promise.all([getCurrentLanguage(), getCurrentUser()]);
-  const t = getDictionary(language);
   const [customerSnapshot, adminSnapshot, notificationSnapshot] = await Promise.all([
     getCustomerSnapshot(user ?? undefined),
     user?.role === "ADMIN" ? getAdminSnapshot() : Promise.resolve(null),
@@ -404,9 +402,7 @@ export default async function PwaAppPage() {
   return (
     <div className="app-shell pwa-app-shell">
       <PwaServiceWorkerRegister />
-      <header className="topbar">
-        <Navigation language={language} t={t} user={user} />
-      </header>
+      <PwaAppHeader language={language} userRole={user?.role ?? null} />
 
       <main className="pwa-hub" aria-labelledby="pwa-hub-title">
         <section className="pwa-hero">

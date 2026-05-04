@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { Language } from "@/lib/i18n";
@@ -18,12 +18,12 @@ type NavItem = {
 };
 
 const navItems: NavItem[] = [
-  { href: "/admin", icon: "\u{1F3E2}", labelFr: "Tableau de bord", labelEn: "Dashboard" },
-  { href: "/admin/products", icon: "\u{1F6D2}", labelFr: "Produits", labelEn: "Products" },
-  { href: "/admin/orders", icon: "\u{1F4E6}", labelFr: "Commandes", labelEn: "Orders" },
+  { href: "/admin", icon: "DB", labelFr: "Tableau de bord", labelEn: "Dashboard" },
+  { href: "/admin/products", icon: "PR", labelFr: "Produits", labelEn: "Products" },
+  { href: "/admin/orders", icon: "CO", labelFr: "Commandes", labelEn: "Orders" },
   {
     href: "/admin/delivery",
-    icon: "\u{1F69A}",
+    icon: "LV",
     labelFr: "Livraisons",
     labelEn: "Delivery",
     children: [
@@ -31,13 +31,13 @@ const navItems: NavItem[] = [
       { href: "/admin/delivery/runs", labelFr: "Tournées", labelEn: "Runs" },
     ],
   },
-  { href: "/admin/customers", icon: "\u{1F465}", labelFr: "Clients", labelEn: "Customers" },
-  { href: "/admin/dogs", icon: "\u{1F436}", labelFr: "Chiens QR", labelEn: "Dog QR" },
-  { href: "/admin/taxes", icon: "\u{1F4B0}", labelFr: "Taxes", labelEn: "Taxes" },
-  { href: "/admin/promo", icon: "\u{1F4E3}", labelFr: "Promotions", labelEn: "Promotions" },
+  { href: "/admin/customers", icon: "CL", labelFr: "Clients", labelEn: "Customers" },
+  { href: "/admin/dogs", icon: "QR", labelFr: "Chiens QR", labelEn: "Dog QR" },
+  { href: "/admin/taxes", icon: "TX", labelFr: "Taxes", labelEn: "Taxes" },
+  { href: "/admin/promo", icon: "%", labelFr: "Promotions", labelEn: "Promotions" },
   {
     href: "/admin/support",
-    icon: "\u{1F4AC}",
+    icon: "SP",
     labelFr: "Support",
     labelEn: "Support",
     children: [
@@ -49,6 +49,7 @@ const navItems: NavItem[] = [
 
 export function AdminSidebar({ language }: Props) {
   const pathname = usePathname();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [expandedItems, setExpandedItems] = useState<string[]>(() => {
     if (pathname.startsWith("/admin/delivery")) {
       return ["/admin/delivery"];
@@ -69,9 +70,112 @@ export function AdminSidebar({ language }: Props) {
   const isActiveItem = (href: string) => pathname === href;
   const isActiveParent = (item: NavItem) =>
     item.children ? item.children.some((child) => pathname === child.href) : false;
+  const mobileItems = useMemo(() => navItems.flatMap((item) => {
+    const parentLabel = language === "fr" ? item.labelFr : item.labelEn;
+    const parent = { href: item.href, icon: item.icon, label: parentLabel };
+    const children = (item.children ?? []).map((child) => ({
+      href: child.href,
+      icon: item.icon,
+      label: language === "fr" ? child.labelFr : child.labelEn,
+    }));
+    return [parent, ...children.filter((child) => child.href !== item.href)];
+  }), [language]);
+  const currentLabel = useMemo(() => {
+    const exact = mobileItems.find((item) => item.href === pathname);
+    if (exact) return exact.label;
+    const fallback = [...mobileItems]
+      .sort((left, right) => right.href.length - left.href.length)
+      .find((item) => pathname.startsWith(`${item.href}/`));
+    return fallback?.label ?? (language === "fr" ? "Tableau de bord" : "Dashboard");
+  }, [language, mobileItems, pathname]);
+
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMobileMenuOpen(false);
+    };
+
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, []);
+
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [mobileMenuOpen]);
 
   return (
-    <nav className="admin-sidebar">
+    <nav className="admin-sidebar admin-sidebar--main">
+      <div className="admin-mobile-bar">
+        <div>
+          <span>{language === "fr" ? "Admin" : "Admin"}</span>
+          <strong>{currentLabel}</strong>
+        </div>
+        <button
+          className="admin-mobile-menu-button"
+          type="button"
+          aria-expanded={mobileMenuOpen}
+          aria-controls="admin-mobile-drawer"
+          onClick={() => setMobileMenuOpen(true)}
+        >
+          Menu
+        </button>
+      </div>
+
+      <div
+        className={`admin-mobile-overlay${mobileMenuOpen ? " admin-mobile-overlay--visible" : ""}`}
+        aria-hidden="true"
+        onClick={() => setMobileMenuOpen(false)}
+      />
+
+      <aside
+        id="admin-mobile-drawer"
+        className={`admin-mobile-drawer${mobileMenuOpen ? " admin-mobile-drawer--open" : ""}`}
+        aria-hidden={!mobileMenuOpen}
+      >
+        <div className="admin-mobile-drawer__head">
+          <div>
+            <span>{language === "fr" ? "Navigation" : "Navigation"}</span>
+            <strong>Administration</strong>
+          </div>
+          <button
+            className="admin-mobile-drawer__close"
+            type="button"
+            aria-label={language === "fr" ? "Fermer le menu admin" : "Close admin menu"}
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            x
+          </button>
+        </div>
+        <ul className="admin-mobile-drawer__nav">
+          {mobileItems.map((item) => {
+            const active = pathname === item.href;
+            return (
+              <li key={`${item.href}-${item.label}`}>
+                <Link
+                  href={item.href}
+                  className={`admin-mobile-drawer__link${active ? " active" : ""}`}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <span>{item.icon}</span>
+                  <strong>{item.label}</strong>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </aside>
+
       <div className="admin-sidebar-header">
         <h2>{language === "fr" ? "Administration" : "Administration"}</h2>
       </div>
