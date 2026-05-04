@@ -200,6 +200,15 @@ describe("AdminDashboardClient mobile table labels", () => {
     expect(screen.getByRole("link", { name: /Ouvrir support/ })).toHaveAttribute("href", "/admin/support");
     expect(screen.getByText("Backup")).toBeInTheDocument();
     expect(screen.getByText("Produit rupture")).toBeInTheDocument();
+    expect(screen.getByText("Actif, visible, achat public bloque.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Produit rupture/ })).toHaveAttribute(
+      "href",
+      "/admin/products#stock-actions",
+    );
+    expect(screen.getByRole("link", { name: "Traiter le stock" })).toHaveAttribute(
+      "href",
+      "/admin/products#stock-actions",
+    );
     expect(screen.getByRole("heading", { name: "Conversion" })).toBeInTheDocument();
     expect(screen.getByText("Vus sans ajout")).toBeInTheDocument();
     expect(screen.getByText("Paniers sans checkout")).toBeInTheDocument();

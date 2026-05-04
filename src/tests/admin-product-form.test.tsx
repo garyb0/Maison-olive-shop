@@ -1,5 +1,5 @@
 import { createElement, type ImgHTMLAttributes } from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { AdminProductsClient } from "@/app/admin/products/admin-products-client";
 
 const fetchMock = vi.fn();
@@ -92,6 +92,99 @@ describe("admin product form", () => {
     expect(screen.getByText("Produit créé.")).toBeInTheDocument();
   });
 
+  it("signale les produits actifs a stock 0 et permet de les remettre achetables", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        product: {
+          id: "prod_lit",
+          slug: "lit-douillet-anti-stress",
+          category: { name: "Beds" },
+          nameFr: "Lit douillet anti-stress",
+          nameEn: "Cozy anti-stress bed",
+          descriptionFr: "Lit test",
+          descriptionEn: "Test bed",
+          imageUrl: null,
+          priceCents: 4999,
+          currency: "CAD",
+          stock: 5,
+          isActive: true,
+          isSubscription: false,
+          priceWeekly: null,
+          priceBiweekly: null,
+          priceMonthly: null,
+          priceQuarterly: null,
+          createdAt: "2026-04-22T12:00:00.000Z",
+          _count: { orderItems: 4 },
+        },
+        movement: {
+          id: "movement_lit",
+          productId: "prod_lit",
+          quantityChange: 5,
+          reason: "restock",
+          order: null,
+          product: {
+            nameFr: "Lit douillet anti-stress",
+            nameEn: "Cozy anti-stress bed",
+          },
+          createdAt: "2026-05-04T12:00:00.000Z",
+        },
+      }),
+    });
+
+    render(
+      <AdminProductsClient
+        language="fr"
+        products={[
+          {
+            id: "prod_lit",
+            slug: "lit-douillet-anti-stress",
+            category: "Beds",
+            nameFr: "Lit douillet anti-stress",
+            nameEn: "Cozy anti-stress bed",
+            descriptionFr: "Lit test",
+            descriptionEn: "Test bed",
+            imageUrl: null,
+            priceCents: 4999,
+            currency: "CAD",
+            stock: 0,
+            isActive: true,
+            isSubscription: false,
+            priceWeekly: null,
+            priceBiweekly: null,
+            priceMonthly: null,
+            priceQuarterly: null,
+            orderHistoryCount: 4,
+            createdAt: "2026-04-22T10:00:00.000Z",
+          },
+        ]}
+        inventoryMovements={[]}
+      />,
+    );
+
+    const stockSection = screen.getByRole("region", { name: "Produits actifs non achetables" });
+    expect(within(stockSection).getByText("lit-douillet-anti-stress")).toBeInTheDocument();
+    expect(within(stockSection).getByText("Stock: 0")).toBeInTheDocument();
+    expect(within(stockSection).getByText("Achat bloque")).toBeInTheDocument();
+
+    fireEvent.change(within(stockSection).getByLabelText("Variation stock"), { target: { value: "5" } });
+    fireEvent.change(within(stockSection).getByLabelText("Raison"), { target: { value: "restock" } });
+    fireEvent.click(within(stockSection).getByRole("button", { name: "Ajuster" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+    const [, requestInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/admin/products/stock");
+    expect(JSON.parse(String(requestInit.body))).toMatchObject({
+      productId: "prod_lit",
+      quantityChange: 5,
+      reason: "restock",
+    });
+    await waitFor(() =>
+      expect(screen.queryByRole("region", { name: "Produits actifs non achetables" })).not.toBeInTheDocument(),
+    );
+  });
+
   it("archive les produits avec historique au lieu de proposer une suppression directe", async () => {
     fetchMock.mockResolvedValue({
       ok: true,
@@ -107,7 +200,7 @@ describe("admin product form", () => {
           imageUrl: null,
           priceCents: 50,
           currency: "CAD",
-          stock: 0,
+          stock: 1,
           isActive: false,
           isSubscription: false,
           priceWeekly: null,
@@ -135,7 +228,7 @@ describe("admin product form", () => {
             imageUrl: null,
             priceCents: 50,
             currency: "CAD",
-            stock: 0,
+            stock: 1,
             isActive: true,
             isSubscription: false,
             priceWeekly: null,

@@ -549,13 +549,17 @@ export function AdminDashboardClient({
   ];
   const lowStockActionItems: AdminActionItem[] = stockProducts.map((product) => ({
     id: product.id,
-    href: "/admin/products",
+    href: product.stock <= 0 ? "/admin/products#stock-actions" : "/admin/products",
     title: product.name,
     meta: product.slug,
     detail:
-      language === "fr"
-        ? `${product.stock} unite(s) en stock`
-        : `${product.stock} unit(s) in stock`,
+      product.stock <= 0
+        ? language === "fr"
+          ? "Actif, visible, achat public bloque."
+          : "Active, visible, public purchase blocked."
+        : language === "fr"
+          ? `${product.stock} unite(s) en stock`
+          : `${product.stock} unit(s) in stock`,
     badge: product.stock <= 0 ? (language === "fr" ? "Rupture" : "Out") : language === "fr" ? "Bas" : "Low",
   }));
   const lowButAvailableCount = Math.max(0, todayCockpit.lowStockCount - todayCockpit.outOfStockCount);
@@ -689,8 +693,8 @@ export function AdminDashboardClient({
                 ? `${todayCockpit.outOfStockCount} rupture(s), ${lowButAvailableCount} bas stock.`
                 : `${todayCockpit.outOfStockCount} out, ${lowButAvailableCount} low stock.`
             }
-            href="/admin/products"
-            actionLabel={language === "fr" ? "Ouvrir produits" : "Open products"}
+            href={todayCockpit.outOfStockCount > 0 ? "/admin/products#stock-actions" : "/admin/products"}
+            actionLabel={language === "fr" ? "Traiter le stock" : "Handle stock"}
             items={lowStockActionItems}
             emptyLabel={language === "fr" ? "Aucun produit critique." : "No critical product."}
             tone={todayCockpit.lowStockCount > 0 || todayCockpit.outOfStockCount > 0 ? "warn" : "default"}

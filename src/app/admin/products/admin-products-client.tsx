@@ -495,6 +495,7 @@ export function AdminProductsClient({ language, products, inventoryMovements }: 
 
   const activeCount = productItems.filter((product) => product.isActive).length;
   const archivedCount = productItems.filter((product) => !product.isActive).length;
+  const activeUnavailableProducts = productItems.filter((product) => product.isActive && product.stock <= 0);
   const filteredProducts = productItems.filter((product) => {
     if (productFilter === "ACTIVE") return product.isActive;
     if (productFilter === "ARCHIVED") return !product.isActive;
@@ -564,6 +565,86 @@ export function AdminProductsClient({ language, products, inventoryMovements }: 
 
         <ImageSelector isOpen={imageSelectorOpen} onClose={() => setImageSelectorOpen(false)} onSelect={(url) => setProductForm((current) => ({ ...current, imageUrl: url }))} language={language} />
       </section>
+
+      {activeUnavailableProducts.length > 0 ? (
+        <section className="section admin-stock-action-section" id="stock-actions" aria-labelledby="admin-stock-action-title">
+          <div className="admin-section-head">
+            <div>
+              <h2 id="admin-stock-action-title">
+                {language === "fr" ? "Produits actifs non achetables" : "Active products not buyable"}
+              </h2>
+              <p className="small">
+                {language === "fr"
+                  ? "Ces produits restent visibles, mais le checkout public demeure bloque tant que le stock est a 0."
+                  : "These products remain visible, but public checkout stays blocked while stock is 0."}
+              </p>
+            </div>
+            <span className="badge">
+              {language === "fr"
+                ? `${activeUnavailableProducts.length} a traiter`
+                : `${activeUnavailableProducts.length} to handle`}
+            </span>
+          </div>
+
+          <div className="admin-stock-action-list">
+            {activeUnavailableProducts.map((product) => {
+              const productName = language === "fr" ? product.nameFr : product.nameEn;
+              const alternateName = language === "fr" ? product.nameEn : product.nameFr;
+
+              return (
+                <article className="admin-stock-action-row" key={product.id}>
+                  <div className="admin-stock-action-copy">
+                    <strong>{productName}</strong>
+                    <span className="small">{alternateName}</span>
+                    <div className="admin-stock-action-meta">
+                      <span>{product.slug}</span>
+                      <span>Stock: {product.stock}</span>
+                      <span className="badge">{language === "fr" ? "Achat bloque" : "Purchase blocked"}</span>
+                    </div>
+                  </div>
+
+                  <div className="admin-stock-action-controls">
+                    <label className="field admin-stock-action-field">
+                      <span>{language === "fr" ? "Variation stock" : "Stock change"}</span>
+                      <input
+                        className="input"
+                        placeholder={language === "fr" ? "+5 ou -2" : "+5 or -2"}
+                        type="number"
+                        value={stockAdjustments[product.id] ?? ""}
+                        onChange={(e) =>
+                          setStockAdjustments((current) => ({ ...current, [product.id]: e.target.value }))
+                        }
+                      />
+                    </label>
+                    <label className="field admin-stock-action-field admin-stock-action-field--reason">
+                      <span>{language === "fr" ? "Raison" : "Reason"}</span>
+                      <input
+                        className="input"
+                        placeholder={language === "fr" ? "Raison" : "Reason"}
+                        value={stockReasons[product.id] ?? ""}
+                        onChange={(e) =>
+                          setStockReasons((current) => ({ ...current, [product.id]: e.target.value }))
+                        }
+                      />
+                    </label>
+                    <button
+                      className="btn btn-secondary"
+                      disabled={stockLoadingId === product.id}
+                      onClick={() => void submitStockAdjustment(product.id)}
+                      type="button"
+                    >
+                      {stockLoadingId === product.id ? "..." : language === "fr" ? "Ajuster" : "Adjust"}
+                    </button>
+                    <button className="btn" onClick={() => void toggleProductActive(product)} type="button">
+                      {getToggleLabel(product)}
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
 
       <section className="section">
         <div className="row" style={{ justifyContent: "space-between", alignItems: "center", gap: 12 }}>
