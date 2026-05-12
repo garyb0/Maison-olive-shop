@@ -7,7 +7,7 @@
     "dev:delivery": "next dev -p 3103",
     "build": "next build",
     "start": "next start",
-    "start:lan": "next start --hostname 0.0.0.0 --port 3101",
+    "start:lan": "next start --hostname 127.0.0.1 --port 3101",
     "test": "vitest run",
     "test:critical": "vitest run src/tests/maintenance.test.ts src/tests/admin-maintenance-route.test.ts src/tests/auth-login-route.test.ts src/tests/orders-delivery-zone.test.ts src/tests/subscription-checkout-route.test.ts src/tests/subscription-cancel-route.test.ts src/tests/stripe-webhook-route.test.ts",
     "test:module:auth": "vitest run src/tests/auth-login-route.test.ts src/tests/auth-login-verify-two-factor-route.test.ts src/tests/auth-forgot-password-route.test.ts src/tests/account-password-route.test.ts src/tests/account-sessions-route.test.ts src/tests/account-two-factor-route.test.ts src/tests/account-pages-auth-guard.test.tsx",
