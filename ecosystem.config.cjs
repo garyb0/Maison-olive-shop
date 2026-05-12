@@ -63,7 +63,7 @@ module.exports = {
       name: "chez-olive-shop",
       cwd: __dirname,
       script: "./node_modules/next/dist/bin/next",
-      args: "start --hostname 0.0.0.0 --port 3101",
+      args: "start --hostname 127.0.0.1 --port 3101",
       interpreter: "node",
       env: {
         NODE_ENV: "production",
