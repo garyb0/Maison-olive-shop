@@ -13,6 +13,36 @@ describe("proxy maintenance", () => {
     isMaintenanceEnabledMock.mockReturnValue(true);
   });
 
+  it("redirige HTTP public vers HTTPS avant la maintenance", async () => {
+    const { NextRequest } = await import("next/server");
+    const { proxy } = await import("@/proxy");
+
+    const request = new NextRequest("http://localhost:3101/products/example?ref=test", {
+      headers: {
+        "x-forwarded-host": "chezolive.ca",
+        "x-forwarded-proto": "http",
+      },
+    });
+
+    const response = await proxy(request);
+
+    expect(response.status).toBe(308);
+    expect(response.headers.get("location")).toBe("https://chezolive.ca/products/example?ref=test");
+  });
+
+  it("ne force pas HTTPS pour localhost", async () => {
+    isMaintenanceEnabledMock.mockReturnValue(false);
+
+    const { NextRequest } = await import("next/server");
+    const { proxy } = await import("@/proxy");
+
+    const request = new NextRequest("http://localhost:3101/products/example");
+    const response = await proxy(request);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("location")).toBeNull();
+  });
+
   it("reecrit un visiteur public vers maintenance", async () => {
     const { NextRequest } = await import("next/server");
     const { proxy } = await import("@/proxy");

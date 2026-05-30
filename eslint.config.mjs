@@ -14,6 +14,10 @@ const eslintConfig = defineConfig([
     "coverage/**",
     "audit-output/**",
     "output/**",
+    "android/**/build/**",
+    "android/app/src/main/assets/**",
+    "android/app/src/main/res/xml/config.xml",
+    "android/capacitor-cordova-android-plugins/**",
     "backups/delivery-checkpoints/**",
     "next-env.d.ts",
     // Node maintenance scripts (outside Next/TS app scope):

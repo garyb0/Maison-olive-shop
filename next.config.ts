@@ -20,6 +20,9 @@ const contentSecurityPolicy = [
 ].join("; ");
 
 const nextConfig: NextConfig = {
+  poweredByHeader: false,
+  ...(process.env.NEXT_DIST_DIR ? { distDir: process.env.NEXT_DIST_DIR } : {}),
+
   // Autoriser l'accès par IP locale en développement
   allowedDevOrigins: ['192.168.1.96', 'localhost:3101'],
 
@@ -33,11 +36,6 @@ const nextConfig: NextConfig = {
       {
         source: "/returns",
         destination: "/faq#retours",
-        permanent: true,
-      },
-      {
-        source: "/terms",
-        destination: "/faq#conditions",
         permanent: true,
       },
     ];

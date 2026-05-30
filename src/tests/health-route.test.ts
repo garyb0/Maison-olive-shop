@@ -18,6 +18,7 @@ describe("health route", () => {
   const previousVercelSha = process.env.VERCEL_GIT_COMMIT_SHA;
   const previousGitSha = process.env.GIT_COMMIT_SHA;
   const previousGitHead = process.env.npm_package_gitHead;
+  const previousHealthcheckDetailToken = process.env.HEALTHCHECK_DETAIL_TOKEN;
 
   beforeEach(() => {
     vi.resetModules();
@@ -29,6 +30,7 @@ describe("health route", () => {
     delete process.env.VERCEL_GIT_COMMIT_SHA;
     delete process.env.GIT_COMMIT_SHA;
     delete process.env.npm_package_gitHead;
+    delete process.env.HEALTHCHECK_DETAIL_TOKEN;
   });
 
   afterAll(() => {
@@ -43,11 +45,33 @@ describe("health route", () => {
 
     if (previousGitHead === undefined) delete process.env.npm_package_gitHead;
     else process.env.npm_package_gitHead = previousGitHead;
+
+    if (previousHealthcheckDetailToken === undefined) delete process.env.HEALTHCHECK_DETAIL_TOKEN;
+    else process.env.HEALTHCHECK_DETAIL_TOKEN = previousHealthcheckDetailToken;
   });
 
-  it("expose une release non vide en fallback", async () => {
+  it("expose seulement l'etat minimal publiquement", async () => {
     const { GET } = await import("@/app/api/health/route");
-    const response = await GET();
+    const response = await GET(new Request("https://chezolive.ca/api/health"));
+    const payload = (await response.json()) as Record<string, unknown>;
+
+    expect(response.status).toBe(200);
+    expect(payload).toEqual({ ok: true });
+    expect(payload).not.toHaveProperty("release");
+    expect(payload).not.toHaveProperty("version");
+    expect(payload).not.toHaveProperty("service");
+    expect(payload).not.toHaveProperty("checks");
+  });
+
+  it("expose une release non vide en fallback avec le bearer interne", async () => {
+    process.env.HEALTHCHECK_DETAIL_TOKEN = "health-detail-token";
+
+    const { GET } = await import("@/app/api/health/route");
+    const response = await GET(
+      new Request("https://chezolive.ca/api/health", {
+        headers: { authorization: "Bearer health-detail-token" },
+      }),
+    );
     const payload = (await response.json()) as { release?: string; ok?: boolean };
 
     expect(response.status).toBe(200);
@@ -57,11 +81,16 @@ describe("health route", () => {
     expect(payload.release).not.toBe("unknown");
   });
 
-  it("priorise APP_RELEASE quand defini", async () => {
+  it("priorise APP_RELEASE quand defini avec le bearer interne", async () => {
     process.env.APP_RELEASE = "manual-release-42";
+    process.env.HEALTHCHECK_DETAIL_TOKEN = "health-detail-token";
 
     const { GET } = await import("@/app/api/health/route");
-    const response = await GET();
+    const response = await GET(
+      new Request("https://chezolive.ca/api/health", {
+        headers: { authorization: "Bearer health-detail-token" },
+      }),
+    );
     const payload = (await response.json()) as { release?: string };
 
     expect(response.status).toBe(200);

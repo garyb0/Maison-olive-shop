@@ -25,7 +25,7 @@ describe("site url helpers", () => {
     expect(isSecureSiteUrl("http://chezolive.ca")).toBe(false);
   });
 
-  it("falls back to request origin only outside production", () => {
+  it("uses the request origin outside production", () => {
     expect(
       resolvePublicSiteUrl({
         nodeEnv: "development",
@@ -33,14 +33,31 @@ describe("site url helpers", () => {
         configuredUrl: "",
       }),
     ).toBe("https://preview.chezolive.ca");
+  });
 
+  it("uses forwarded public headers in production instead of localhost", () => {
     expect(
       resolvePublicSiteUrl({
         nodeEnv: "production",
-        request: new Request("https://preview.chezolive.ca/api/health"),
+        request: new Request("http://localhost:3101/api/health", {
+          headers: {
+            "x-forwarded-host": "chezolive.ca",
+            "x-forwarded-proto": "https",
+          },
+        }),
         configuredUrl: "",
       }),
-    ).toBe("http://localhost:3101");
+    ).toBe("https://chezolive.ca");
+  });
+
+  it("falls back to the public production URL when production only sees localhost", () => {
+    expect(
+      resolvePublicSiteUrl({
+        nodeEnv: "production",
+        request: new Request("http://localhost:3101/api/health"),
+        configuredUrl: "",
+      }),
+    ).toBe("https://chezolive.ca");
   });
 });
 

@@ -28,11 +28,17 @@ Créer des variables **production** (jamais dans Git):
 
 Stripe (si activé):
 - [ ] `STRIPE_SECRET_KEY` (live)
+- [ ] `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (live, clé publique `pk_live_...`)
 - [ ] `STRIPE_WEBHOOK_SECRET` (live)
 
 Email transactionnel (Resend):
 - [ ] `RESEND_API_KEY`
 - [ ] `RESEND_FROM_EMAIL` (domaine vérifié)
+
+Notifications / connexions optionnelles:
+- [ ] Web Push configuré si les notifications navigateur sont offertes (`WEB_PUSH_*` + `NEXT_PUBLIC_WEB_PUSH_PUBLIC_KEY`)
+- [ ] Firebase configuré si les notifications Android natives sont envoyées (`FIREBASE_*`)
+- [ ] Google OAuth configuré si le bouton Google est visible (`GOOGLE_OAUTH_*`)
 
 ---
 
@@ -128,17 +134,20 @@ Note:
 - [ ] Worker Cloudflare de maintenance prêt à activer en cas de panne origin
 - [ ] `npm run ops:status` passe sans `FAIL`
 - [ ] `ops:status` confirme PM2, release, backups, push/env et dernier smoke account
-- [ ] Backup horaire Windows actif et caché (`MaisonOlive-DB-Backup-Hourly`)
-- [ ] Diagnostic backup horaire OK: `npm run ops:backup-hourly:diagnose`
-- [ ] Aucun popup CMD/PowerShell visible après lancement manuel de la tâche horaire
+- [ ] Politique backup respectée: ne pas réactiver `MaisonOlive-DB-Backup`, `MaisonOlive-DB-Backup-Hourly` ou `MaisonOlive-DB-Backup-Health` sans demande explicite de Gary
+- [ ] Backup manuel récent effectué avant release sensible: `npm run db:backup -- manual`
+- [ ] Si Gary demande de réactiver le backup Windows: diagnostic backup horaire OK (`npm run ops:backup-hourly:diagnose`)
 
-### Backup horaire invisible Windows
+### Backup Windows
 
 ```powershell
-# Réinstaller/forcer la tâche horaire cachée
+# Backup manuel autorisé
+npm run db:backup -- manual
+
+# Réinstaller/forcer la tâche horaire cachée seulement si Gary le demande explicitement
 npm run ops:backup-hourly:install
 
-# Voir état, action, dernier résultat et logs récents
+# Voir état, action, dernier résultat et logs récents seulement si la tâche est volontairement active
 npm run ops:backup-hourly:diagnose
 
 # Santé complète ops
@@ -146,6 +155,7 @@ npm run ops:status
 ```
 
 Notes:
+- Ne pas réactiver les tâches Windows `MaisonOlive-DB-Backup`, `MaisonOlive-DB-Backup-Hourly` ou `MaisonOlive-DB-Backup-Health` sans demande explicite de Gary.
 - La tâche horaire doit utiliser `powershell.exe -WindowStyle Hidden -File scripts/windows/db-backup-hourly-hidden.ps1`.
 - Le vieux wrapper `scripts/windows/db-backup-hourly.cmd` ne doit pas être l'action de la tâche horaire.
 - Les logs horaires sont dans `maison-olive-data/logs` et le wrapper garde environ 14 jours de logs.

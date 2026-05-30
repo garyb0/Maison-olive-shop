@@ -9,6 +9,37 @@ const MAINTENANCE_BYPASS_PREFIXES = ['/admin', '/login', '/forgot-password', '/r
 const MAINTENANCE_BYPASS_EXACT = ['/maintenance', '/api/health', '/favicon.ico', '/robots.txt', '/sitemap.xml']
 const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 const CROSS_SITE_API_EXEMPT_PREFIXES = ['/api/stripe/webhook', '/api/support/email-reply']
+const LOCALHOST_NAMES = new Set(['localhost', '127.0.0.1', '::1'])
+
+function getForwardedHost(request: NextRequest) {
+  return request.headers.get('x-forwarded-host')?.split(',')[0]?.trim() || request.headers.get('host')?.trim() || request.nextUrl.host
+}
+
+function getHostnameFromHost(host: string) {
+  const value = host.trim().toLowerCase()
+  if (value.startsWith('[')) {
+    const closingBracket = value.indexOf(']')
+    if (closingBracket > 0) return value.slice(1, closingBracket)
+  }
+
+  const colonCount = value.match(/:/g)?.length ?? 0
+  if (colonCount > 1) return value
+
+  return value.split(':')[0]
+}
+
+function isLocalhostHost(host: string) {
+  return LOCALHOST_NAMES.has(getHostnameFromHost(host))
+}
+
+function shouldRedirectToHttps(request: NextRequest) {
+  const host = getForwardedHost(request)
+  if (!host || isLocalhostHost(host)) return false
+
+  const forwardedProto = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim().toLowerCase()
+  const protocol = forwardedProto || request.nextUrl.protocol.replace(/:$/, '').toLowerCase()
+  return protocol === 'http'
+}
 
 function normalizeOrigin(value: string | null) {
   if (!value) return null
@@ -55,6 +86,11 @@ function isCrossSiteApiMutation(request: NextRequest, path: string) {
 
 export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname
+
+  if (shouldRedirectToHttps(request)) {
+    const redirectUrl = new URL(`${request.nextUrl.pathname}${request.nextUrl.search}`, `https://${getForwardedHost(request)}`)
+    return NextResponse.redirect(redirectUrl, 308)
+  }
 
   // Toujours laisser passer les ressources statiques
   if (

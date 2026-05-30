@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 
@@ -90,7 +91,7 @@ function createWorktreeSnapshotCommit(options: {
   headCommitSha: string;
   label: string;
 }) {
-  const tempDir = fs.mkdtempSync(path.join(options.checkpointDir, ".git-snapshot-"));
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "chez-olive-git-snapshot-"));
   const tempIndexPath = path.join(tempDir, "index");
   const indexEnv = { GIT_INDEX_FILE: tempIndexPath };
 

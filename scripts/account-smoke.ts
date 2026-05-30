@@ -582,6 +582,7 @@ async function prepareSmokeProduct(
         method: "POST",
         json: {
           slug: SMOKE_PRODUCT_SLUG,
+          sku: "SMOKE-ACCOUNT",
           category: "Smoke QA",
           nameFr: "Produit smoke compte",
           nameEn: "Account smoke product",

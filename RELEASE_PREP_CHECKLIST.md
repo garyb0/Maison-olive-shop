@@ -42,7 +42,6 @@ npm run test:e2e:mobile-solid
 npm run test:e2e:delivery-solid
 npm run validate:env:prod
 npm run db:backup -- release-check
-npm run db:backup:hourly
 npm run db:backup:health
 npm run ops:status
 npm run build
@@ -79,8 +78,9 @@ npm run test:e2e:delivery-solid
 - Ne jamais committer `.env*`, `*.db`, `backups/`, `logs/` ou des exports clients.
 - Ne jamais mettre `SESSION_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `RESEND_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_MAPS_API_KEY` ou donnees privees de depot dans les `.env*` du repo.
 - Avant migration Prisma ou release sensible, lancer `npm run db:backup -- before-release`.
-- Garder `MaisonOlive-DB-Backup` actif pour le backup quotidien et `MaisonOlive-DB-Backup-Health` actif pour verifier les backups.
-- `MaisonOlive-DB-Backup-Hourly` doit utiliser `scripts/windows/db-backup-hourly-hidden.ps1` pour eviter les fenetres CMD visibles. Si la tache est desactivee temporairement, la reactiver avec `Enable-ScheduledTask -TaskName "MaisonOlive-DB-Backup-Hourly"` apres test manuel.
+- Ne pas reactiver les taches Windows `MaisonOlive-DB-Backup`, `MaisonOlive-DB-Backup-Hourly` ou `MaisonOlive-DB-Backup-Health` sans demande explicite de Gary.
+- Les backups manuels restent autorises avec `npm run db:backup -- manual` ou un label de release explicite.
+- Si Gary demande de reactiver le backup Windows, `MaisonOlive-DB-Backup-Hourly` doit utiliser `scripts/windows/db-backup-hourly-hidden.ps1` pour eviter les fenetres CMD visibles.
 - Lancer `npm run db:backup:health` apres les changements serveur pour verifier que le dernier backup s'ouvre et passe `PRAGMA integrity_check`.
 - Si un secret est affiche dans un log, le considerer compromis et le remplacer.
 - Les vrais secrets Stripe, OpenAI, email et session doivent rester serveur-only.
@@ -115,6 +115,16 @@ Cette recette complete les tests Playwright; elle ne remplace pas les smokes aut
 - Remplacer les fichiers secrets locaux par un vrai gestionnaire hote/PM2/Windows env si le serveur est transfere a une autre machine.
 - Ajouter une copie hors machine des backups: disque externe, NAS ou stockage cloud chiffre.
 - Planifier une retention de backups: quotidien 14 jours, hebdomadaire 8 semaines, mensuel 12 mois.
+- Valider un abonnement Stripe live end-to-end avant de pousser les produits recurrents: checkout, webhook, affichage compte/admin et annulation.
+- Revoir le produit `lit-douillet-anti-stress` si `ops:status` le signale encore actif avec stock 0: restocker, desactiver, ou le retirer temporairement de la vitrine.
+
+## Triage paquet release 2026-05-18
+
+- Worktree: gros paquet en cours, a decouper en commits thematiques plutot qu'un commit unique.
+- Migrations Prisma a inclure avec `prisma/schema.prisma`: `20260504173000_add_native_push_tokens`, `20260506205000_add_product_subcategories`, `20260507001000_add_google_oauth_accounts`, `20260508143500_add_product_sku_barcode`, `20260513102000_add_dog_qr_scan_history`.
+- Android / Google Play: inclure `android/`, `capacitor.config.ts`, `capacitor-www/` et `play-store/` seulement si la release Android part dans le meme paquet; garder `android/app/google-services.json`, `android/key.properties` et les keystores hors Git.
+- Assets `public/Logo/`: les 6 nouveaux PNG ne sont pas references par le code au 2026-05-18; commit uniquement les images utilisees par les produits ou l'admin image library, puis retirer ou externaliser les doublons/scratch avant release.
+- Artefacts locaux: ne pas committer `.homecore-integration-3101.log`, `.next/`, `test-results/`, backups, logs ou exports clients.
 
 ## Etat de ce serveur
 

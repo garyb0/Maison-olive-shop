@@ -1336,6 +1336,7 @@ async function main() {
           method: "POST",
           json: {
             slug: SMOKE_PRODUCT_SLUG,
+            sku: "SMOKE-DELIVERY",
             category: "Smoke QA",
             nameFr: "Produit smoke livraison",
             nameEn: "Delivery smoke product",

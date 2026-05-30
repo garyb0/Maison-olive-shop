@@ -55,6 +55,12 @@ const optionalAppEnv = pickEnv([
   "WEB_PUSH_PRIVATE_KEY",
   "WEB_PUSH_SUBJECT",
   "NEXT_PUBLIC_WEB_PUSH_PUBLIC_KEY",
+  "SMS_NOTIFICATIONS_ENABLED",
+  "SMS_DRY_RUN",
+  "TWILIO_ACCOUNT_SID",
+  "TWILIO_AUTH_TOKEN",
+  "TWILIO_MESSAGING_SERVICE_SID",
+  "TWILIO_FROM_NUMBER",
 ]);
 
 module.exports = {
@@ -63,7 +69,7 @@ module.exports = {
       name: "chez-olive-shop",
       cwd: __dirname,
       script: "./node_modules/next/dist/bin/next",
-      args: "start --hostname 0.0.0.0 --port 3101",
+      args: "start --hostname 127.0.0.1 --port 3101",
       interpreter: "node",
       env: {
         NODE_ENV: "production",

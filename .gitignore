@@ -28,6 +28,10 @@
 .DS_Store
 *.pem
 *.bundle
+android/app/google-services.json
+android/key.properties
+android/app/*.jks
+android/app/*.keystore
 
 # maintenance lock file (état dynamique, ne pas versionner)
 .maintenance-lock
@@ -41,9 +45,11 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 .next-dev*.log
+.homecore-integration-*.log
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 !.env.production.example
 scripts/windows/cloudflare-ddns.env
 cloudflared-config.yml

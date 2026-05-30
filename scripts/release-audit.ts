@@ -102,7 +102,7 @@ export function analyzeReleaseStatus(statusText: string, projectRoot = process.c
       : "PWA release paths are missing",
   });
 
-  const legacyHelpPages = ["src/app/shipping/page.tsx", "src/app/returns/page.tsx", "src/app/terms/page.tsx"];
+  const legacyHelpPages = ["src/app/shipping/page.tsx", "src/app/returns/page.tsx"];
   const removedLegacyHelpInStatus = legacyHelpPages
     .every((filePath) => statusLines.some((line) => line.startsWith(" D ") && pathFromStatusLine(line) === filePath));
   const legacyHelpRemovedFromTree = legacyHelpPages.every((filePath) => !fileExists(projectRoot, filePath));
@@ -111,15 +111,14 @@ export function analyzeReleaseStatus(statusText: string, projectRoot = process.c
     fileTextIncludes(projectRoot, "next.config.ts", 'destination: "/faq#livraison"') &&
     fileTextIncludes(projectRoot, "next.config.ts", 'source: "/returns"') &&
     fileTextIncludes(projectRoot, "next.config.ts", 'destination: "/faq#retours"') &&
-    fileTextIncludes(projectRoot, "next.config.ts", 'source: "/terms"') &&
-    fileTextIncludes(projectRoot, "next.config.ts", 'destination: "/faq#conditions"');
+    fileExists(projectRoot, "src/app/terms/page.tsx");
   const removedLegacyHelp = (removedLegacyHelpInStatus || legacyHelpRemovedFromTree) && redirectsPresent;
   items.push({
     level: removedLegacyHelp ? "pass" : "warn",
     name: "help-redirect-cleanup",
     details: removedLegacyHelp
-      ? "legacy help pages removed and redirects are present in next.config.ts"
-      : "legacy help cleanup or redirects are missing",
+      ? "legacy shipping/returns pages removed, redirects are present, and /terms exists as a legal page"
+      : "legacy help cleanup, redirects, or /terms legal page are missing",
   });
 
   return { items, statusLines };

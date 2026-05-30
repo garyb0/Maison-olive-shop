@@ -12,6 +12,9 @@ Ce document sert de runbook court pour le prochain sprint de mise en production.
    - `SESSION_SECRET` (fort, 32+ chars)
    - `NEXT_PUBLIC_SITE_URL` (domaine réel)
    - `DATABASE_URL`
+   - `RESEND_API_KEY` ou `SMTP_HOST` pour les courriels transactionnels
+   - Si Stripe est activé: `STRIPE_SECRET_KEY`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET`
+   - Si notifications activées: `WEB_PUSH_*` / `NEXT_PUBLIC_WEB_PUSH_PUBLIC_KEY` et, pour Android natif, `FIREBASE_*`
 3. Valider:
    ```bash
    npm run validate:env:prod
@@ -118,6 +121,13 @@ En cas d’incident, commence par:
   - webhook reçu,
   - abonnement visible côté compte/admin,
   - test d'annulation simple.
+
+## 4.2) Signal commercial ouvert — stock visible
+
+- Si `ops:status` signale encore `lit-douillet-anti-stress(0)`, choisir explicitement une action avant une release visible:
+  - restocker le produit,
+  - le désactiver temporairement,
+  - ou assumer la fiche visible en rupture si c'est voulu commercialement.
 
 ## 5) Go / No-Go
 

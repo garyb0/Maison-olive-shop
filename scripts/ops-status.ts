@@ -384,12 +384,17 @@ async function checkBusinessSignals(): Promise<Check> {
     `.catch(() => []);
     const hasConversionTable = conversionTables.length > 0;
 
-    const [lastOrder, recentOrderCount, criticalStockCount, criticalProducts] = await Promise.all([
+    const [lastOrder, lastAnyOrder, totalOrderCount, recentOrderCount, criticalStockCount, criticalProducts] = await Promise.all([
       prisma.order.findFirst({
         where: { status: { not: "CANCELLED" } },
         orderBy: { createdAt: "desc" },
         select: { orderNumber: true, createdAt: true },
       }),
+      prisma.order.findFirst({
+        orderBy: { createdAt: "desc" },
+        select: { orderNumber: true, createdAt: true, status: true },
+      }),
+      prisma.order.count(),
       prisma.order.count({
         where: {
           status: { not: "CANCELLED" },
@@ -418,7 +423,9 @@ async function checkBusinessSignals(): Promise<Check> {
       warnings.push(
         lastOrder
           ? `no order in ${noOrderWarnHours}h; last=${lastOrder.orderNumber} (${formatAgeHours(lastOrder.createdAt)})`
-          : `no order found in ${target} DB`,
+          : lastAnyOrder
+            ? `no non-cancelled order found in ${target} DB; totalOrders=${totalOrderCount}; lastAny=${lastAnyOrder.orderNumber} ${lastAnyOrder.status} (${formatAgeHours(lastAnyOrder.createdAt)})`
+            : `no order found in ${target} DB`,
       );
     }
     if ((checkoutErrorCount ?? 0) > 0) {

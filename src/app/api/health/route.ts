@@ -12,6 +12,19 @@ type DbHealth = {
 
 let cachedBuildId: string | null = null;
 
+function getBearerToken(request?: Request) {
+  const header = request?.headers.get("authorization") ?? "";
+  const [scheme, token] = header.split(" ");
+  if (scheme?.toLowerCase() !== "bearer" || !token) return "";
+  return token.trim();
+}
+
+function canReadHealthDetails(request?: Request) {
+  const expectedToken = process.env.HEALTHCHECK_DETAIL_TOKEN?.trim() ?? "";
+  const receivedToken = getBearerToken(request);
+  return Boolean(expectedToken && receivedToken && receivedToken === expectedToken);
+}
+
 function getBuildIdFromDisk(): string | null {
   if (cachedBuildId !== null) return cachedBuildId;
 
@@ -53,7 +66,7 @@ async function checkDbHealth(timeoutMs: number): Promise<DbHealth> {
   }
 }
 
-export async function GET() {
+export async function GET(request?: Request) {
   const db = await checkDbHealth(1200);
   const degraded = !db.ok;
   const buildId = getBuildIdFromDisk();
@@ -66,17 +79,21 @@ export async function GET() {
     buildId ??
     `v${version}`;
 
-  const payload = {
-    ok: !degraded,
-    degraded,
-    service: "chez-olive-shop",
-    version,
-    release,
-    timestamp: new Date().toISOString(),
-    checks: {
-      db,
-    },
-  };
+  const payload = canReadHealthDetails(request)
+    ? {
+        ok: !degraded,
+        degraded,
+        service: "chez-olive-shop",
+        version,
+        release,
+        timestamp: new Date().toISOString(),
+        checks: {
+          db,
+        },
+      }
+    : {
+        ok: !degraded,
+      };
 
   if (degraded) {
     logApiEvent({

@@ -115,15 +115,22 @@ Option admin (Task Scheduler ONLOGON):
 scripts\windows\create-onlogon-task-admin.cmd
 ```
 
-## 3.1) Ouverture LAN (port 3101)
+## 3.1) Accès réseau local (désactivé)
 
-Pour accès depuis d'autres appareils du réseau local, ouvrir le port 3101 en **terminal administrateur**:
+Pour des raisons de sécurité, **ne pas** exposer le port 3101 au LAN en HTTP.
 
-```bash
-scripts\windows\open-firewall-3101-admin.cmd
-```
+- garder l'application en écoute locale uniquement (`127.0.0.1:3101`)
+- utiliser Cloudflare Tunnel pour l'accès externe
+- ne pas créer de règle firewall entrante pour le port 3101
+
+Le script `scripts\windows\open-firewall-3101-admin.cmd` est conservé uniquement pour rappeler cette contrainte.
 
 ## 4) Backups et restauration
+
+Les backups automatiques Windows sont volontairement desactives pour eviter les
+lancements pendant les sessions de jeu. Ne pas reactiver les taches
+`MaisonOlive-DB-Backup`, `MaisonOlive-DB-Backup-Hourly` ou
+`MaisonOlive-DB-Backup-Health` sauf demande explicite de Gary.
 
 Backup manuel:
 
