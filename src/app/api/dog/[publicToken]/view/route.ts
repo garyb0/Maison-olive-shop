@@ -1,5 +1,6 @@
 import { createDogQrScanNotification } from "@/lib/app-notifications";
 import { getCurrentUser } from "@/lib/auth";
+import { recordDogQrScan } from "@/lib/dog-scans";
 import { jsonError, jsonOk } from "@/lib/http";
 import { prisma } from "@/lib/prisma";
 import { applyRateLimit } from "@/lib/rate-limit";
@@ -24,6 +25,7 @@ export async function POST(request: Request, context: RouteContext) {
           name: true,
           isActive: true,
           claimedAt: true,
+          lostModeEnabled: true,
         },
       }),
     ]);
@@ -32,13 +34,22 @@ export async function POST(request: Request, context: RouteContext) {
       return jsonOk({ ok: true, tracked: false });
     }
 
-    const notification = await createDogQrScanNotification({
+    await recordDogQrScan({
+      dogId: dog.id,
+      viewerUserId: viewer?.id ?? null,
+      eventType: "VIEW",
+      lostModeAtScan: dog.lostModeEnabled,
+      request,
+    });
+
+    await createDogQrScanNotification({
       userId: dog.userId,
       dogId: dog.id,
       dogName: dog.name,
+      lostMode: dog.lostModeEnabled,
     });
 
-    return jsonOk({ ok: true, tracked: Boolean(notification) });
+    return jsonOk({ ok: true, tracked: true });
   } catch {
     return jsonError("Unable to record dog QR view", 500);
   }

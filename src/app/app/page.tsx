@@ -17,7 +17,12 @@ import { AppNotificationCenter } from "./app-notification-center";
 import { PwaDriverAccessCard } from "./pwa-driver-access-card";
 import { PwaInstallPanel } from "./pwa-install-panel";
 import { PwaServiceWorkerRegister } from "./pwa-service-worker-register";
-import { PwaSupportButton } from "./pwa-support-button";
+import { NativeAppRuntime } from "./native-app-runtime";
+import { CartResumeBanner } from "./cart-resume-banner";
+import { GoogleAuthButton } from "@/components/GoogleAuthButton";
+import { NavIcon } from "@/components/NavIcon";
+import { isGoogleOAuthConfigured } from "@/lib/google-oauth";
+import type { NavigationIconKey } from "@/lib/navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +39,14 @@ type HubLink = {
   eyebrow: string;
   title: string;
   text: string;
+};
+
+type PremiumAction = {
+  href: string;
+  icon: NavigationIconKey;
+  title: string;
+  text: string;
+  meta: string;
 };
 
 type CustomerSnapshot = {
@@ -102,6 +115,21 @@ function HubCard({ item }: { item: HubLink }) {
   );
 }
 
+function PremiumActionCard({ item }: { item: PremiumAction }) {
+  return (
+    <Link className="pwa-premium-action-card" href={item.href}>
+      <span className="pwa-premium-action-icon">
+        <NavIcon name={item.icon} size={20} />
+      </span>
+      <span className="pwa-premium-action-copy">
+        <strong>{item.title}</strong>
+        <small>{item.text}</small>
+      </span>
+      <em>{item.meta}</em>
+    </Link>
+  );
+}
+
 function StatCard({
   href,
   label,
@@ -142,11 +170,11 @@ function formatCurrency(cents: number, language: "fr" | "en") {
 function orderStatusLabel(status: string, language: "fr" | "en") {
   const fr: Record<string, string> = {
     PENDING: "en attente",
-    PAID: "payee",
-    PROCESSING: "en preparation",
-    SHIPPED: "expediee",
-    DELIVERED: "livree",
-    CANCELLED: "annulee",
+    PAID: "payée",
+    PROCESSING: "en préparation",
+    SHIPPED: "expédiée",
+    DELIVERED: "livrée",
+    CANCELLED: "annulée",
   };
   const en: Record<string, string> = {
     PENDING: "pending",
@@ -162,10 +190,10 @@ function orderStatusLabel(status: string, language: "fr" | "en") {
 function runStatusLabel(status: string, language: "fr" | "en") {
   const fr: Record<string, string> = {
     DRAFT: "brouillon",
-    PUBLISHED: "publiee",
+    PUBLISHED: "publiée",
     IN_PROGRESS: "en cours",
-    COMPLETED: "terminee",
-    CANCELLED: "annulee",
+    COMPLETED: "terminée",
+    CANCELLED: "annulée",
   };
   const en: Record<string, string> = {
     DRAFT: "draft",
@@ -179,11 +207,11 @@ function runStatusLabel(status: string, language: "fr" | "en") {
 
 function deliveryStatusLabel(status: string, language: "fr" | "en") {
   const fr: Record<string, string> = {
-    SCHEDULED: "planifiee",
+    SCHEDULED: "planifiée",
     OUT_FOR_DELIVERY: "sur la route",
-    DELIVERED: "livree",
-    FAILED: "echec",
-    RESCHEDULED: "a replanifier",
+    DELIVERED: "livrée",
+    FAILED: "échec",
+    RESCHEDULED: "à replanifier",
   };
   const en: Record<string, string> = {
     SCHEDULED: "scheduled",
@@ -326,51 +354,154 @@ async function getAdminSnapshot(): Promise<AdminSnapshot | null> {
 
 export default async function PwaAppPage() {
   const [language, user] = await Promise.all([getCurrentLanguage(), getCurrentUser()]);
+  const googleOAuthEnabled = isGoogleOAuthConfigured();
   const [customerSnapshot, adminSnapshot, notificationSnapshot] = await Promise.all([
     getCustomerSnapshot(user ?? undefined),
     user?.role === "ADMIN" ? getAdminSnapshot() : Promise.resolve(null),
     user ? getNotificationSnapshot(user) : Promise.resolve(null),
   ]);
   const webPushPublicKey = getWebPushPublicKey();
+  const latestOrder = customerSnapshot?.latestOrder ?? null;
+  const latestOrderText = latestOrder
+    ? `${orderStatusLabel(latestOrder.status, language)} - ${formatCurrency(latestOrder.totalCents, language)}`
+    : language === "fr"
+      ? "Aucune commande active"
+      : "No active order";
 
-  const customerLinks: HubLink[] = [
+  const primaryAction: PremiumAction = latestOrder
+    ? {
+        href: "/account/orders",
+        icon: "orders",
+        title: language === "fr" ? `Commande #${latestOrder.orderNumber}` : `Order #${latestOrder.orderNumber}`,
+        text: latestOrderText,
+        meta: language === "fr" ? "Suivre" : "Track",
+      }
+    : user
+      ? {
+          href: "/boutique",
+          icon: "catalog",
+          title: language === "fr" ? "Preparer une commande locale" : "Prepare a local order",
+          text: language === "fr" ? "Boutique, panier et livraison Rimouski." : "Shop, cart, and Rimouski delivery.",
+          meta: language === "fr" ? "Magasiner" : "Shop",
+        }
+      : {
+          href: "/login",
+          icon: "profile",
+          title: language === "fr" ? "Retrouver mon espace client" : "Open my customer space",
+          text: language === "fr" ? "Commandes, profils chiens QR et support." : "Orders, QR dog profiles, and support.",
+          meta: language === "fr" ? "Connexion" : "Sign in",
+        };
+
+  const coreActions: PremiumAction[] = [
     {
       href: "/boutique",
-      eyebrow: language === "fr" ? "Boutique" : "Shop",
-      title: language === "fr" ? "Magasiner" : "Shop",
-      text: language === "fr" ? "Produits, categories et recherche rapide." : "Products, categories, and quick search.",
-    },
-    {
-      href: "/cart",
-      eyebrow: language === "fr" ? "Panier" : "Cart",
-      title: language === "fr" ? "Reprendre mon panier" : "Resume my cart",
-      text: language === "fr" ? "Verifier les items avant le checkout." : "Review items before checkout.",
+      icon: "catalog",
+      title: language === "fr" ? "Boutique" : "Shop",
+      text: language === "fr" ? "Recherche, categories et produits disponibles." : "Search, categories, and available products.",
+      meta: language === "fr" ? "Achat rapide" : "Quick buy",
     },
     {
       href: user ? "/account/orders" : "/login",
-      eyebrow: language === "fr" ? "Compte" : "Account",
-      title: language === "fr" ? "Mes commandes" : "My orders",
-      text: language === "fr" ? "Suivi, factures et statut de livraison." : "Tracking, invoices, and delivery status.",
+      icon: "orders",
+      title: language === "fr" ? "Commandes" : "Orders",
+      text: latestOrder
+        ? latestOrderText
+        : language === "fr"
+          ? "Historique, statuts et suivi."
+          : "History, statuses, and tracking.",
+      meta: user ? (language === "fr" ? "Voir" : "Open") : (language === "fr" ? "Connexion" : "Sign in"),
+    },
+    {
+      href: user ? "/account/support" : "/faq",
+      icon: "support",
+      title: "Support",
+      text: language === "fr" ? "Question, livraison ou aide apres achat." : "Questions, delivery, or after-sale help.",
+      meta: language === "fr" ? "Aide" : "Help",
     },
     {
       href: user ? "/account/dogs" : "/login",
-      eyebrow: "QR",
-      title: language === "fr" ? "Mes chiens" : "My dogs",
-      text: language === "fr" ? "Profils QR, infos utiles et contact." : "QR profiles, useful info, and contact.",
+      icon: "dog",
+      title: language === "fr" ? "Chiens QR" : "QR dogs",
+      text: language === "fr" ? "Profils utiles pour les colliers QR." : "Useful profiles for QR collars.",
+      meta: user ? "QR" : (language === "fr" ? "Compte" : "Account"),
+    },
+  ];
+
+  const secondaryActions: PremiumAction[] = [
+    {
+      href: "/cart",
+      icon: "cart",
+      title: language === "fr" ? "Panier" : "Cart",
+      text: language === "fr" ? "Revoir les articles avant le paiement." : "Review items before payment.",
+      meta: language === "fr" ? "Verifier" : "Review",
     },
     {
       href: user ? "/account/profile" : "/login",
-      eyebrow: language === "fr" ? "Profil" : "Profile",
-      title: language === "fr" ? "Adresses et securite" : "Addresses and security",
-      text: language === "fr" ? "Infos client, adresses et sessions." : "Customer info, addresses, and sessions.",
+      icon: "security",
+      title: language === "fr" ? "Profil et securite" : "Profile and security",
+      text: language === "fr" ? "Adresses, sessions et preferences." : "Addresses, sessions, and preferences.",
+      meta: language === "fr" ? "Gerer" : "Manage",
     },
     {
       href: "/faq",
-      eyebrow: language === "fr" ? "Aide" : "Help",
+      icon: "support",
       title: language === "fr" ? "Centre d'aide" : "Help center",
       text: language === "fr" ? "Livraison, retours, paiement et support." : "Delivery, returns, payment, and support.",
+      meta: "FAQ",
     },
   ];
+
+  const notificationSummary = notificationSnapshot
+    ? notificationSnapshot.unreadCount > 0
+      ? language === "fr"
+        ? `${notificationSnapshot.unreadCount} alerte(s) a lire`
+        : `${notificationSnapshot.unreadCount} alert(s) to read`
+      : notificationSnapshot.preferences.pushEnabled
+        ? language === "fr"
+          ? "Alertes push actives"
+          : "Push alerts active"
+        : language === "fr"
+          ? "Alertes visibles dans l'app"
+          : "Alerts visible in app"
+    : language === "fr"
+      ? "Installation, profil et options"
+      : "Install, profile, and options";
+
+  const accountSignals: Array<{ href: string; label: string; value: string; help: string }> = [];
+  if (latestOrder) {
+    accountSignals.push({
+      href: "/account/orders",
+      label: language === "fr" ? "Commande active" : "Active order",
+      value: `#${latestOrder.orderNumber}`,
+      help: latestOrderText,
+    });
+  }
+  if ((customerSnapshot?.dogWithoutPhoneCount ?? 0) > 0) {
+    accountSignals.push({
+      href: "/account/dogs",
+      label: language === "fr" ? "Chiens QR" : "QR dogs",
+      value: String(customerSnapshot?.dogWithoutPhoneCount ?? 0),
+      help: language === "fr" ? "Profil(s) sans telephone." : "Profile(s) missing phone.",
+    });
+  }
+  if ((customerSnapshot?.activeSupportCount ?? 0) > 0) {
+    accountSignals.push({
+      href: "/account/support",
+      label: "Support",
+      value: String(customerSnapshot?.activeSupportCount ?? 0),
+      help: language === "fr" ? "Conversation ouverte ou en attente." : "Open or waiting conversation.",
+    });
+  }
+  if (customerSnapshot && customerSnapshot.deliveryAddressCount === 0) {
+    accountSignals.push({
+      href: "/account/profile",
+      label: language === "fr" ? "Adresse" : "Address",
+      value: language === "fr" ? "A ajouter" : "To add",
+      help: language === "fr" ? "Utile pour accelerer le checkout." : "Helps speed up checkout.",
+    });
+  }
+
+  const accountNeedsAttention = accountSignals.length > 0;
 
   const adminLinks: HubLink[] = [
     {
@@ -389,7 +520,7 @@ export default async function PwaAppPage() {
       href: "/admin/delivery/runs",
       eyebrow: language === "fr" ? "Terrain" : "Field",
       title: language === "fr" ? "Tournees" : "Runs",
-      text: language === "fr" ? "Suivre les tournees chauffeur." : "Track driver runs.",
+      text: language === "fr" ? "Suivre les tournées chauffeur." : "Track driver runs.",
     },
     {
       href: "/admin/support",
@@ -402,135 +533,123 @@ export default async function PwaAppPage() {
   return (
     <div className="app-shell pwa-app-shell">
       <PwaServiceWorkerRegister />
+      <NativeAppRuntime nativePushEnabled={notificationSnapshot?.preferences.pushEnabled ?? false} />
       <PwaAppHeader language={language} userRole={user?.role ?? null} />
 
       <main className="pwa-hub" aria-labelledby="pwa-hub-title">
-        <section className="pwa-hero">
-          <div>
-            <p className="pwa-kicker">{language === "fr" ? "Application" : "App"}</p>
-            <h1 id="pwa-hub-title">Chez Olive</h1>
+        <section className="pwa-hero pwa-home-hero pwa-home-hero--compact">
+          <div className="pwa-home-hero__copy">
+            <div className="pwa-home-hero__eyebrow-row">
+              <p className="pwa-kicker">{language === "fr" ? "Application client" : "Customer app"}</p>
+              <span>{language === "fr" ? "Rimouski" : "Local"}</span>
+            </div>
+            <h1 id="pwa-hub-title">
+              {user
+                ? language === "fr"
+                  ? `Bonjour, ${user.firstName || "ami"}`
+                  : `Hi, ${user.firstName || "friend"}`
+                : language === "fr"
+                  ? "Bienvenue"
+                  : "Welcome"}
+            </h1>
             <p>
-              {language === "fr"
-                ? "Le raccourci mobile pour magasiner, suivre ton compte, gerer les profils QR et ouvrir les outils terrain."
-                : "The mobile shortcut to shop, follow your account, manage QR profiles, and open field tools."}
+              {user
+                ? language === "fr"
+                  ? "Les actions utiles d'abord; le reste reste disponible dans Plus."
+                  : "Useful actions first; everything else stays under More."
+                : language === "fr"
+                  ? "Boutique locale, commandes, profils QR et support dans un seul espace."
+                  : "Local shop, orders, QR profiles, and support in one place."}
             </p>
           </div>
-          <div className="pwa-hero-actions">
-            <Link className="btn" href="/boutique">
-              {language === "fr" ? "Ouvrir la boutique" : "Open shop"}
+          {!user ? (
+            <div className="pwa-hero-actions">
+              <Link className="btn" href="/boutique">
+                {language === "fr" ? "Boutique" : "Shop"}
+              </Link>
+              {googleOAuthEnabled ? (
+                <GoogleAuthButton language={language} returnTo="/app" />
+              ) : (
+                <Link className="btn btn-secondary" href="/login">
+                  {language === "fr" ? "Connexion" : "Sign in"}
+                </Link>
+              )}
+            </div>
+          ) : null}
+        </section>
+
+        <section
+          className="pwa-premium-dashboard pwa-premium-dashboard--focused"
+          aria-label={language === "fr" ? "Tableau de bord client" : "Customer dashboard"}
+        >
+          <div className="pwa-next-action-card">
+            <div className="pwa-next-action-copy">
+              <p className="pwa-kicker">{language === "fr" ? "Prochaine action" : "Next action"}</p>
+              <h2>{primaryAction.title}</h2>
+              <p>{primaryAction.text}</p>
+            </div>
+            <Link className="btn" href={primaryAction.href}>
+              <NavIcon name={primaryAction.icon} size={18} />
+              {primaryAction.meta}
             </Link>
-            {user ? (
-              <Link className="btn btn-secondary" href="/account">
-                {language === "fr" ? "Mon compte" : "My account"}
-              </Link>
-            ) : (
-              <Link className="btn btn-secondary" href="/login">
-                {language === "fr" ? "Se connecter" : "Sign in"}
-              </Link>
-            )}
+          </div>
+
+          <div className="pwa-premium-action-grid pwa-core-action-grid">
+            {coreActions.map((item) => <PremiumActionCard item={item} key={`${item.href}-${item.title}`} />)}
           </div>
         </section>
 
-        <PwaInstallPanel language={language} />
+        <CartResumeBanner language={language} />
 
-        {user && notificationSnapshot ? (
-          <AppNotificationCenter
-            language={language}
-            publicKey={webPushPublicKey}
-            userRole={user.role}
-            initialNotifications={notificationSnapshot.notifications}
-            initialUnreadCount={notificationSnapshot.unreadCount}
-            initialPreferences={notificationSnapshot.preferences}
-          />
-        ) : null}
-
-        {user ? (
-          <section className="pwa-hub-section pwa-account-snapshot" aria-label={language === "fr" ? "Resume du compte" : "Account summary"}>
+        {user && accountNeedsAttention ? (
+          <section className="pwa-hub-section pwa-account-snapshot pwa-account-snapshot--compact" aria-label={language === "fr" ? "Resume du compte" : "Account summary"}>
             <div className="pwa-section-head">
               <div>
-                <p className="pwa-kicker">{language === "fr" ? "Connecte" : "Signed in"}</p>
-                <h2>
-                  {language === "fr"
-                    ? `Bonjour, ${user.firstName || "ami"}`
-                    : `Hi, ${user.firstName || "friend"}`}
-                </h2>
-              </div>
-              <div className="pwa-shortcut-row" aria-label={language === "fr" ? "Raccourcis recents" : "Recent shortcuts"}>
-                <Link className="btn btn-secondary" href="/account/orders">
-                  {language === "fr" ? "Commandes" : "Orders"}
-                </Link>
-                <Link className="btn btn-secondary" href="/account/dogs">
-                  {language === "fr" ? "Chiens QR" : "QR dogs"}
-                </Link>
-                <Link className="btn btn-secondary" href="/account/support">
-                  Support
-                </Link>
+                <p className="pwa-kicker">{language === "fr" ? "A surveiller" : "Worth checking"}</p>
+                <h2>{language === "fr" ? "Resume utile" : "Useful summary"}</h2>
               </div>
             </div>
             <div className="pwa-stat-grid">
-              <StatCard
-                href="/account/orders"
-                label={language === "fr" ? "Commandes" : "Orders"}
-                value={String(customerSnapshot?.orderCount ?? 0)}
-                help={
-                  customerSnapshot?.latestOrder
-                    ? language === "fr"
-                      ? `Derniere #${customerSnapshot.latestOrder.orderNumber} - ${orderStatusLabel(customerSnapshot.latestOrder.status, language)} - ${formatCurrency(customerSnapshot.latestOrder.totalCents, language)}`
-                      : `Latest #${customerSnapshot.latestOrder.orderNumber} - ${orderStatusLabel(customerSnapshot.latestOrder.status, language)} - ${formatCurrency(customerSnapshot.latestOrder.totalCents, language)}`
-                    : language === "fr"
-                      ? "Aucune commande recente."
-                      : "No recent order."
-                }
-              />
-              <StatCard
-                href="/account/dogs"
-                label={language === "fr" ? "Profils chiens" : "Dog profiles"}
-                value={String(customerSnapshot?.dogCount ?? 0)}
-                help={
-                  (customerSnapshot?.dogWithoutPhoneCount ?? 0) > 0
-                    ? language === "fr"
-                      ? `${customerSnapshot?.dogWithoutPhoneCount} profil(s) sans telephone.`
-                      : `${customerSnapshot?.dogWithoutPhoneCount} profile(s) missing phone.`
-                    : language === "fr"
-                      ? "Colliers QR actifs dans ton compte."
-                      : "Active QR collars in your account."
-                }
-              />
-              <StatCard
-                href="/account/support"
-                label="Support"
-                value={String(customerSnapshot?.activeSupportCount ?? 0)}
-                help={language === "fr" ? "Conversation ouverte ou en attente." : "Open or waiting conversation."}
-              />
-            </div>
-            <div className="pwa-action-strip">
-              <Link className="pwa-action-pill" href="/cart">
-                {language === "fr" ? "Reprendre mon panier" : "Resume cart"}
-              </Link>
-              <Link className="pwa-action-pill" href="/account/orders">
-                {language === "fr" ? "Commander encore" : "Order again"}
-              </Link>
-              <Link className="pwa-action-pill" href="/account/profile">
-                {(customerSnapshot?.deliveryAddressCount ?? 0) > 0
-                  ? language === "fr" ? "Gerer mes adresses" : "Manage addresses"
-                  : language === "fr" ? "Ajouter une adresse" : "Add address"}
-              </Link>
+              {accountSignals.map((signal) => (
+                <StatCard
+                  href={signal.href}
+                  label={signal.label}
+                  value={signal.value}
+                  help={signal.help}
+                  key={`${signal.href}-${signal.label}`}
+                />
+              ))}
             </div>
           </section>
         ) : null}
 
-        <section className="pwa-hub-section">
-          <div className="pwa-section-head">
-            <p className="pwa-kicker">{language === "fr" ? "Client" : "Customer"}</p>
-            <h2>{language === "fr" ? "Tout pour ton compte" : "Everything for your account"}</h2>
-            <PwaSupportButton language={language} />
-          </div>
-          <div className="pwa-hub-grid">
-            {customerLinks.map((item) => <HubCard key={item.href + item.title} item={item} />)}
-          </div>
-        </section>
+        <section className="pwa-hub-section pwa-more-section" aria-label={language === "fr" ? "Options secondaires" : "Secondary options"}>
+          <details className="pwa-more-panel">
+            <summary>
+              <span className="pwa-more-panel__title">{language === "fr" ? "Plus dans l'app" : "More in the app"}</span>
+              <span className="pwa-more-panel__meta">{notificationSummary}</span>
+            </summary>
+            <div className="pwa-more-content">
+              <div className="pwa-secondary-action-grid">
+                {secondaryActions.map((item) => <PremiumActionCard item={item} key={`${item.href}-${item.title}`} />)}
+              </div>
 
-        <PwaDriverAccessCard language={language} />
+              {user && notificationSnapshot ? (
+                <AppNotificationCenter
+                  language={language}
+                  publicKey={webPushPublicKey}
+                  userRole={user.role}
+                  initialNotifications={notificationSnapshot.notifications}
+                  initialUnreadCount={notificationSnapshot.unreadCount}
+                  initialPreferences={notificationSnapshot.preferences}
+                />
+              ) : null}
+
+              <PwaInstallPanel language={language} />
+              <PwaDriverAccessCard language={language} />
+            </div>
+          </details>
+        </section>
 
         {user?.role === "ADMIN" ? (
           <section className="pwa-hub-section pwa-admin-lite">
@@ -596,7 +715,7 @@ export default async function PwaAppPage() {
                       ? `${adminSnapshot.latestRun.dateKey} - ${runStatusLabel(adminSnapshot.latestRun.status, language)} - ${adminSnapshot.latestRun.stopCount} arrets`
                       : `${adminSnapshot.latestRun.dateKey} - ${runStatusLabel(adminSnapshot.latestRun.status, language)} - ${adminSnapshot.latestRun.stopCount} stops`
                     : language === "fr"
-                      ? "Aucune tournee active."
+                      ? "Aucune tournée active."
                       : "No active run."
                 }
               />

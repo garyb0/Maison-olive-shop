@@ -65,7 +65,7 @@ async function openAccountPage(page: Page, route: string, title: RegExp) {
   await page.waitForLoadState("domcontentloaded");
   await expect(page.getByRole("heading", { name: title }).first()).toBeVisible();
   await expectNoHorizontalOverflow(page);
-  await expectMinTapSize(page.locator(".account-sidebar .admin-nav-item").first(), "account nav first item");
+  await expectMinTapSize(page.locator(".account-mobile-account-tab").first(), "account mobile nav first item");
 }
 
 test.describe("authenticated mobile account smoke", () => {
@@ -79,6 +79,7 @@ test.describe("authenticated mobile account smoke", () => {
     await page.goto("/app");
     await page.waitForLoadState("domcontentloaded");
 
+    await page.locator(".pwa-more-panel > summary").click();
     await expect(page.getByRole("heading", { name: "Centre d'actions" })).toBeVisible();
     await expect(page.getByText("In-app actif")).toBeVisible();
     await expect(page.getByRole("button", { name: "Tester une notification" })).toBeVisible();
@@ -93,10 +94,10 @@ test.describe("authenticated mobile account smoke", () => {
     await expect(page.getByText(email)).toBeVisible();
     await screenshot(page, "account-dashboard.png");
 
-    await openAccountPage(page, "/account/orders", /mes commandes|my orders/i);
+    await openAccountPage(page, "/account/orders", /centre de commandes|order center|mes commandes|my orders/i);
     if (orderNumber) {
       await expect(page.getByText(orderNumber).first()).toBeVisible();
-      await expectMinTapSize(page.locator(".account-order-card__detail-link").first(), "order detail link");
+      await expectMinTapSize(page.getByRole("link", { name: /Voir le détail|View details/i }).first(), "order detail link");
     }
     await screenshot(page, "account-orders.png");
 
@@ -124,7 +125,7 @@ test.describe("authenticated mobile account smoke", () => {
     await screenshot(page, "account-subscriptions.png");
 
     await openAccountPage(page, "/account/support", /support client|customer support/i);
-    await expectMinTapSize(page.locator(".account-main a, .account-main button").first(), "support primary action");
+    await expectMinTapSize(page.locator(".account-support-card__cta").first(), "support primary action");
     await screenshot(page, "account-support.png");
   });
 

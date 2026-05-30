@@ -80,13 +80,18 @@ async function firstAvailableProduct(page: Page) {
 test.describe("solid mobile release recipe", () => {
   test("public, app, account and admin surfaces are mobile-stable", async ({ page }, testInfo) => {
     const routes = [
-      { path: "/?home=1", name: "01-home", heading: /De notre famille/i, tapTarget: ".home-hero-primary" },
+      { path: "/?home=1", name: "01-home", heading: /Boutique locale, achat direct/i, tapTarget: ".home-hero-primary" },
       { path: "/boutique", name: "02-boutique", heading: /Catalogue|Catalog/i, tapTarget: ".catalog-side-link" },
       { path: "/faq", name: "03-faq", heading: /Comment peut-on|How can we help/i, tapTarget: ".help-anchor-nav a" },
-      { path: "/cart", name: "04-cart", heading: /panier|cart/i, tapTarget: ".nav-marketplace-cart, .nav-hamburger" },
+      {
+        path: "/cart",
+        name: "04-cart",
+        heading: /panier|cart/i,
+        tapTarget: ".pwa-app-header a[href='/cart'], .nav-marketplace-cart, .nav-hamburger",
+      },
       { path: "/account", name: "05-account-guard", heading: /Connecte-toi|Sign in/i, tapTarget: ".account-access-actions .btn" },
       { path: "/admin", name: "06-admin-guard", heading: /Administration|Admin/i, tapTarget: ".btn, .admin-mobile-menu-button" },
-      { path: "/app", name: "07-app", heading: /^Chez Olive$/i, tapTarget: ".pwa-app-header__brand" },
+      { path: "/app", name: "07-app", heading: /Bienvenue|Welcome/i, tapTarget: ".pwa-app-header__brand" },
     ];
 
     let publicHeaderHeight: number | null = null;
@@ -98,7 +103,7 @@ test.describe("solid mobile release recipe", () => {
       await expectNoHorizontalOverflow(page);
 
       const publicHeader = page.locator(".nav-marketplace").first();
-      if (await publicHeader.count()) {
+      if ((await publicHeader.count()) && (await publicHeader.isVisible())) {
         const height = await publicHeader.evaluate((element) => element.getBoundingClientRect().height);
         if (publicHeaderHeight === null) {
           publicHeaderHeight = height;
@@ -123,7 +128,7 @@ test.describe("solid mobile release recipe", () => {
     await expectNoHorizontalOverflow(page);
     await expect(page.locator(".olive-product-add-btn").first()).toBeVisible();
     await expectMinTapSize(page.locator(".olive-product-add-btn").first(), "product add button");
-    await expect(page.locator(".olive-product-trust-grid")).toContainText(/Livraison locale|Local delivery/i);
+    await expect(page.locator(".olive-product-purchase-note")).toContainText(/Livraison locale|Local delivery/i);
     await capture(page, testInfo, "08-product");
 
     await page.evaluate((productId) => {
@@ -153,11 +158,46 @@ test.describe("solid mobile release recipe", () => {
 
     await page.goto("/app");
     await page.waitForLoadState("domcontentloaded");
-    await expect(page.getByRole("heading", { name: /^Chez Olive$/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Bienvenue|Welcome/i })).toBeVisible();
+    await page.locator(".pwa-more-panel > summary").click();
     await expect(page.getByRole("region", { name: "Installer Chez Olive" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Se connecter" })).toHaveAttribute("href", "/login");
+    await expect(page.locator("a[href^='/login']").first()).toBeVisible();
     await expect(page.getByRole("heading", { name: "Centre d'actions" })).toHaveCount(0);
     await expectNoHorizontalOverflow(page);
     await capture(page, testInfo, "11-app-install-optional-public");
+  });
+
+  test("native boutique shows a compact two-column product grid", async ({ page }, testInfo) => {
+    await page.goto("/boutique?native=1");
+    await page.waitForLoadState("domcontentloaded");
+
+    await expect(page.locator("html")).toHaveClass(/is-capacitor-native/);
+    await expectNoHorizontalOverflow(page);
+
+    const cards = page.locator(".catalog-product-card");
+    const cardCount = await cards.count();
+    test.skip(cardCount < 2, "Native boutique density needs at least two products in the catalog.");
+
+    const firstCard = cards.nth(0);
+    const secondCard = cards.nth(1);
+    await expect(firstCard).toBeVisible();
+    await expect(secondCard).toBeVisible();
+
+    const [firstBox, secondBox] = await Promise.all([firstCard.boundingBox(), secondCard.boundingBox()]);
+    expect(firstBox, "first product card box").not.toBeNull();
+    expect(secondBox, "second product card box").not.toBeNull();
+    expect(Math.abs(firstBox!.y - secondBox!.y), "first two products should share the same row").toBeLessThanOrEqual(4);
+    expect(secondBox!.x, "second product should sit in the second column").toBeGreaterThan(firstBox!.x + firstBox!.width * 0.75);
+
+    await expect(firstCard.locator(".catalog-stock-pill")).toBeVisible();
+    await expect(firstCard.locator(".catalog-product-price")).toBeVisible();
+    await expect(firstCard.locator(".catalog-product-seller")).toBeHidden();
+    await expect(firstCard.locator(".catalog-product-rating")).toBeHidden();
+    await expect(firstCard.locator(".catalog-product-fast-note")).toBeHidden();
+    await expect(firstCard.locator(".catalog-product-view")).toBeHidden();
+    await expectMinTapSize(firstCard.locator(".catalog-product-add"), "native boutique add button");
+    await expectMinTapSize(firstCard.locator(".product-share__primary"), "native boutique share button");
+
+    await capture(page, testInfo, "12-native-boutique-compact-grid");
   });
 });

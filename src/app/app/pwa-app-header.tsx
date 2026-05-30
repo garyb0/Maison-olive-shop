@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { NavIcon } from "@/components/NavIcon";
 import type { Language } from "@/lib/i18n";
 import type { UserRole } from "@/lib/types";
 
@@ -62,20 +63,22 @@ export function PwaAppHeader({ language, userRole }: Props) {
         />
         <span>
           <strong>Chez Olive</strong>
-          <small>{language === "fr" ? "App" : "App"}</small>
+          <small>{language === "fr" ? "Application client" : "Customer app"}</small>
         </span>
       </Link>
 
       <nav className="pwa-app-header__actions" aria-label={language === "fr" ? "Actions application" : "App actions"}>
         <Link className="pwa-app-header__action" href="/cart" aria-label={language === "fr" ? `Panier ${cartCount}` : `Cart ${cartCount}`}>
-          <span aria-hidden="true">Panier</span>
+          <NavIcon name="cart" size={18} />
           <em>{cartCount}</em>
         </Link>
         <Link className="pwa-app-header__action" href={userRole ? "/account" : "/login"}>
+          <NavIcon name="profile" size={18} />
           {userRole ? (language === "fr" ? "Compte" : "Account") : (language === "fr" ? "Connexion" : "Sign in")}
         </Link>
         {userRole === "ADMIN" ? (
           <Link className="pwa-app-header__action pwa-app-header__action--admin" href="/admin">
+            <NavIcon name="admin" size={18} />
             Admin
           </Link>
         ) : null}

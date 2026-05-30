@@ -3,6 +3,8 @@ import { getCurrentLanguage } from "@/lib/language";
 import { getDictionary } from "@/lib/i18n";
 import { getCurrentUser } from "@/lib/auth";
 import { Navigation } from "@/components/Navigation";
+import { AppMobileNav } from "@/app/app/app-mobile-nav";
+import { PwaAppHeader } from "@/app/app/pwa-app-header";
 import { AccountSidebar } from "./account-sidebar";
 
 export default async function AccountLayout({
@@ -15,8 +17,11 @@ export default async function AccountLayout({
 
   if (!user) {
     return (
-      <div className="app-shell">
-        <header className="topbar">
+      <div className="app-shell account-app-shell">
+        <div className="account-mobile-chrome">
+          <PwaAppHeader language={language} userRole={null} />
+        </div>
+        <header className="topbar account-desktop-topbar">
           <Navigation language={language} t={t} user={user} />
         </header>
         <section className="section account-access-card">
@@ -36,13 +41,19 @@ export default async function AccountLayout({
             </Link>
           </div>
         </section>
+        <div className="account-mobile-chrome">
+          <AppMobileNav language={language} userRole={null} showSecondary={false} />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="app-shell">
-      <header className="topbar">
+    <div className="app-shell account-app-shell">
+      <div className="account-mobile-chrome">
+        <PwaAppHeader language={language} userRole={user.role} />
+      </div>
+      <header className="topbar account-desktop-topbar">
         <Navigation language={language} t={t} user={user} />
       </header>
       <div className="admin-layout account-layout-shell">
@@ -50,6 +61,9 @@ export default async function AccountLayout({
         <main className="admin-main account-main">
           {children}
         </main>
+      </div>
+      <div className="account-mobile-chrome">
+        <AppMobileNav language={language} userRole={user.role} showSecondary={false} />
       </div>
     </div>
   );

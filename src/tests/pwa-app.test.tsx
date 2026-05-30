@@ -1,5 +1,6 @@
 import { createElement, type AnchorHTMLAttributes, type ImgHTMLAttributes } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { Capacitor } from "@capacitor/core";
 import manifest from "@/app/manifest";
 import { PwaDriverAccessCard } from "@/app/app/pwa-driver-access-card";
 import { PwaAppHeader } from "@/app/app/pwa-app-header";
@@ -30,6 +31,10 @@ const prismaMock = vi.hoisted(() => ({
     findFirst: vi.fn(),
   },
   product: {
+    count: vi.fn(),
+    findMany: vi.fn(),
+  },
+  productVariant: {
     count: vi.fn(),
     findMany: vi.fn(),
   },
@@ -109,6 +114,8 @@ describe("PWA Chez Olive", () => {
     prismaMock.deliveryRun.findFirst.mockResolvedValue(null);
     prismaMock.product.count.mockResolvedValue(0);
     prismaMock.product.findMany.mockResolvedValue([]);
+    prismaMock.productVariant.count.mockResolvedValue(0);
+    prismaMock.productVariant.findMany.mockResolvedValue([]);
     getWebPushPublicKeyMock.mockReturnValue("");
     getAppNotificationPreferencesMock.mockResolvedValue({
       pushEnabled: false,
@@ -156,9 +163,13 @@ describe("PWA Chez Olive", () => {
 
     expect(screen.getByRole("banner", { name: "En-tete application" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Chez Olive App/ })).toHaveAttribute("href", "/app");
-    expect(screen.getByRole("heading", { name: "Chez Olive" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Ouvrir la boutique" })).toHaveAttribute("href", "/boutique");
-    expect(screen.getByRole("link", { name: "Se connecter" })).toHaveAttribute("href", "/login");
+    expect(screen.getByRole("heading", { name: "Bienvenue" })).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: "Boutique" }).map((link) => link.getAttribute("href"))).toContain(
+      "/boutique",
+    );
+    expect(screen.getAllByRole("link", { name: "Connexion" }).map((link) => link.getAttribute("href"))).toContain(
+      "/login",
+    );
     expect(hrefs).toContain("/faq");
     expect(hrefs).toContain("/login");
     expect(screen.queryByText("Admin leger")).not.toBeInTheDocument();
@@ -199,8 +210,14 @@ describe("PWA Chez Olive", () => {
     render(await PwaAppPage());
 
     expect(screen.getByRole("heading", { name: "Bonjour, Gary" })).toBeInTheDocument();
-    expect(screen.getByText("Derniere #CO-4242 - en preparation - 45,99 $")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Chiens QR/ })).toHaveAttribute("href", "/account/dogs");
+    expect(screen.getByRole("heading", { name: "Commande #CO-4242" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Resume utile" })).toBeInTheDocument();
+    expect(screen.getByText("Plus dans l'app")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Tout pour ton compte" })).not.toBeInTheDocument();
+    expect(screen.getAllByText(/45,99/).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: /Chiens QR/ }).map((link) => link.getAttribute("href"))).toContain(
+      "/account/dogs",
+    );
     expect(prismaMock.dogProfile.count).toHaveBeenCalledWith({ where: { userId: "user_1", isActive: true } });
   });
 
@@ -247,6 +264,63 @@ describe("PWA Chez Olive", () => {
       "/account/orders/order_1",
     );
     expect(screen.getByRole("button", { name: "Activer les alertes utiles" })).toBeDisabled();
+  });
+
+  it("masque le panneau d'installation PWA en mode Capacitor natif", async () => {
+    vi.spyOn(Capacitor, "isNativePlatform").mockReturnValue(true);
+
+    const { container } = render(<PwaInstallPanel language="fr" />);
+
+    await waitFor(() => expect(container.querySelector(".pwa-install-panel")).toBeNull());
+  });
+
+  it("active les alertes natives Capacitor via les preferences existantes", async () => {
+    vi.spyOn(Capacitor, "isNativePlatform").mockReturnValue(true);
+    const fetchMock = vi.fn(async () =>
+      Response.json({
+        preferences: {
+          pushEnabled: true,
+          orderUpdates: true,
+          deliveryUpdates: true,
+          supportUpdates: true,
+          dogQrUpdates: true,
+          adminAlerts: true,
+          driverRunUpdates: true,
+        },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <AppNotificationCenter
+        language="fr"
+        publicKey=""
+        userRole="CUSTOMER"
+        initialNotifications={[]}
+        initialUnreadCount={0}
+        initialPreferences={{
+          pushEnabled: false,
+          orderUpdates: true,
+          deliveryUpdates: true,
+          supportUpdates: true,
+          dogQrUpdates: true,
+          adminAlerts: true,
+          driverRunUpdates: true,
+        }}
+      />,
+    );
+
+    const button = screen.getByRole("button", { name: "Activer les alertes utiles" });
+    expect(button).not.toBeDisabled();
+    fireEvent.click(button);
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      "/api/notifications/preferences",
+      expect.objectContaining({
+        method: "PATCH",
+        body: JSON.stringify({ pushEnabled: true }),
+      }),
+    ));
   });
 
   it("permet de creer une notification test in-app", async () => {
@@ -390,7 +464,7 @@ describe("PWA Chez Olive", () => {
 
     expect(screen.getByText("Admin quotidien")).toBeInTheDocument();
     expect(screen.getByText("Prochaine #CO-9001 - Client Admin.")).toBeInTheDocument();
-    expect(screen.getByText("#CO-9002 - Rimouski - planifiee.")).toBeInTheDocument();
+    expect(screen.getByText(/#CO-9002/)).toBeInTheDocument();
     expect(screen.getByText("Client Support - attend une reponse.")).toBeInTheDocument();
     expect(screen.getByText("2026-05-03 - en cours - 7 arrets")).toBeInTheDocument();
     expect(screen.getByText("Collier test - 2 en stock.")).toBeInTheDocument();
@@ -427,7 +501,7 @@ describe("PWA Chez Olive", () => {
     fireEvent.click(installButton);
 
     await waitFor(() => expect(prompt).toHaveBeenCalledTimes(1));
-    await screen.findByRole("heading", { name: "Mode app active." });
+    await screen.findByRole("heading", { name: /Mode app activ/i });
   });
 
   it("affiche l'aide iPhone quand le prompt natif n'existe pas", async () => {

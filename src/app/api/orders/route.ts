@@ -13,6 +13,7 @@ import { buildCheckoutConfirmation } from "@/lib/checkout-confirmation";
 import { resolvePublicSiteUrl } from "@/lib/site-url";
 import { recordOrderCreatedConversion } from "@/lib/conversion-analytics";
 import { createAdminAppNotification, createAppNotification } from "@/lib/app-notifications";
+import { createOrderSmsPreference } from "@/lib/sms";
 
 const stripeMinimumAmountMessage =
   "Le paiement par carte exige un total d'au moins 0,50 $ CAD. Augmente légèrement le montant de la commande ou retire le rabais de test.";
@@ -126,6 +127,15 @@ export async function POST(request: Request) {
     if (!orderForResponse) {
       return jsonError("Unable to load created order", 500);
     }
+
+    await createOrderSmsPreference({
+      orderId: orderForResponse.id,
+      userId: user?.id ?? null,
+      phone: orderForResponse.deliveryPhone,
+      language: customerLanguage,
+      optedIn: input.smsOrderUpdatesOptIn,
+      source: "checkout",
+    });
 
     const confirmation = buildCheckoutConfirmation(orderForResponse);
     await recordOrderCreatedConversion({
@@ -447,7 +457,7 @@ export async function POST(request: Request) {
 
     if (
       error instanceof Error &&
-      ["EMPTY_CART", "PRODUCT_NOT_FOUND", "INVALID_QUANTITY"].includes(error.message)
+      ["EMPTY_CART", "PRODUCT_NOT_FOUND", "INVALID_QUANTITY", "PRODUCT_VARIANT_REQUIRED", "PRODUCT_VARIANT_NOT_FOUND"].includes(error.message)
     ) {
       logApiEvent({
         level: "WARN",

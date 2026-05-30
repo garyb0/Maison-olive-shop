@@ -75,7 +75,7 @@ export function SiteFooter() {
                 <Link href={HOME_HREF}>{t.navHome}</Link>
                 <Link href="/app">{language === "fr" ? "Application" : "App"}</Link>
                 <Link href="/boutique">{language === "fr" ? "Boutique" : "Shop"}</Link>
-                <Link href="/faq">{language === "fr" ? "Centre d’aide" : "Help center"}</Link>
+                <Link href="/faq">{language === "fr" ? "Centre d'aide" : "Help center"}</Link>
                 <Link href="/faq#livraison">{language === "fr" ? "Livraison" : "Shipping"}</Link>
               </div>
             </div>
@@ -86,7 +86,9 @@ export function SiteFooter() {
               </p>
               <div className="site-footer__links">
                 <Link href="/faq#retours">{language === "fr" ? "Retours et remboursements" : "Returns and refunds"}</Link>
-                <Link href="/faq#conditions">{language === "fr" ? "Conditions de vente" : "Terms of sale"}</Link>
+                <Link href="/terms">{language === "fr" ? "Conditions" : "Terms"}</Link>
+                <Link href="/privacy">{language === "fr" ? "Confidentialité" : "Privacy"}</Link>
+                <Link href="/data-deletion">{language === "fr" ? "Suppression des données" : "Data deletion"}</Link>
                 <Link href="/account">{t.navAccount}</Link>
                 <a href={`mailto:${business.supportEmail}`}>{business.supportEmail}</a>
               </div>
@@ -97,7 +99,7 @@ export function SiteFooter() {
                 {language === "fr" ? "Support" : "Support"}
               </p>
               <div className="site-footer__meta">
-                <strong>{language === "fr" ? "Besoin d’aide ?" : "Need help?"}</strong>
+                <strong>{language === "fr" ? "Besoin d'aide ?" : "Need help?"}</strong>
                 <span>{business.supportHours}</span>
                 <span>{business.shippingPolicy}</span>
               </div>
@@ -111,8 +113,8 @@ export function SiteFooter() {
                 <strong>{language === "fr" ? "Installer Chez Olive" : "Install Chez Olive"}</strong>
                 <span>
                   {language === "fr"
-                    ? "Android: bouton Installer. iPhone: Partager > Sur l'ecran d'accueil."
-                    : "Android: Install button. iPhone: Share > Add to Home Screen."}
+                    ? "Android: app Google Play en préparation. iPhone: Partager > Sur l'écran d'accueil."
+                    : "Android: Google Play app in preparation. iPhone: Share > Add to Home Screen."}
                 </span>
                 <Link href="/app">{language === "fr" ? "Ouvrir l'app" : "Open the app"}</Link>
               </div>
@@ -120,9 +122,7 @@ export function SiteFooter() {
           </div>
 
           <div className="site-footer__bottom">
-            <span>
-              © {new Date().getFullYear()} Chez Olive
-            </span>
+            <span>&copy; {new Date().getFullYear()} Chez Olive</span>
             <span>
               {language === "fr"
                 ? "De notre famille à la vôtre"

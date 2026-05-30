@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { normalizeDogPublicTokenInput } from "@/lib/dog-token";
 import { isValidPromoCtaLink } from "@/lib/promo-links";
 
 const emptyToUndefined = (value: unknown) => {
@@ -20,6 +21,10 @@ export const registerSchema = z.object({
   firstName: z.string().min(1).max(80),
   lastName: z.string().min(1).max(80),
   language: z.enum(["fr", "en"]).optional(),
+});
+
+export const registerRequestSchema = registerSchema.extend({
+  autoLogin: z.boolean().optional(),
 });
 
 export const loginSchema = z.object({
@@ -46,6 +51,7 @@ export const checkoutSchema = z.object({
     .array(
       z.object({
         productId: z.string().min(1),
+        variantId: z.preprocess(emptyToUndefined, z.string().min(1).max(191).optional()),
         quantity: z.number().int().min(1).max(99),
       }),
     )
@@ -77,6 +83,7 @@ export const checkoutSchema = z.object({
         .refine((value) => !value || isValidDeliveryPhone(value), "INVALID_DELIVERY_PHONE"),
     )
     .optional(),
+  smsOrderUpdatesOptIn: z.boolean().optional().default(false),
   conversionSessionKey: z.preprocess(emptyToUndefined, z.string().trim().min(8).max(120).optional()),
 });
 
@@ -108,12 +115,15 @@ export const deliveryAddressPatchSchema = deliveryAddressUpsertSchema.partial().
   },
 );
 
-const publicTokenSchema = z
-  .string()
-  .trim()
-  .min(8)
-  .max(120)
-  .regex(/^[A-Za-z0-9_-]+$/, "INVALID_PUBLIC_TOKEN");
+const publicTokenSchema = z.preprocess(
+  (value) => (typeof value === "string" ? normalizeDogPublicTokenInput(value) : value),
+  z
+    .string()
+    .trim()
+    .min(8)
+    .max(120)
+    .regex(/^[A-Za-z0-9_-]+$/, "INVALID_PUBLIC_TOKEN"),
+);
 
 const dogPhotoUrlSchema = z.preprocess(
   (value) => {
@@ -134,6 +144,14 @@ const dogPhotoUrlSchema = z.preprocess(
 );
 
 const dogNotesSchema = z.preprocess(emptyToUndefined, z.string().trim().max(500).optional());
+const dogLostModeMessageSchema = z.preprocess(
+  (value) => {
+    if (value === null) return null;
+    if (typeof value === "string" && value.trim() === "") return null;
+    return value;
+  },
+  z.string().trim().max(240).nullable().optional(),
+);
 const dogVisibilitySchema = {
   publicProfileEnabled: z.boolean().optional(),
   showPhotoPublic: z.boolean().optional(),
@@ -163,6 +181,8 @@ export const dogProfilePatchSchema = z
     ownerPhone: z.preprocess(emptyToUndefined, z.string().trim().min(1).max(40).optional()),
     importantNotes: dogNotesSchema,
     ...dogVisibilitySchema,
+    lostModeEnabled: z.boolean().optional(),
+    lostModeMessage: dogLostModeMessageSchema,
     isActive: z.boolean().optional(),
   })
   .refine(
@@ -177,6 +197,8 @@ export const dogProfilePatchSchema = z
       input.showAgePublic !== undefined ||
       input.showPhonePublic !== undefined ||
       input.showNotesPublic !== undefined ||
+      input.lostModeEnabled !== undefined ||
+      input.lostModeMessage !== undefined ||
       input.isActive !== undefined,
     {
       message: "DOG_PROFILE_UPDATE_REQUIRED",
@@ -197,6 +219,12 @@ export const adminDogProfileUpdateSchema = z
 
 export const adminDogBatchCreateSchema = z.object({
   count: z.coerce.number().int().min(1).max(500),
+});
+
+export const dogLocationShareSchema = z.object({
+  latitude: z.coerce.number().min(-90).max(90),
+  longitude: z.coerce.number().min(-180).max(180),
+  accuracyMeters: z.coerce.number().min(0).max(100000).optional(),
 });
 
 export const deliverySlotsQuerySchema = z.object({
@@ -420,6 +448,11 @@ export const webPushSubscriptionSchema = z.object({
   }),
 });
 
+export const nativePushTokenSchema = z.object({
+  token: z.string().trim().min(20).max(4096),
+  platform: z.enum(["ANDROID"]).default("ANDROID"),
+});
+
 export const notificationPreferencePatchSchema = z.object({
   pushEnabled: z.boolean().optional(),
   orderUpdates: z.boolean().optional(),
@@ -494,6 +527,14 @@ export const maintenanceSettingsSchema = z.object({
 
 export const reorderSchema = z.object({
   orderId: z.string().min(1),
+});
+
+export const reorderCartSchema = z.object({
+  orderId: z.string().min(1),
+});
+
+export const favoriteProductSchema = z.object({
+  productId: z.string().trim().min(1).max(191),
 });
 
 export const languageSchema = z.object({
@@ -588,21 +629,58 @@ export const conversionEventSchema = z.object({
 
 export const hasSensitiveConversionKey = (key: string) => conversionSensitiveKeyPattern.test(key);
 
+const imageUrlStringSchema = z
+  .string()
+  .trim()
+  .max(500)
+  .refine((val) => !val || val.startsWith("/") || val.startsWith("http://") || val.startsWith("https://"), {
+    message: "INVALID_URL",
+  });
+
 const optionalImageUrlSchema = z.preprocess(
   emptyToUndefined,
-  z.string()
-    .trim()
-    .max(500)
-    .refine(
-      (val) => !val || val.startsWith("/") || val.startsWith("http://") || val.startsWith("https://"),
-      { message: "INVALID_URL" }
-    )
-    .optional(),
+  z.union([imageUrlStringSchema, z.null()]).optional(),
+);
+
+const subcategorySlugSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(80)
+  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
+
+const optionalSubcategorySlugSchema = z.preprocess(
+  emptyToUndefined,
+  z.union([subcategorySlugSchema, z.null()]).optional(),
+);
+
+const uppercaseTrim = (value: unknown) => (typeof value === "string" ? value.trim().toUpperCase() : value);
+const optionalUppercaseTrim = (value: unknown) => {
+  if (typeof value !== "string") return value;
+  const trimmed = value.trim();
+  return trimmed ? trimmed.toUpperCase() : undefined;
+};
+
+const productSkuSchema = z.preprocess(
+  uppercaseTrim,
+  z
+    .string()
+    .min(3)
+    .max(64)
+    .regex(/^[A-Z0-9]+(?:-[A-Z0-9]+)*$/),
+);
+
+const optionalBarcodeSchema = z.preprocess(
+  optionalUppercaseTrim,
+  z.union([z.string().max(64), z.null()]).optional(),
 );
 
 export const adminProductCreateSchema = z.object({
   slug: productSlugSchema,
+  sku: productSkuSchema,
+  barcode: optionalBarcodeSchema,
   category: z.string().trim().min(1).max(80),
+  subcategorySlug: optionalSubcategorySlugSchema,
   nameFr: z.string().trim().min(1).max(160),
   nameEn: z.string().trim().min(1).max(160),
   descriptionFr: z.string().trim().min(1).max(4000),
@@ -623,7 +701,10 @@ export const adminProductCreateSchema = z.object({
 export const adminProductUpdateSchema = z.object({
   id: z.string().min(1),
   slug: z.preprocess(emptyToUndefined, productSlugSchema.optional()),
+  sku: z.preprocess(emptyToUndefined, productSkuSchema.optional()),
+  barcode: optionalBarcodeSchema,
   category: z.preprocess(emptyToUndefined, z.string().trim().min(1).max(80).optional()),
+  subcategorySlug: optionalSubcategorySlugSchema,
   nameFr: z.preprocess(emptyToUndefined, z.string().trim().min(1).max(160).optional()),
   nameEn: z.preprocess(emptyToUndefined, z.string().trim().min(1).max(160).optional()),
   descriptionFr: z.preprocess(emptyToUndefined, z.string().trim().min(1).max(4000).optional()),
@@ -642,10 +723,16 @@ export const adminProductUpdateSchema = z.object({
 
 export const adminStockAdjustmentSchema = z.object({
   productId: z.string().min(1),
+  variantId: z.preprocess(emptyToUndefined, z.string().min(1).max(191).optional()),
   quantityChange: z.coerce.number().int().min(-1000000).max(1000000).refine((value) => value !== 0, {
     message: "QUANTITY_CHANGE_REQUIRED",
   }),
   reason: z.preprocess(emptyToUndefined, z.string().trim().min(1).max(120).optional()),
+});
+
+export const adminProductVariantImportSchema = z.object({
+  csvText: z.string().min(1).max(1_000_000),
+  dryRun: z.boolean().optional(),
 });
 
 export const adminProductDeleteSchema = z.object({
@@ -770,6 +857,11 @@ export const supportConversationCreateSchema = z.object({
   name: z.preprocess(emptyToUndefined, z.string().trim().min(1).max(120).optional()),
   email: z.preprocess(emptyToUndefined, z.string().trim().email().max(160).optional()),
   message: z.string().trim().min(1).max(2000),
+  orderId: z.preprocess(emptyToUndefined, z.string().trim().min(1).max(191).optional()),
+  topic: z.preprocess(
+    emptyToUndefined,
+    z.enum(["DELIVERY", "PRODUCT", "PAYMENT", "CHANGE_CANCEL", "OTHER"]).optional(),
+  ),
 });
 
 export const supportMessageCreateSchema = z.object({

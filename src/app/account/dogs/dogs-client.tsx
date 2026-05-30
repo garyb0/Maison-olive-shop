@@ -4,11 +4,13 @@ import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import type { DogProfileAccount } from "@/lib/types";
 import type { Language } from "@/lib/i18n";
+import { normalizeDogPublicTokenInput } from "@/lib/dog-token";
 import { DogPhotoUpload } from "@/components/DogPhotoUpload";
 
 type Props = {
   language: Language;
   initialDogs: DogProfileAccount[];
+  initialActivationToken?: string | null;
 };
 
 type EditorTab = "profile" | "visibility";
@@ -24,6 +26,8 @@ type DogFormState = {
   showAgePublic: boolean;
   showPhonePublic: boolean;
   showNotesPublic: boolean;
+  lostModeEnabled: boolean;
+  lostModeMessage: string;
   isActive: boolean;
 };
 
@@ -38,6 +42,8 @@ const toFormState = (dog: DogProfileAccount): DogFormState => ({
   showAgePublic: dog.showAgePublic,
   showPhonePublic: dog.showPhonePublic,
   showNotesPublic: dog.showNotesPublic,
+  lostModeEnabled: dog.lostModeEnabled,
+  lostModeMessage: dog.lostModeMessage ?? "",
   isActive: dog.isActive,
 });
 
@@ -53,7 +59,14 @@ const emptyClaimState = (): DogFormState & { publicToken: string } => ({
   showAgePublic: false,
   showPhonePublic: false,
   showNotesPublic: false,
+  lostModeEnabled: false,
+  lostModeMessage: "",
   isActive: true,
+});
+
+const initialClaimState = (publicToken?: string | null) => ({
+  ...emptyClaimState(),
+  publicToken: publicToken ? normalizeDogPublicTokenInput(publicToken) : "",
 });
 
 function summarizeVisibility(
@@ -84,6 +97,36 @@ function summarizeVisibility(
   return language === "fr"
     ? `Le public verra : ${visible.join(", ")}.`
     : `The public will see: ${visible.join(", ")}.`;
+}
+
+function formatScanDate(value: string | null | undefined, language: Language) {
+  if (!value) return language === "fr" ? "Aucun scan" : "No scans yet";
+
+  try {
+    return new Intl.DateTimeFormat(language === "fr" ? "fr-CA" : "en-CA", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(new Date(value));
+  } catch {
+    return value;
+  }
+}
+
+function scanEventLabel(eventType: string, lostModeAtScan: boolean, language: Language) {
+  if (eventType === "LOCATION_SHARED") {
+    return language === "fr" ? "Position partagée" : "Location shared";
+  }
+
+  if (lostModeAtScan) {
+    return language === "fr" ? "Scan en mode perdu" : "Lost mode scan";
+  }
+
+  return language === "fr" ? "Scan QR" : "QR scan";
+}
+
+function scanLocationHref(latitude: number | null, longitude: number | null) {
+  if (latitude === null || longitude === null) return null;
+  return `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
 }
 
 function ProfileSection({
@@ -381,14 +424,14 @@ function VisibilityControls({
   );
 }
 
-export function DogsClient({ language, initialDogs }: Props) {
+export function DogsClient({ language, initialDogs, initialActivationToken }: Props) {
   const [dogs, setDogs] = useState(initialDogs);
   const [editingDogId, setEditingDogId] = useState<string | null>(null);
   const [editingDog, setEditingDog] = useState<DogFormState | null>(null);
   const [editingTab, setEditingTab] = useState<EditorTab>("profile");
-  const [claimForm, setClaimForm] = useState(emptyClaimState);
+  const [claimForm, setClaimForm] = useState(() => initialClaimState(initialActivationToken));
   const [claimTab, setClaimTab] = useState<EditorTab>("profile");
-  const [claimPanelOpen, setClaimPanelOpen] = useState(false);
+  const [claimPanelOpen, setClaimPanelOpen] = useState(Boolean(initialActivationToken));
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -409,11 +452,18 @@ export function DogsClient({ language, initialDogs }: Props) {
     resetFeedback();
 
     try {
+      const publicToken = normalizeDogPublicTokenInput(claimForm.publicToken);
+
+      if (!publicToken) {
+        setError(language === "fr" ? "Entre le code ou le lien du collier QR." : "Enter the QR collar code or link.");
+        return;
+      }
+
       const response = await fetch("/api/account/dogs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          publicToken: claimForm.publicToken,
+          publicToken,
           name: claimForm.name,
           photoUrl: claimForm.photoUrl,
           ageLabel: claimForm.ageLabel,
@@ -474,7 +524,7 @@ export function DogsClient({ language, initialDogs }: Props) {
         return;
       }
 
-      setDogs((current) => current.map((dog) => (dog.id === payload.dog!.id ? payload.dog! : dog)));
+      setDogs((current) => current.map((dog) => (dog.id === payload.dog!.id ? { ...dog, ...payload.dog! } : dog)));
       setEditingDogId(null);
       setEditingDog(null);
       setMessage(language === "fr" ? "Réglages du chien mis à jour." : "Dog profile settings updated.");
@@ -569,6 +619,11 @@ export function DogsClient({ language, initialDogs }: Props) {
                               : "Private"}
                         </span>
                         {dog.ageLabel ? <span className="account-status-pill account-status-pill--muted">{dog.ageLabel}</span> : null}
+                        {dog.lostModeEnabled ? (
+                          <span className="account-status-pill account-status-pill--warn">
+                            {language === "fr" ? "Chien perdu" : "Lost mode"}
+                          </span>
+                        ) : null}
                       </div>
                     </div>
                     <div className="account-action-row account-action-row--end">
@@ -673,6 +728,49 @@ export function DogsClient({ language, initialDogs }: Props) {
                                     <span>{language === "fr" ? "Le collier QR est actif" : "QR collar is active"}</span>
                                   </label>
                                 </div>
+                                <div className="field account-field-full dog-lost-mode-panel">
+                                  <label className="dog-checkbox-row dog-checkbox-row--strong">
+                                    <input
+                                      checked={editing.lostModeEnabled}
+                                      onChange={(event) =>
+                                        setEditingDog((current) =>
+                                          current
+                                            ? {
+                                                ...current,
+                                                lostModeEnabled: event.target.checked,
+                                                publicProfileEnabled: event.target.checked
+                                                  ? true
+                                                  : current.publicProfileEnabled,
+                                              }
+                                            : current,
+                                        )
+                                      }
+                                      type="checkbox"
+                                    />
+                                    <span>{language === "fr" ? "Mode chien perdu" : "Lost dog mode"}</span>
+                                  </label>
+                                  <p className="small account-field-hint">
+                                    {language === "fr"
+                                      ? "Quand il est actif, les scans deviennent prioritaires et la page QR propose le partage volontaire de position."
+                                      : "When enabled, scans become priority events and the QR page offers voluntary location sharing."}
+                                  </p>
+                                  <textarea
+                                    className="textarea"
+                                    disabled={!editing.lostModeEnabled}
+                                    rows={3}
+                                    value={editing.lostModeMessage}
+                                    onChange={(event) =>
+                                      setEditingDog((current) =>
+                                        current ? { ...current, lostModeMessage: event.target.value } : current,
+                                      )
+                                    }
+                                    placeholder={
+                                      language === "fr"
+                                        ? "Message public optionnel: approche doucement, appelle-moi tout de suite..."
+                                        : "Optional public message: approach gently, call me right away..."
+                                    }
+                                  />
+                                </div>
                               </div>
                             </ProfileSection>
                           </>
@@ -704,23 +802,67 @@ export function DogsClient({ language, initialDogs }: Props) {
                       </div>
                     </div>
                   ) : (
-                    <div className="account-subscription-meta">
-                      <div className="account-order-card__meta-block">
-                        <span className="account-order-card__meta-label">
-                          {language === "fr" ? "Contact enregistré" : "Stored contact"}
-                        </span>
-                        <p className="small account-section-copy">
-                          {dog.ownerPhone ?? "-"}
-                        </p>
+                    <div className="dog-card-readonly">
+                      <div className="account-subscription-meta">
+                        <div className="account-order-card__meta-block">
+                          <span className="account-order-card__meta-label">
+                            {language === "fr" ? "Contact enregistré" : "Stored contact"}
+                          </span>
+                          <p className="small account-section-copy">
+                            {dog.ownerPhone ?? "-"}
+                          </p>
+                        </div>
+                        <div className="account-order-card__meta-block">
+                          <span className="account-order-card__meta-label">
+                            {language === "fr" ? "Aperçu visibilité" : "Visibility summary"}
+                          </span>
+                          <p className="small account-section-copy">
+                            {summarizeVisibility(dog, language)}
+                          </p>
+                        </div>
+                        <div className="account-order-card__meta-block">
+                          <span className="account-order-card__meta-label">
+                            {language === "fr" ? "Dernier scan" : "Last scan"}
+                          </span>
+                          <p className="small account-section-copy">
+                            {formatScanDate(dog.lastScanAt, language)}
+                          </p>
+                        </div>
                       </div>
-                      <div className="account-order-card__meta-block">
-                        <span className="account-order-card__meta-label">
-                          {language === "fr" ? "Aperçu visibilité" : "Visibility summary"}
-                        </span>
-                        <p className="small account-section-copy">
-                          {summarizeVisibility(dog, language)}
-                        </p>
-                      </div>
+
+                      <details className="dog-scan-history">
+                        <summary>
+                          {language === "fr"
+                            ? `Historique des scans (${dog.scanCount ?? 0})`
+                            : `Scan history (${dog.scanCount ?? 0})`}
+                        </summary>
+                        {dog.scanHistory?.length ? (
+                          <ol className="dog-scan-list">
+                            {dog.scanHistory.map((scan) => {
+                              const mapHref = scanLocationHref(scan.latitude, scan.longitude);
+                              return (
+                                <li key={scan.id}>
+                                  <div>
+                                    <strong>{scanEventLabel(scan.eventType, scan.lostModeAtScan, language)}</strong>
+                                    <span className="small">{formatScanDate(scan.createdAt, language)}</span>
+                                  </div>
+                                  {mapHref ? (
+                                    <a href={mapHref} rel="noreferrer" target="_blank">
+                                      {language === "fr" ? "Voir carte" : "View map"}
+                                    </a>
+                                  ) : null}
+                                </li>
+                              );
+                            })}
+                          </ol>
+                        ) : (
+                          <p className="small account-section-copy">
+                            {language === "fr"
+                              ? "Aucun scan enregistré pour le moment."
+                              : "No scans recorded yet."}
+                          </p>
+                        )}
+                      </details>
                     </div>
                   )}
                 </article>
@@ -769,13 +911,20 @@ export function DogsClient({ language, initialDogs }: Props) {
                         <label>{language === "fr" ? "Token QR" : "QR token"}</label>
                         <input
                           className="input"
+                          placeholder={language === "fr" ? "Code ou lien complet du QR" : "QR code or full link"}
                           value={claimForm.publicToken}
                           onChange={(event) => setClaimForm((current) => ({ ...current, publicToken: event.target.value }))}
+                          onBlur={() =>
+                            setClaimForm((current) => ({
+                              ...current,
+                              publicToken: normalizeDogPublicTokenInput(current.publicToken),
+                            }))
+                          }
                         />
                         <p className="small account-field-hint">
                           {language === "fr"
-                            ? "Entre le code indiqué sur le collier ou colle le token du lien QR."
-                            : "Enter the code printed on the collar or paste the token from the QR link."}
+                            ? "Entre le code indiqué sur le collier ou colle le lien complet du QR."
+                            : "Enter the code printed on the collar or paste the full QR link."}
                         </p>
                       </div>
                       <div className="field">

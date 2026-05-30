@@ -5,6 +5,7 @@ import { resolvePromoCodeDiscount } from "@/lib/promo";
 import { getHiddenStorefrontProductSlugs } from "@/lib/launch-guards";
 import { computeOrderAmounts } from "@/lib/taxes";
 import { sendOrderConfirmationEmail } from "@/lib/business";
+import { sendOrderSmsNotification } from "@/lib/sms";
 import { stripe, stripeEnabled } from "@/lib/stripe";
 import type { PaymentMethod } from "@/lib/types";
 import { isRimouskiDeliveryAddress } from "@/lib/delivery-zone";
@@ -21,6 +22,7 @@ import {
 
 type CheckoutItem = {
   productId: string;
+  variantId?: string;
   quantity: number;
 };
 
@@ -88,6 +90,24 @@ const nextOrderNumber = () => {
 };
 
 const ORDER_CREATE_TRANSACTION_TIMEOUT_MS = 15_000;
+
+const variantOptionLabel = (variant: {
+  slug: string;
+  colorNameFr: string | null;
+  colorNameEn: string | null;
+  sizeNameFr: string | null;
+  sizeNameEn: string | null;
+  sizeCode: string | null;
+}, language: "fr" | "en") => {
+  const color = language === "fr"
+    ? variant.colorNameFr ?? variant.colorNameEn ?? variant.slug
+    : variant.colorNameEn ?? variant.colorNameFr ?? variant.slug;
+  const size = language === "fr"
+    ? variant.sizeNameFr ?? variant.sizeNameEn ?? variant.sizeCode
+    : variant.sizeNameEn ?? variant.sizeNameFr ?? variant.sizeCode;
+
+  return size ? `${color} / ${size}` : color;
+};
 
 // CRITICAL DATA SAFETY NOTE (FR/EN)
 // FR: Cette fonction utilise une transaction pour protéger commandes + inventaire.
@@ -194,22 +214,63 @@ export async function createOrderSafely(input: CreateOrderInput) {
         stock: true,
         nameFr: true,
         nameEn: true,
+        variants: {
+          where: { isActive: true },
+          select: {
+            id: true,
+            slug: true,
+            stock: true,
+            priceCents: true,
+            colorNameFr: true,
+            colorNameEn: true,
+            sizeNameFr: true,
+            sizeNameEn: true,
+            sizeCode: true,
+          },
+        },
       },
     });
 
     const map = new Map(products.map((p) => [p.id, p] as const));
 
-    for (const item of input.items) {
+    const resolvedItems = input.items.map((item) => {
       const product = map.get(item.productId);
       if (!product) throw new Error("PRODUCT_NOT_FOUND");
       if (item.quantity <= 0) throw new Error("INVALID_QUANTITY");
-      if (product.stock < item.quantity) throw new Error("INSUFFICIENT_STOCK");
-    }
 
-    const subtotalCents = input.items.reduce((sum, item) => {
-      const product = map.get(item.productId)!;
-      return sum + product.priceCents * item.quantity;
-    }, 0);
+      if (product.variants.length > 0) {
+        if (!item.variantId) throw new Error("PRODUCT_VARIANT_REQUIRED");
+        const variant = product.variants.find((candidate) => candidate.id === item.variantId);
+        if (!variant) throw new Error("PRODUCT_VARIANT_NOT_FOUND");
+        if (variant.stock < item.quantity) throw new Error("INSUFFICIENT_STOCK");
+
+        const unitPriceCents = variant.priceCents ?? product.priceCents;
+        return {
+          product,
+          variant,
+          quantity: item.quantity,
+          unitPriceCents,
+          productNameSnapshotFr: `${product.nameFr} - ${variantOptionLabel(variant, "fr")}`,
+          productNameSnapshotEn: `${product.nameEn} - ${variantOptionLabel(variant, "en")}`,
+        };
+      }
+
+      if (product.stock < item.quantity) throw new Error("INSUFFICIENT_STOCK");
+
+      return {
+        product,
+        variant: null,
+        quantity: item.quantity,
+        unitPriceCents: product.priceCents,
+        productNameSnapshotFr: product.nameFr,
+        productNameSnapshotEn: product.nameEn,
+      };
+    });
+
+    const subtotalCents = resolvedItems.reduce(
+      (sum, item) => sum + item.unitPriceCents * item.quantity,
+      0,
+    );
 
     const promo = await resolvePromoCodeDiscount(subtotalCents, input.promoCode);
     const amounts = computeOrderAmounts(subtotalCents, promo.discountCents);
@@ -243,29 +304,40 @@ export async function createOrderSafely(input: CreateOrderInput) {
       },
     });
 
-    for (const item of input.items) {
-      const product = map.get(item.productId)!;
-
+    for (const item of resolvedItems) {
       await tx.orderItem.create({
         data: {
           orderId: order.id,
-          productId: product.id,
+          productId: item.product.id,
+          variantId: item.variant?.id,
           quantity: item.quantity,
-          unitPriceCents: product.priceCents,
-          lineTotalCents: product.priceCents * item.quantity,
-          productNameSnapshotFr: product.nameFr,
-          productNameSnapshotEn: product.nameEn,
+          unitPriceCents: item.unitPriceCents,
+          lineTotalCents: item.unitPriceCents * item.quantity,
+          productNameSnapshotFr: item.productNameSnapshotFr,
+          productNameSnapshotEn: item.productNameSnapshotEn,
         },
       });
 
-      await tx.product.update({
-        where: { id: product.id },
-        data: { stock: { decrement: item.quantity } },
-      });
+      if (item.variant) {
+        await tx.productVariant.update({
+          where: { id: item.variant.id },
+          data: { stock: { decrement: item.quantity } },
+        });
+        await tx.product.update({
+          where: { id: item.product.id },
+          data: { stock: { decrement: item.quantity } },
+        });
+      } else {
+        await tx.product.update({
+          where: { id: item.product.id },
+          data: { stock: { decrement: item.quantity } },
+        });
+      }
 
       await tx.inventoryMovement.create({
         data: {
-          productId: product.id,
+          productId: item.product.id,
+          variantId: item.variant?.id,
           orderId: order.id,
           quantityChange: -item.quantity,
           reason: "ORDER_PLACED",
@@ -375,6 +447,7 @@ export async function reorderFromOrder(orderId: string, userId: string) {
       items: {
         select: {
           productId: true,
+          variantId: true,
           quantity: true,
         },
       },
@@ -390,6 +463,7 @@ export async function reorderFromOrder(orderId: string, userId: string) {
     paymentMethod: "MANUAL",
     items: baseOrder.items.map((item) => ({
       productId: item.productId,
+      variantId: item.variantId ?? undefined,
       quantity: item.quantity,
     })),
     shippingLine1: baseOrder.shippingLine1 ?? undefined,
@@ -398,6 +472,158 @@ export async function reorderFromOrder(orderId: string, userId: string) {
     shippingPostal: baseOrder.shippingPostal ?? undefined,
     shippingCountry: baseOrder.shippingCountry ?? undefined,
   });
+}
+
+export type ReorderCartLine = {
+  productId: string;
+  variantId?: string | null;
+  name: string;
+  quantity: number;
+  slug: string | null;
+  imageUrl: string | null;
+  currentStock: number;
+};
+
+export type ReorderCartUnavailableItem = {
+  productId: string;
+  variantId?: string | null;
+  name: string;
+  requestedQuantity: number;
+  reason: "inactive" | "out_of_stock" | "missing";
+};
+
+export type ReorderCartAdjustedItem = {
+  productId: string;
+  variantId?: string | null;
+  name: string;
+  requestedQuantity: number;
+  availableQuantity: number;
+};
+
+export async function buildReorderCart(orderId: string, userId: string) {
+  const baseOrder = await prisma.order.findFirst({
+    where: { id: orderId, userId },
+    select: {
+      id: true,
+      orderNumber: true,
+      items: {
+        orderBy: { createdAt: "asc" },
+        select: {
+          productId: true,
+          variantId: true,
+          quantity: true,
+          productNameSnapshotFr: true,
+          productNameSnapshotEn: true,
+          variant: {
+            select: {
+              id: true,
+              stock: true,
+              imageUrl: true,
+              isActive: true,
+            },
+          },
+          product: {
+            select: {
+              id: true,
+              slug: true,
+              nameFr: true,
+              nameEn: true,
+              imageUrl: true,
+              stock: true,
+              isActive: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!baseOrder) throw new Error("ORDER_NOT_FOUND");
+
+  const lines: ReorderCartLine[] = [];
+  const unavailableItems: ReorderCartUnavailableItem[] = [];
+  const adjustedItems: ReorderCartAdjustedItem[] = [];
+
+  for (const item of baseOrder.items) {
+    const product = item.product;
+    const name = product?.nameFr ?? item.productNameSnapshotFr ?? item.productNameSnapshotEn;
+    const variant = item.variant;
+
+    if (!product) {
+      unavailableItems.push({
+        productId: item.productId,
+        variantId: item.variantId,
+        name,
+        requestedQuantity: item.quantity,
+        reason: "missing",
+      });
+      continue;
+    }
+
+    if (item.variantId && !variant) {
+      unavailableItems.push({
+        productId: product.id,
+        variantId: item.variantId,
+        name,
+        requestedQuantity: item.quantity,
+        reason: "missing",
+      });
+      continue;
+    }
+
+    if (!product.isActive || (variant && !variant.isActive)) {
+      unavailableItems.push({
+        productId: product.id,
+        variantId: variant?.id ?? item.variantId,
+        name,
+        requestedQuantity: item.quantity,
+        reason: "inactive",
+      });
+      continue;
+    }
+
+    const currentStock = variant ? variant.stock : product.stock;
+
+    if (currentStock <= 0) {
+      unavailableItems.push({
+        productId: product.id,
+        variantId: variant?.id ?? item.variantId,
+        name,
+        requestedQuantity: item.quantity,
+        reason: "out_of_stock",
+      });
+      continue;
+    }
+
+    const quantity = Math.min(item.quantity, currentStock);
+    if (quantity < item.quantity) {
+      adjustedItems.push({
+        productId: product.id,
+        variantId: variant?.id ?? item.variantId,
+        name,
+        requestedQuantity: item.quantity,
+        availableQuantity: quantity,
+      });
+    }
+
+    lines.push({
+      productId: product.id,
+      variantId: variant?.id ?? item.variantId,
+      name,
+      quantity,
+      slug: product.slug,
+      imageUrl: variant?.imageUrl ?? product.imageUrl,
+      currentStock,
+    });
+  }
+
+  return {
+    orderId: baseOrder.id,
+    orderNumber: baseOrder.orderNumber,
+    lines,
+    unavailableItems,
+    adjustedItems,
+  };
 }
 
 export async function syncOrderPaymentFromStripeSessionForUser(sessionId: string, userId: string) {
@@ -515,6 +741,11 @@ export async function markOrderPaidFromStripeSession(
     })),
   });
 
+  sendOrderSmsNotification({
+    orderId: order.id,
+    type: "ORDER_PAID",
+  }).catch(() => undefined);
+
   return { orderId: order.id, transitionedToPaid: true };
 }
 
@@ -540,6 +771,7 @@ export async function markOrderStripePaymentFailed(orderId: string, source: stri
         items: {
           select: {
             productId: true,
+            variantId: true,
             quantity: true,
           },
         },
@@ -569,14 +801,26 @@ export async function markOrderStripePaymentFailed(orderId: string, source: stri
     const restockReason = restockReasonForStripeFailure(source);
 
     for (const item of order.items) {
-      await tx.product.update({
-        where: { id: item.productId },
-        data: { stock: { increment: item.quantity } },
-      });
+      if (item.variantId) {
+        await tx.productVariant.update({
+          where: { id: item.variantId },
+          data: { stock: { increment: item.quantity } },
+        });
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { stock: { increment: item.quantity } },
+        });
+      } else {
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { stock: { increment: item.quantity } },
+        });
+      }
 
       await tx.inventoryMovement.create({
         data: {
           productId: item.productId,
+          variantId: item.variantId,
           orderId: order.id,
           quantityChange: item.quantity,
           reason: restockReason,

@@ -25,6 +25,9 @@ const dog: DogProfileAccount = {
   showAgePublic: false,
   showPhonePublic: false,
   showNotesPublic: false,
+  lostModeEnabled: false,
+  lostModeMessage: null,
+  lostModeActivatedAt: null,
   isActive: true,
   claimedAt: "2026-04-29T12:00:00.000Z",
   createdAt: "2026-04-29T12:00:00.000Z",
@@ -57,5 +60,18 @@ describe("DogsClient", () => {
 
     expect(screen.getByRole("heading", { name: "Ajouter un collier QR" })).toBeInTheDocument();
     expect(screen.getByText("Token QR")).toBeInTheDocument();
+  });
+
+  it("ouvre l'activation avec un lien QR pre-rempli", () => {
+    render(
+      <DogsClient
+        language="fr"
+        initialActivationToken="https://chezolive.ca/dog/dog-token-002?utm=print"
+        initialDogs={[]}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "Ajouter un collier QR" })).toBeInTheDocument();
+    expect(screen.getByDisplayValue("dog-token-002")).toBeInTheDocument();
   });
 });

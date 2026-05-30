@@ -13,6 +13,7 @@ const prismaMock = {
 const stripeSessionsCreateMock = vi.fn();
 const stripeProductsCreateMock = vi.fn();
 const stripePricesCreateMock = vi.fn();
+const stripePricesRetrieveMock = vi.fn();
 
 vi.mock("@/lib/auth", () => ({
   getCurrentUser: (...args: unknown[]) => getCurrentUserMock(...args),
@@ -38,6 +39,7 @@ vi.mock("@/lib/stripe", () => ({
       create: (...args: unknown[]) => stripeProductsCreateMock(...args),
     },
     prices: {
+      retrieve: (...args: unknown[]) => stripePricesRetrieveMock(...args),
       create: (...args: unknown[]) => stripePricesCreateMock(...args),
     },
   },
@@ -74,6 +76,17 @@ describe("POST /api/checkout/subscription", () => {
     stripeSessionsCreateMock.mockResolvedValue({
       id: "cs_test_1",
       client_secret: "cs_test_secret_1",
+    });
+
+    stripePricesRetrieveMock.mockResolvedValue({
+      id: "price_weekly_1",
+      active: true,
+      unit_amount: 1299,
+      currency: "cad",
+      recurring: {
+        interval: "week",
+        interval_count: 1,
+      },
     });
   });
 
@@ -148,11 +161,100 @@ describe("POST /api/checkout/subscription", () => {
     );
     expect(payload.returnUrl).toContain("/products/croquettes-premium?");
     expect(payload.url).toBeUndefined();
+    expect(stripePricesRetrieveMock).toHaveBeenCalledWith("price_weekly_1");
     expect(stripeSessionsCreateMock).toHaveBeenCalledWith(
       expect.objectContaining({
         mode: "subscription",
         ui_mode: "custom",
         return_url: expect.stringContaining("/products/croquettes-premium?"),
+      }),
+    );
+  });
+
+  it("recree un prix Stripe quand l'identifiant stocke appartient a un autre mode Stripe", async () => {
+    stripePricesRetrieveMock.mockRejectedValue({
+      code: "resource_missing",
+      message: "No such price: 'price_test_123'; a similar object exists in test mode, but a live mode key was used to make this request.",
+    });
+    stripeProductsCreateMock.mockResolvedValue({ id: "prod_stripe_live_1" });
+    stripePricesCreateMock.mockResolvedValue({ id: "price_live_weekly_1" });
+
+    const { POST } = await import("@/app/api/checkout/subscription/route");
+    const req = new Request("http://localhost:3101/api/checkout/subscription", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        productId: "prod_1",
+        interval: "WEEKLY",
+        quantity: 1,
+      }),
+    });
+
+    const res = await POST(req);
+    const payload = (await res.json()) as { clientSecret?: string };
+
+    expect(res.status).toBe(200);
+    expect(payload.clientSecret).toBe("cs_test_secret_1");
+    expect(stripeProductsCreateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "Croquettes premium",
+        metadata: expect.objectContaining({ productId: "prod_1", interval: "WEEKLY" }),
+      }),
+    );
+    expect(stripePricesCreateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        product: "prod_stripe_live_1",
+        unit_amount: 1299,
+        currency: "cad",
+        recurring: { interval: "week", interval_count: 1 },
+      }),
+    );
+    expect(prismaMock.product.update).toHaveBeenCalledWith({
+      where: { id: "prod_1" },
+      data: { stripePriceWeekly: "price_live_weekly_1" },
+    });
+    expect(stripeSessionsCreateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        line_items: [{ price: "price_live_weekly_1", quantity: 1 }],
+      }),
+    );
+  });
+
+  it("recree un prix Stripe quand le montant stocke ne correspond plus au produit", async () => {
+    stripePricesRetrieveMock.mockResolvedValue({
+      id: "price_weekly_1",
+      active: true,
+      unit_amount: 999,
+      currency: "cad",
+      recurring: {
+        interval: "week",
+        interval_count: 1,
+      },
+    });
+    stripeProductsCreateMock.mockResolvedValue({ id: "prod_stripe_live_2" });
+    stripePricesCreateMock.mockResolvedValue({ id: "price_live_weekly_2" });
+
+    const { POST } = await import("@/app/api/checkout/subscription/route");
+    const req = new Request("http://localhost:3101/api/checkout/subscription", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        productId: "prod_1",
+        interval: "WEEKLY",
+        quantity: 1,
+      }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.product.update).toHaveBeenCalledWith({
+      where: { id: "prod_1" },
+      data: { stripePriceWeekly: "price_live_weekly_2" },
+    });
+    expect(stripeSessionsCreateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        line_items: [{ price: "price_live_weekly_2", quantity: 1 }],
       }),
     );
   });

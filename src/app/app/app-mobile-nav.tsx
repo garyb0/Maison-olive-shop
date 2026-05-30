@@ -2,15 +2,51 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { NavIcon } from "@/components/NavIcon";
 import type { Language } from "@/lib/i18n";
 import type { UserRole } from "@/lib/types";
+import { appNavigationItems, navigationLabel } from "@/lib/navigation";
 
 type Props = {
   language: Language;
   userRole: UserRole | null;
+  className?: string;
+  showSecondary?: boolean;
 };
 
-export function AppMobileNav({ language, userRole }: Props) {
+const accountSecondaryPaths = ["/account/dogs", "/account/profile", "/account/subscriptions"];
+
+function isExactOrChildPath(pathname: string, href: string) {
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+export function isAppNavigationItemActive(pathname: string, href: string) {
+  if (href === "/app") {
+    return pathname === "/app";
+  }
+
+  if (href === "/boutique") {
+    return isExactOrChildPath(pathname, "/boutique") || pathname.startsWith("/products/");
+  }
+
+  if (href === "/account/orders") {
+    return isExactOrChildPath(pathname, "/account/orders");
+  }
+
+  if (href === "/account/support") {
+    return pathname === "/account/support";
+  }
+
+  if (href === "/account") {
+    return pathname === "/account" || accountSecondaryPaths.some((accountPath) => isExactOrChildPath(pathname, accountPath));
+  }
+
+  return isExactOrChildPath(pathname, href);
+}
+
+export function AppMobileNav({ language, userRole, className, showSecondary = true }: Props) {
+  const pathname = usePathname() ?? "";
   const [driverHref, setDriverHref] = useState<string | null>(null);
 
   useEffect(() => {
@@ -24,29 +60,40 @@ export function AppMobileNav({ language, userRole }: Props) {
     return () => window.clearTimeout(id);
   }, []);
 
-  const items = [
-    { href: "/boutique", label: language === "fr" ? "Boutique" : "Shop" },
-    { href: "/cart", label: language === "fr" ? "Panier" : "Cart" },
-    { href: "/account/orders", label: language === "fr" ? "Commandes" : "Orders" },
-    { href: "/account/dogs", label: language === "fr" ? "Chiens" : "Dogs" },
-    { href: "/account/support", label: "Support" },
-  ];
-
-  if (driverHref) {
-    items.push({ href: driverHref, label: language === "fr" ? "Livreur" : "Driver" });
-  }
-
-  if (userRole === "ADMIN") {
-    items.push({ href: "/admin", label: "Admin" });
-  }
+  const items = appNavigationItems.map((item) => {
+    const requiresAccount = item.href.startsWith("/account");
+    return {
+      ...item,
+      originalHref: item.href,
+      targetHref: requiresAccount && !userRole ? "/login" : item.href,
+      label: navigationLabel(item, language),
+    };
+  });
 
   return (
-    <nav className="pwa-app-nav" aria-label={language === "fr" ? "Navigation application" : "App navigation"}>
+    <nav className={`pwa-app-nav${className ? ` ${className}` : ""}`} aria-label={language === "fr" ? "Navigation application" : "App navigation"}>
       {items.map((item) => (
-        <Link href={item.href} key={`${item.href}-${item.label}`}>
-          {item.label}
+        <Link
+          className={isAppNavigationItemActive(pathname, item.originalHref) ? "active" : ""}
+          href={item.targetHref}
+          key={`${item.originalHref}-${item.label}`}
+        >
+          <NavIcon name={item.icon} size={19} />
+          <span>{item.label}</span>
         </Link>
       ))}
+      {showSecondary && driverHref ? (
+        <Link className="pwa-app-nav__secondary" href={driverHref}>
+          <NavIcon name="delivery" size={19} />
+          <span>{language === "fr" ? "Livreur" : "Driver"}</span>
+        </Link>
+      ) : null}
+      {showSecondary && userRole === "ADMIN" ? (
+        <Link className="pwa-app-nav__secondary" href="/admin">
+          <NavIcon name="admin" size={19} />
+          <span>Admin</span>
+        </Link>
+      ) : null}
     </nav>
   );
 }

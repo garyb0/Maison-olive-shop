@@ -126,8 +126,6 @@ test.describe("mobile public layout", () => {
     expect(homeMetrics.primaryCtaBottom, "primary CTA should be visible quickly").toBeLessThanOrEqual(homeMetrics.viewportHeight);
     expect(homeMetrics.footerHeight, "mobile footer should be compact").toBeLessThanOrEqual(760);
 
-    await page.screenshot({ path: "test-results/mobile-home-step2.png", fullPage: true });
-
     await page.locator(".home-hero-primary").click();
     await expect(page).toHaveURL(/\/boutique/);
     await page.waitForLoadState("domcontentloaded");
@@ -167,19 +165,21 @@ test.describe("mobile public layout", () => {
       (window as typeof window & { __chezoliveSupportOpenCount?: number }).__chezoliveSupportOpenCount ?? 0
     ))).toBe(1);
 
-    await page.screenshot({ path: "test-results/mobile-faq-step3.png", fullPage: true });
   });
 
-  test("legacy help routes redirect to the FAQ anchors", async ({ page }) => {
+  test("legacy help routes redirect while legal terms remain canonical", async ({ page }) => {
     for (const route of [
       { from: "/shipping", hash: "livraison" },
       { from: "/returns", hash: "retours" },
-      { from: "/terms", hash: "conditions" },
     ]) {
       await page.goto(route.from);
       await expect(page).toHaveURL(new RegExp(`/faq#${route.hash}$`));
       await expect(page.locator(`#${route.hash}`)).toBeAttached();
     }
+
+    await page.goto("/terms");
+    await expect(page).toHaveURL(/\/terms$/);
+    await expect(page.getByRole("heading", { name: /Conditions d'utilisation et de vente|Terms of use and sale/i })).toBeVisible();
   });
 
   test("help sitemap stays canonical", async ({ request }) => {
@@ -188,9 +188,9 @@ test.describe("mobile public layout", () => {
     const sitemapText = await sitemap.text();
 
     expect(sitemapText).toContain("/faq");
+    expect(sitemapText).toContain("/terms");
     expect(sitemapText).not.toContain("/shipping");
     expect(sitemapText).not.toContain("/returns");
-    expect(sitemapText).not.toContain("/terms");
 
     const robots = await request.get("/robots.txt");
     expect(robots.ok()).toBe(true);
@@ -212,7 +212,7 @@ test.describe("mobile public layout", () => {
     await expectNoHorizontalOverflow(page);
 
     await expectMinTapSize(page.locator(".catalog-side-link").first(), "catalog category chip");
-    await expectMinTapSize(page.locator(".catalog-conversion-strip a").first(), "catalog delivery help link");
+    await expectMinTapSize(page.locator(".catalog-product-card a[href^='/products/']").first(), "first product details link");
     await expectMinTapSize(page.locator(".catalog-product-add").first(), "first product add button");
 
     const firstCard = page.locator(".catalog-product-card").first();
@@ -246,7 +246,6 @@ test.describe("mobile public layout", () => {
       await expect(unavailableCard.locator(".catalog-product-add")).toContainText(/Indisponible|Unavailable/i);
     }
 
-    await page.screenshot({ path: "test-results/mobile-boutique-step4.png", fullPage: true });
   });
 
   test("product pages explain available and unavailable purchase states", async ({ page, request }) => {
@@ -263,13 +262,23 @@ test.describe("mobile public layout", () => {
     await page.waitForLoadState("domcontentloaded");
     await expectNoHorizontalOverflow(page);
     await expectMinTapSize(page.locator(".olive-product-add-btn").first(), "product add button");
+    const productAddBox = await page.locator(".olive-product-add-btn").first().boundingBox();
+    expect(productAddBox, "product add button should be measurable").not.toBeNull();
+    expect(productAddBox!.y, "product add button should appear in the first mobile screen").toBeLessThan(MOBILE_VIEWPORT.height);
     await expectMinTapSize(page.locator(".olive-product-trust-grid a").first(), "product trust link");
     await expect(page.locator(".olive-product-trust-grid")).toContainText(/Livraison locale|Local delivery/i);
     await expect(page.locator(".olive-product-trust-grid")).toContainText(/Paiement sécurisé|Secure payment/i);
     await expect(page.locator(".olive-product-trust-grid")).toContainText(/Retour \/ problème|Return \/ issue/i);
     await page.locator(".olive-product-add-btn").first().click();
     await expect(page.locator(".olive-product-add-btn").first()).toContainText(/Ajout|Added/i);
-    await page.screenshot({ path: "test-results/mobile-product-step4.png", fullPage: true });
+    await page.evaluate(() => window.scrollTo(0, 520));
+    await expect(page.locator(".olive-product-sticky-cta").first()).toBeVisible();
+    await expectMinTapSize(page.locator(".olive-product-sticky-cta__button").first(), "product sticky add button");
+    const productSupportFloat = page.locator(".support-lite-float").first();
+    if (await productSupportFloat.count()) {
+      await expect(productSupportFloat).toBeHidden();
+    }
+    await page.screenshot({ path: "test-results/mobile-product-step4.png", fullPage: false });
 
     if (unavailableProduct) {
       await page.goto(`/products/${unavailableProduct.slug}`);
@@ -299,15 +308,21 @@ test.describe("mobile public layout", () => {
     await page.waitForLoadState("domcontentloaded");
 
     await expectNoHorizontalOverflow(page);
+    await expect(page.locator(".cart-mobile-summary")).toContainText(/Total|Subtotal/i);
+    await expect(page.locator(".cart-mobile-summary")).toContainText(/checkout|Ready/i);
+    await expect(page.locator(".cart-mobile-summary")).toContainText(/Panier|Cart/i);
     await expect(page.locator(".cart-item-card")).toHaveCount(1);
     await expectMinTapSize(page.locator(".cart-qty-btn").first(), "cart quantity button");
     await expectMinTapSize(page.locator(".cart-item-card .cart-remove-btn").first(), "cart remove button");
     await expectMinTapSize(page.locator(".cart-checkout-btn").first(), "cart checkout CTA");
-    await expect(page.locator(".cart-summary-next-steps")).toContainText(/Adresse locale|Local address/i);
-    await expect(page.locator(".cart-summary-next-steps")).toContainText(/Créneau de livraison|Delivery window/i);
-    await expect(page.getByText(/Besoin d'aide avant de payer|Need help before paying/i)).toBeVisible();
+    const cartCtaBox = await page.locator(".cart-checkout-btn").first().boundingBox();
+    expect(cartCtaBox, "cart checkout CTA should be measurable").not.toBeNull();
+    expect(cartCtaBox!.y + cartCtaBox!.height, "cart checkout CTA should be visible immediately").toBeLessThanOrEqual(MOBILE_VIEWPORT.height);
+    await expectMinTapSize(page.locator(".cart-support-note summary").first(), "cart help summary");
+    await page.locator(".cart-support-note summary").first().click();
+    await expectMinTapSize(page.locator(".cart-support-note a").first(), "cart help link");
 
-    await page.screenshot({ path: "test-results/mobile-cart-step5.png", fullPage: true });
+    await page.screenshot({ path: "test-results/mobile-cart-step5.png", fullPage: false });
   });
 
   test("checkout mobile with a seeded item has clear steps, final CTA and no support overlap", async ({ page, request }) => {
@@ -326,9 +341,14 @@ test.describe("mobile public layout", () => {
 
     await expectNoHorizontalOverflow(page);
     await expect(page.getByRole("heading", { name: /Finaliser ma commande|Checkout/i })).toBeVisible();
+    await expect(page.locator(".checkout-mobile-summary")).toContainText(/Total actuel|Current total/i);
     await expect(page.locator(".checkout-step-card")).toHaveCount(4);
-    await expectMinTapSize(page.locator(".checkout-flow-strip span").first(), "checkout step chip");
+    await expect(page.locator(".checkout-flow-strip span").first()).toBeVisible();
+    await expectMinTapSize(page.locator(".checkout-help-strip summary").first(), "checkout help summary");
+    await page.locator(".checkout-help-strip summary").first().click();
     await expectMinTapSize(page.locator(".checkout-help-strip a").first(), "checkout help link");
+    await expectMinTapSize(page.locator(".checkout-payment-assurance summary").first(), "checkout payment help summary");
+    await page.locator(".checkout-payment-assurance summary").first().click();
     await expectMinTapSize(page.locator(".checkout-payment-assurance a").first(), "checkout payment help link");
     await expectMinTapSize(page.locator(".checkout-place-order-btn").first(), "checkout final CTA");
     await expect(page.locator(".checkout-payment-assurance")).toContainText(/Stripe sécurise|Stripe secures/i);
@@ -339,7 +359,7 @@ test.describe("mobile public layout", () => {
       await expect(supportFloat).toBeHidden();
     }
 
-    await page.screenshot({ path: "test-results/mobile-checkout-step5.png", fullPage: true });
+    await page.screenshot({ path: "test-results/mobile-checkout-step5.png", fullPage: false });
   });
 
   test("account mobile guards stay readable for signed-out users", async ({ page }) => {
@@ -358,7 +378,6 @@ test.describe("mobile public layout", () => {
       }
     }
 
-    await page.screenshot({ path: "test-results/mobile-account-guard-step6.png", fullPage: true });
   });
 
   test("login recovery pages remain mobile stable", async ({ page }) => {
@@ -369,6 +388,5 @@ test.describe("mobile public layout", () => {
     }
 
     await expectMinTapSize(page.locator("button[type='submit']").first(), "auth submit");
-    await page.screenshot({ path: "test-results/mobile-auth-step6.png", fullPage: true });
   });
 });

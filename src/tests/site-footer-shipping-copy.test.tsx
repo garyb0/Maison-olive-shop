@@ -40,9 +40,8 @@ describe("SiteFooter shipping copy", () => {
     expect(hrefs).toContain("/faq");
     expect(hrefs).toContain("/faq#livraison");
     expect(hrefs).toContain("/faq#retours");
-    expect(hrefs).toContain("/faq#conditions");
+    expect(hrefs).toContain("/terms");
     expect(hrefs).not.toContain("/shipping");
     expect(hrefs).not.toContain("/returns");
-    expect(hrefs).not.toContain("/terms");
   });
 });

@@ -1,3 +1,5 @@
+export {};
+
 const requireUserMock = vi.fn();
 const getDogProfilesForUserMock = vi.fn();
 const claimDogProfileForUserMock = vi.fn();
@@ -43,7 +45,7 @@ describe("account dog routes", () => {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        publicToken: "dog-token-001",
+        publicToken: "https://chezolive.ca/dog/dog-token-001?utm=print",
         name: "Olive",
         ownerPhone: "418-555-1212",
       }),

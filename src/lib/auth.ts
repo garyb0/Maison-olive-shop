@@ -3,6 +3,7 @@ import { randomBytes, createHash } from "crypto";
 import bcrypt from "bcryptjs";
 import { ADMIN_ACCESS_COOKIE_NAME, createAdminAccessCookieValue } from "@/lib/admin-access-cookie";
 import { DEV_SESSION_SECRET, env } from "@/lib/env";
+import type { GoogleVerifiedProfile } from "@/lib/google-oauth";
 import { prisma } from "@/lib/prisma";
 import {
   buildTwoFactorOtpAuthUri,
@@ -40,12 +41,16 @@ type RegisterInput = {
   language?: "fr" | "en";
 };
 
+type RegisterOptions = {
+  autoLogin?: boolean;
+};
+
 type AuthenticatedUser = Awaited<ReturnType<typeof getCurrentUser>>;
 
 type SessionUser = {
   id: string;
   email: string;
-  passwordHash: string;
+  passwordHash: string | null;
   firstName: string;
   lastName: string;
   role: "CUSTOMER" | "ADMIN";
@@ -165,11 +170,16 @@ export async function hashPassword(password: string) {
   return bcrypt.hash(password, 12);
 }
 
-export async function verifyPassword(password: string, hash: string) {
+export async function verifyPassword(password: string, hash: string | null | undefined) {
+  if (!hash) return false;
   return bcrypt.compare(password, hash);
 }
 
-export async function registerUser(input: RegisterInput) {
+export async function registerUser(input: RegisterInput, options: RegisterOptions = {}) {
+  if (options.autoLogin) {
+    ensureSessionSecret();
+  }
+
   const existing = await prisma.user.findUnique({ where: { email: input.email.toLowerCase() } });
   if (existing) {
     throw new Error("EMAIL_ALREADY_EXISTS");
@@ -186,6 +196,11 @@ export async function registerUser(input: RegisterInput) {
       language: input.language ?? "fr",
     },
   });
+
+  if (options.autoLogin) {
+    await clearTwoFactorLoginChallenge();
+    await createSessionForUser({ id: user.id, role: user.role });
+  }
 
   return user;
 }
@@ -224,6 +239,158 @@ export async function loginUser(email: string, password: string) {
     requiresTwoFactor: false,
     user: toCurrentUser(user as SessionUser),
   } satisfies LoginResult;
+}
+
+function splitGoogleName(profile: GoogleVerifiedProfile) {
+  const emailLocalPart = profile.email.split("@")[0]?.trim() || "client";
+  const nameParts = profile.name?.trim().split(/\s+/).filter(Boolean) ?? [];
+  const firstName = profile.givenName?.trim() || nameParts[0] || emailLocalPart;
+  const lastName = profile.familyName?.trim() || nameParts.slice(1).join(" ") || "Google";
+
+  return {
+    firstName,
+    lastName,
+  };
+}
+
+export async function loginOrRegisterGoogleUser(
+  profile: GoogleVerifiedProfile,
+  language: "fr" | "en" = "fr",
+) {
+  ensureSessionSecret();
+
+  if (!profile.emailVerified) {
+    logApiEvent({
+      level: "WARN",
+      route: "lib/auth",
+      event: "GOOGLE_EMAIL_NOT_VERIFIED",
+      status: 403,
+      details: { email: profile.email.toLowerCase() },
+    });
+    throw new Error("GOOGLE_EMAIL_NOT_VERIFIED");
+  }
+
+  const email = profile.email.toLowerCase();
+  const existingOAuthAccount = await prisma.oAuthAccount.findUnique({
+    where: {
+      provider_providerAccountId: {
+        provider: "google",
+        providerAccountId: profile.sub,
+      },
+    },
+    include: { user: true },
+  });
+
+  if (existingOAuthAccount) {
+    if (existingOAuthAccount.user.role !== "CUSTOMER") {
+      await prisma.auditLog.create({
+        data: {
+          action: "GOOGLE_LOGIN_ADMIN_REFUSED",
+          entity: "User",
+          entityId: existingOAuthAccount.user.id,
+          metadata: JSON.stringify({ provider: "google", email }),
+        },
+      });
+      throw new Error("GOOGLE_ADMIN_FORBIDDEN");
+    }
+
+    await clearTwoFactorLoginChallenge();
+    await createSessionForUser({ id: existingOAuthAccount.user.id, role: existingOAuthAccount.user.role });
+    logApiEvent({
+      level: "INFO",
+      route: "lib/auth",
+      event: "GOOGLE_LOGIN_SUCCESS",
+      status: 200,
+      details: { userId: existingOAuthAccount.user.id },
+    });
+
+    return toCurrentUser(existingOAuthAccount.user as SessionUser);
+  }
+
+  const existingUser = await prisma.user.findUnique({ where: { email } });
+  if (existingUser) {
+    if (existingUser.role !== "CUSTOMER") {
+      await prisma.auditLog.create({
+        data: {
+          action: "GOOGLE_LINK_ADMIN_REFUSED",
+          entity: "User",
+          entityId: existingUser.id,
+          metadata: JSON.stringify({ provider: "google", email }),
+        },
+      });
+      throw new Error("GOOGLE_ADMIN_FORBIDDEN");
+    }
+
+    await prisma.oAuthAccount.create({
+      data: {
+        userId: existingUser.id,
+        provider: "google",
+        providerAccountId: profile.sub,
+        email,
+      },
+    });
+    await prisma.auditLog.create({
+      data: {
+        actorUserId: existingUser.id,
+        action: "GOOGLE_ACCOUNT_LINKED",
+        entity: "User",
+        entityId: existingUser.id,
+        metadata: JSON.stringify({ provider: "google", email }),
+      },
+    });
+
+    await clearTwoFactorLoginChallenge();
+    await createSessionForUser({ id: existingUser.id, role: existingUser.role });
+    logApiEvent({
+      level: "INFO",
+      route: "lib/auth",
+      event: "GOOGLE_ACCOUNT_LINKED",
+      status: 200,
+      details: { userId: existingUser.id },
+    });
+
+    return toCurrentUser(existingUser as SessionUser);
+  }
+
+  const { firstName, lastName } = splitGoogleName({ ...profile, email });
+  const user = await prisma.user.create({
+    data: {
+      email,
+      passwordHash: null,
+      firstName,
+      lastName,
+      language,
+      oauthAccounts: {
+        create: {
+          provider: "google",
+          providerAccountId: profile.sub,
+          email,
+        },
+      },
+    },
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      actorUserId: user.id,
+      action: "GOOGLE_ACCOUNT_CREATED",
+      entity: "User",
+      entityId: user.id,
+      metadata: JSON.stringify({ provider: "google", email }),
+    },
+  });
+
+  await clearTwoFactorLoginChallenge();
+  await createSessionForUser({ id: user.id, role: user.role });
+  logApiEvent({
+    level: "INFO",
+    route: "lib/auth",
+    event: "GOOGLE_ACCOUNT_CREATED",
+    status: 200,
+    details: { userId: user.id },
+  });
+
+  return toCurrentUser(user as SessionUser);
 }
 
 export async function verifyTwoFactorLogin(code: string) {

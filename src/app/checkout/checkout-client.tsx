@@ -22,18 +22,23 @@ import {
 import { isRimouskiPostalCode } from "@/lib/delivery-zone";
 import { getConversionSessionKey, trackConversionEvent } from "@/lib/conversion-tracker";
 import { Navigation } from "@/components/Navigation";
+import { GoogleAuthButton } from "@/components/GoogleAuthButton";
 import { StripeInlineCheckout } from "@/components/StripeInlineCheckoutSurface";
 import { CheckoutSuccessView } from "@/components/CheckoutSuccessView";
+import { PwaAppHeader } from "@/app/app/pwa-app-header";
 
 type ProductIndex = Record<
   string,
   {
     id: string;
+    productId?: string;
+    variantId?: string | null;
     name: string;
     priceCents: number;
     currency: string;
     priceLabel: string;
     stock: number;
+    requiresVariantSelection?: boolean;
   }
 >;
 
@@ -48,10 +53,12 @@ type Props = {
   initialConfirmation: CheckoutConfirmation | null;
   initialPaymentMode: "manual" | "stripe";
   initialStripeNotice: "paid" | "pending" | "cancelled" | null;
+  googleOAuthEnabled?: boolean;
 };
 
 type CartLine = {
   productId: string;
+  variantId?: string | null;
   name?: string;
   quantity: number;
 };
@@ -177,6 +184,8 @@ const getCalendarDays = (deliveryDays: Array<{ dateKey: string; label: string; s
 };
 
 const normalizeDeliveryPhone = (value: string) => value.replace(/\D/g, "");
+const getCartLineKey = (line: { productId: string; variantId?: string | null }) =>
+  line.variantId ? `${line.productId}:${line.variantId}` : line.productId;
 const normalizeAddressText = (value: string) => value.trim().replace(/\s+/g, " ").toLowerCase();
 const normalizeAddressPostal = (value: string) => value.replace(/\s+/g, "").trim().toUpperCase();
 
@@ -287,8 +296,10 @@ export function CheckoutClient({
   initialConfirmation,
   initialPaymentMode,
   initialStripeNotice,
+  googleOAuthEnabled = false,
 }: Props) {
   const searchParams = useSearchParams();
+  const [isMobileCheckout, setIsMobileCheckout] = useState(false);
   const [deliveryAddresses] = useState<DeliveryAddress[]>(initialDeliveryAddresses);
   const [selectedSavedAddressId, setSelectedSavedAddressId] = useState("");
   const [saveDeliveryAddress, setSaveDeliveryAddress] = useState(Boolean(user) && initialDeliveryAddresses.length === 0);
@@ -301,6 +312,7 @@ export function CheckoutClient({
   const [shippingPostal, setShippingPostal] = useState("");
   const [shippingCountry, setShippingCountry] = useState("CA");
   const [deliveryPhone, setDeliveryPhone] = useState("");
+  const [smsOrderUpdatesOptIn, setSmsOrderUpdatesOptIn] = useState(false);
   const [deliveryInstructions, setDeliveryInstructions] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"MANUAL" | "STRIPE">(user ? "MANUAL" : "STRIPE");
   const [promoCode, setPromoCode] = useState("");
@@ -340,26 +352,26 @@ export function CheckoutClient({
     localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(updated));
   };
 
-  const updateQty = (productId: string, qty: number) => {
+  const updateQty = (lineKey: string, qty: number) => {
     if (qty <= 0) {
-      saveCart(cart.filter((line) => line.productId !== productId));
+      saveCart(cart.filter((line) => getCartLineKey(line) !== lineKey));
       return;
     }
 
-    const maxStock = productIndex[productId]?.stock;
+    const maxStock = productIndex[lineKey]?.stock;
     const nextQty = typeof maxStock === "number" && maxStock > 0 ? Math.min(qty, maxStock) : qty;
 
     saveCart(
       cart.map((line) => (
-        line.productId === productId
+        getCartLineKey(line) === lineKey
           ? { ...line, quantity: nextQty }
           : line
       )),
     );
   };
 
-  const remove = (productId: string) => {
-    saveCart(cart.filter((line) => line.productId !== productId));
+  const remove = (lineKey: string) => {
+    saveCart(cart.filter((line) => getCartLineKey(line) !== lineKey));
   };
 
   // Validation code postal en temps réel
@@ -382,6 +394,20 @@ export function CheckoutClient({
       : isDeliveryPhoneInvalid;
 
   useEffect(() => {
+    if (typeof window.matchMedia !== "function") {
+      return;
+    }
+
+    const query = window.matchMedia("(max-width: 760px)");
+    const syncMobileCheckout = () => setIsMobileCheckout(query.matches);
+
+    syncMobileCheckout();
+    query.addEventListener("change", syncMobileCheckout);
+
+    return () => query.removeEventListener("change", syncMobileCheckout);
+  }, []);
+
+  useEffect(() => {
     const raw = localStorage.getItem(CART_STORAGE_KEY);
     if (!raw) {
       setCart([]);
@@ -395,17 +421,21 @@ export function CheckoutClient({
   }, []);
 
   const cartRows = useMemo(() => cart.map((line) => {
-    const product = productIndex[line.productId];
+    const lineKey = getCartLineKey(line);
+    const product = productIndex[lineKey] ?? productIndex[line.productId];
     const lineSubtotalCents = (product?.priceCents ?? 0) * line.quantity;
     const unavailableReason = !product
       ? "missing"
-      : product.stock <= 0
+      : product.requiresVariantSelection
+        ? "choose-variant"
+        : product.stock <= 0
         ? "out-of-stock"
         : line.quantity > product.stock
           ? "quantity-over-stock"
           : null;
     return {
       ...line,
+      lineKey,
       name: product?.name ?? line.name ?? (language === "fr" ? "Produit indisponible" : "Unavailable product"),
       priceLabel: product?.priceLabel ?? "-",
       lineSubtotalCents,
@@ -424,12 +454,23 @@ export function CheckoutClient({
   const summaryItemCount = cartRows.reduce((acc, row) => acc + row.quantity, 0);
   const beforeTaxCents = Math.max(0, subtotalCents - (quote?.discountCents ?? 0)) + (quote?.shippingCents ?? 0);
   const subtotalLabel = formatCad(subtotalCents, language);
+  const checkoutTotalLabel = quote ? formatCad(quote.totalCents, language) : subtotalLabel;
+  const summaryItemLabel = `${summaryItemCount} ${language === "fr" ? "article" : "item"}${summaryItemCount > 1 ? "s" : ""}`;
+  const paymentMethodLabel =
+    paymentMethod === "STRIPE"
+      ? language === "fr"
+        ? "Carte"
+        : "Card"
+      : language === "fr"
+        ? "Local"
+        : "Local";
+  const checkoutHelpDetailsOpen = isMobileCheckout ? undefined : true;
   const trimmedPromoCode = promoCode.trim().toUpperCase();
   const promoApplied = Boolean(quote && quote.discountCents > 0);
   const checkoutFingerprint = useMemo(
     () =>
       JSON.stringify({
-        items: cartRows.map((row) => ({ productId: row.productId, quantity: row.quantity })),
+        items: cartRows.map((row) => ({ productId: row.productId, variantId: row.variantId ?? undefined, quantity: row.quantity })),
         paymentMethod,
         guestCustomerName: guestCustomerName.trim(),
         guestCustomerEmail: guestCustomerEmail.trim().toLowerCase(),
@@ -445,6 +486,7 @@ export function CheckoutClient({
         deliverySlotId: selectedDeliverySlotId,
         deliveryInstructions: deliveryInstructions.trim(),
         deliveryPhone: deliveryPhone.trim(),
+        smsOrderUpdatesOptIn,
       }),
     [
       cartRows,
@@ -463,6 +505,7 @@ export function CheckoutClient({
       selectedDeliverySlotId,
       deliveryInstructions,
       deliveryPhone,
+      smsOrderUpdatesOptIn,
     ],
   );
   const deliveryDays = useMemo(() => Array.from(new Set(deliverySlots.map((slot) => slot.dateKey))).map((dateKey) => {
@@ -640,6 +683,7 @@ export function CheckoutClient({
     deliveryAddresses,
     deliveryInstructions,
     deliveryPhone,
+    smsOrderUpdatesOptIn,
     selectedSavedAddressId,
     shippingCity,
     shippingLine1,
@@ -705,7 +749,7 @@ export function CheckoutClient({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            items: cart.map((row) => ({ productId: row.productId, quantity: row.quantity })),
+            items: cart.map((row) => ({ productId: row.productId, variantId: row.variantId ?? undefined, quantity: row.quantity })),
             shippingPostal,
             shippingCountry,
             promoCode: trimmedPromoCode || undefined,
@@ -898,10 +942,16 @@ export function CheckoutClient({
       return;
     }
 
-    if ((isDeliveryPhoneRequired && !hasDeliveryPhoneValue) || isDeliveryPhoneInvalid) {
+    if ((isDeliveryPhoneRequired && !hasDeliveryPhoneValue) || (smsOrderUpdatesOptIn && !hasDeliveryPhoneValue) || isDeliveryPhoneInvalid) {
       trackCheckoutError("delivery_phone_invalid");
       setDeliveryPhoneTouched(true);
-      setAddressError(deliveryPhoneErrorMessage);
+      setAddressError(
+        smsOrderUpdatesOptIn && !hasDeliveryPhoneValue
+          ? language === "fr"
+            ? "Ajoute un numero de telephone pour recevoir les suivis SMS."
+            : "Add a phone number to receive SMS updates."
+          : deliveryPhoneErrorMessage,
+      );
       return;
     }
 
@@ -952,7 +1002,7 @@ export function CheckoutClient({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          items: cartRows.map((row) => ({ productId: row.productId, quantity: row.quantity })),
+          items: cartRows.map((row) => ({ productId: row.productId, variantId: row.variantId ?? undefined, quantity: row.quantity })),
           paymentMethod,
           customerName: user ? undefined : guestCustomerName.trim(),
           customerEmail: user ? undefined : guestCustomerEmail.trim().toLowerCase(),
@@ -973,6 +1023,7 @@ export function CheckoutClient({
             deliveryMode === "dynamic" ? selectedSlot?.endAt || undefined : undefined,
           deliveryInstructions: deliveryInstructions.trim() || undefined,
           deliveryPhone: deliveryPhone.trim() || undefined,
+          smsOrderUpdatesOptIn,
           conversionSessionKey: getConversionSessionKey(),
         }),
       });
@@ -1083,8 +1134,11 @@ export function CheckoutClient({
 
   if (inlineConfirmation) {
     return (
-      <div className="app-shell">
-        <header className="topbar">
+      <div className="app-shell checkout-app-shell">
+        <div className="checkout-mobile-chrome">
+          <PwaAppHeader language={language} userRole={user?.role ?? null} />
+        </div>
+        <header className="topbar checkout-desktop-topbar">
           <div className="brand">{t.brandName}</div>
           <Navigation language={language} t={t} user={user} />
         </header>
@@ -1100,11 +1154,33 @@ export function CheckoutClient({
   }
 
   return (
-    <div className="app-shell">
-      <header className="topbar">
+    <div className="app-shell checkout-app-shell">
+      <div className="checkout-mobile-chrome">
+        <PwaAppHeader language={language} userRole={user?.role ?? null} />
+      </div>
+      <header className="topbar checkout-desktop-topbar">
         <div className="brand">{t.brandName}</div>
         <Navigation language={language} t={t} user={user} />
       </header>
+
+      {cartRows.length > 0 ? (
+        <section className="checkout-mobile-summary" aria-label={language === "fr" ? "Résumé mobile du checkout" : "Mobile checkout summary"}>
+          <div className="checkout-mobile-summary__top">
+            <span>{language === "fr" ? "Total actuel" : "Current total"}</span>
+            <strong>{checkoutTotalLabel}</strong>
+          </div>
+          <div className="checkout-mobile-summary__meta">
+            <span>{summaryItemLabel}</span>
+            <span>{language === "fr" ? "Paiement" : "Payment"}: {paymentMethodLabel}</span>
+          </div>
+          <div className="checkout-mobile-summary__steps" aria-label={language === "fr" ? "Étapes compactes" : "Compact steps"}>
+            <span><strong>1</strong>{language === "fr" ? "Infos" : "Info"}</span>
+            <span><strong>2</strong>{language === "fr" ? "Livraison" : "Delivery"}</span>
+            <span><strong>3</strong>{language === "fr" ? "Paiement" : "Payment"}</span>
+            <span><strong>4</strong>{language === "fr" ? "Confirm." : "Confirm"}</span>
+          </div>
+        </section>
+      ) : null}
 
       {/* Page header */}
       <section className="section checkout-page-header">
@@ -1147,16 +1223,21 @@ export function CheckoutClient({
               : "Delivery area: Rimouski and nearby, based on postal code."}
           </span>
         </div>
-        <div className="checkout-help-strip" aria-label={language === "fr" ? "Aide checkout" : "Checkout help"}>
-          <span>
-            {language === "fr"
-              ? "Carte en invite, paiement local avec compte, et support si quelque chose bloque."
-              : "Guest card payment, local payment with an account, and support if anything gets stuck."}
-          </span>
-          <Link href="/faq#paiement">{language === "fr" ? "Paiement" : "Payment"}</Link>
-          <Link href="/faq#livraison">{language === "fr" ? "Livraison" : "Delivery"}</Link>
-          <Link href="/faq#retours">{language === "fr" ? "Probleme" : "Issue"}</Link>
-        </div>
+        <details className="checkout-help-strip checkout-help-details" open={checkoutHelpDetailsOpen} aria-label={language === "fr" ? "Aide checkout" : "Checkout help"}>
+          <summary>{language === "fr" ? "Aide rapide checkout" : "Quick checkout help"}</summary>
+          <div className="checkout-help-details__body">
+            <span>
+              {language === "fr"
+                ? "Carte en invite, paiement local avec compte, et support si quelque chose bloque."
+                : "Guest card payment, local payment with an account, and support if anything gets stuck."}
+            </span>
+            <div className="checkout-help-details__links">
+              <Link href="/faq#paiement">{language === "fr" ? "Paiement" : "Payment"}</Link>
+              <Link href="/faq#livraison">{language === "fr" ? "Livraison" : "Delivery"}</Link>
+              <Link href="/faq#retours">{language === "fr" ? "Probleme" : "Issue"}</Link>
+            </div>
+          </div>
+        </details>
       </section>
 
       {cartRows.length === 0 ? (
@@ -1210,9 +1291,10 @@ export function CheckoutClient({
                       const isOutOfStock = row.unavailableReason === "out-of-stock";
                       const isMissing = row.unavailableReason === "missing";
                       const isOverStock = row.unavailableReason === "quantity-over-stock";
+                      const needsVariant = row.unavailableReason === "choose-variant";
 
                       return (
-                        <tr key={row.productId} className={`cart-row${row.unavailableReason ? " cart-row--blocked" : ""}`}>
+                        <tr key={row.lineKey} className={`cart-row${row.unavailableReason ? " cart-row--blocked" : ""}`}>
                           <td className="cart-td-name">
                             <span className="cart-product-name">{row.name}</span>
                             {row.unavailableReason ? (
@@ -1221,6 +1303,8 @@ export function CheckoutClient({
                                   ? language === "fr" ? "Rupture: retire cet article pour continuer." : "Out of stock: remove this item to continue."
                                   : isOverStock
                                     ? language === "fr" ? `Stock disponible: ${row.stock}.` : `Available stock: ${row.stock}.`
+                                    : needsVariant
+                                      ? language === "fr" ? "Choisis une couleur sur la fiche produit." : "Choose a color on the product page."
                                     : isMissing
                                       ? language === "fr" ? "Produit retiré de la boutique." : "Product removed from the shop."
                                       : null}
@@ -1235,7 +1319,7 @@ export function CheckoutClient({
                               <button
                                 className="cart-qty-btn"
                                 type="button"
-                                onClick={() => updateQty(row.productId, row.quantity - 1)}
+                                onClick={() => updateQty(row.lineKey, row.quantity - 1)}
                                 aria-label={language === "fr" ? "Diminuer" : "Decrease"}
                               >
                                 -
@@ -1245,12 +1329,12 @@ export function CheckoutClient({
                                 type="number"
                                 min={1}
                                 value={row.quantity}
-                                onChange={(e) => updateQty(row.productId, Math.max(1, Number(e.target.value) || 1))}
+                                onChange={(e) => updateQty(row.lineKey, Math.max(1, Number(e.target.value) || 1))}
                               />
                               <button
                                 className="cart-qty-btn"
                                 type="button"
-                                onClick={() => updateQty(row.productId, row.quantity + 1)}
+                                onClick={() => updateQty(row.lineKey, row.quantity + 1)}
                                 disabled={row.stock <= 0 || row.quantity >= row.stock}
                                 aria-label={language === "fr" ? "Augmenter" : "Increase"}
                               >
@@ -1265,7 +1349,7 @@ export function CheckoutClient({
                             <button
                               className="cart-remove-btn"
                               type="button"
-                              onClick={() => remove(row.productId)}
+                              onClick={() => remove(row.lineKey)}
                               aria-label={language === "fr" ? "Retirer" : "Remove"}
                               title={language === "fr" ? "Retirer" : "Remove"}
                             >
@@ -1310,7 +1394,15 @@ export function CheckoutClient({
                           : "You can place your order without an account using Visa or Mastercard. Pay on delivery stays reserved for signed-in customers."}
                       </p>
                     </div>
-                    <Link className="pill-link pill-link--sm" href="/login">
+                    {googleOAuthEnabled ? (
+                      <GoogleAuthButton
+                        language={language}
+                        returnTo="/checkout"
+                        className="checkout-google-auth"
+                        label={language === "fr" ? "Google" : "Google"}
+                      />
+                    ) : null}
+                    <Link className="pill-link pill-link--sm" href="/login?returnTo=/checkout">
                       {language === "fr" ? "Se connecter" : "Sign in"}
                     </Link>
                   </div>
@@ -1955,7 +2047,7 @@ export function CheckoutClient({
                             </span>
                           )}
                         </div>
-                        <div className="checkout-delivery-summary-card">
+                        <div className="checkout-delivery-summary-card checkout-delivery-summary-card--tips">
                           <span className="checkout-delivery-summary-label">
                             {language === "fr" ? "Bon à savoir" : "Good to know"}
                           </span>
@@ -2002,6 +2094,24 @@ export function CheckoutClient({
                         : "E.g. 418 555-1234. This helps the driver reach you if needed."}
                     </p>
                   ) : null}
+                  <label style={{ display: "flex", gap: 10, alignItems: "flex-start", marginTop: 12, color: "#44321d", fontWeight: 600 }}>
+                    <input
+                      type="checkbox"
+                      checked={smsOrderUpdatesOptIn}
+                      onChange={(event) => setSmsOrderUpdatesOptIn(event.target.checked)}
+                      style={{ marginTop: 3 }}
+                    />
+                    <span>
+                      {language === "fr"
+                        ? "Recevoir les suivis de commande et livraison par SMS."
+                        : "Receive order and delivery updates by SMS."}
+                      <small style={{ display: "block", marginTop: 4, color: "#6f624d", fontWeight: 500 }}>
+                        {language === "fr"
+                          ? "Messages transactionnels seulement. Reponds STOP pour arreter."
+                          : "Transactional messages only. Reply STOP to opt out."}
+                      </small>
+                    </span>
+                  </label>
                 </div>
 
                 <div className="field checkout-field-full">
@@ -2125,7 +2235,9 @@ export function CheckoutClient({
                       : "When you prepare payment, the card form opens directly inside the order summary."}
                 </p>
               ) : null}
-              <div className="checkout-payment-assurance" aria-label={language === "fr" ? "Aide paiement" : "Payment reassurance"}>
+              <details className="checkout-payment-assurance checkout-help-details checkout-payment-help-details" open={checkoutHelpDetailsOpen} aria-label={language === "fr" ? "Aide paiement" : "Payment reassurance"}>
+                <summary>{language === "fr" ? "Aide paiement" : "Payment help"}</summary>
+                <div className="checkout-help-details__body">
                 <span>{language === "fr" ? "Stripe sécurise les cartes." : "Stripe secures card payments."}</span>
                 <span>
                   {language === "fr"
@@ -2136,8 +2248,9 @@ export function CheckoutClient({
                       ? "Local payment is available for your account."
                       : "Local payment appears after sign-in."}
                 </span>
-                <Link href="/faq#paiement">{language === "fr" ? "Voir l'aide paiement" : "View payment help"}</Link>
-              </div>
+                  <Link href="/faq#paiement">{language === "fr" ? "Voir l'aide paiement" : "View payment help"}</Link>
+                </div>
+              </details>
             </section>
 
           </div>
@@ -2185,7 +2298,7 @@ export function CheckoutClient({
                 </div>
                 <div className="checkout-summary-lines">
                   {cartRows.map((row) => (
-                    <div key={row.productId} className="checkout-summary-line">
+                    <div key={row.lineKey} className="checkout-summary-line">
                       <span className="checkout-summary-line-name">
                         {row.name} <span className="checkout-summary-line-qty">{"\u00d7"}{row.quantity}</span>
                       </span>
@@ -2249,14 +2362,14 @@ export function CheckoutClient({
                     : "Local delivery in Rimouski area only."}
                 </div>
 
-                <div className="checkout-final-trust">
-                  <strong>{language === "fr" ? "Avant de confirmer" : "Before confirming"}</strong>
+                <details className="checkout-final-trust checkout-final-trust--details" open={checkoutHelpDetailsOpen}>
+                  <summary>{language === "fr" ? "Avant de confirmer" : "Before confirming"}</summary>
                   <ul>
                     <li>{language === "fr" ? "Le total inclut les taxes estimées." : "The total includes estimated taxes."}</li>
                     <li>{language === "fr" ? "Le créneau AM ou PM sert au suivi de livraison." : "The AM or PM window helps delivery tracking."}</li>
                     <li>{language === "fr" ? "Le paiement reste sécurisé; l'équipe aide si quelque chose bloque." : "Payment stays secure; the team helps if anything gets stuck."}</li>
                   </ul>
-                </div>
+                </details>
 
                 {message ? (
                   <div className="auth-alert auth-alert--ok">
@@ -2360,7 +2473,7 @@ export function CheckoutClient({
                             ? "Préparer le paiement"
                             : "Prepare payment"
                           : t.placeOrder}{" "}
-                        {"\u2192"} {quote ? formatCad(quote.totalCents, language) : subtotalLabel}
+                        {"\u2192"} {checkoutTotalLabel}
                       </>
                     )}
                   </button>

@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import type { Language } from "@/lib/i18n";
+import { compressImageFile, formatImageBytes } from "@/lib/client-image-compression";
 
 type Props = {
   language: Language;
@@ -9,67 +10,12 @@ type Props = {
   onChange: (url: string) => void;
 };
 
-const MAX_DIMENSION = 1200;
-const JPEG_QUALITY = 0.72;
-const WEBP_QUALITY = 0.72;
+const MAX_SOURCE_IMAGE_BYTES = 12 * 1024 * 1024;
+const MAX_DOG_UPLOAD_BYTES = 2 * 1024 * 1024;
+const VALID_DOG_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
-function getFileExtension(type: string) {
-  if (type === "image/webp") return "webp";
-  if (type === "image/png") return "png";
-  if (type === "image/gif") return "gif";
-  return "jpg";
-}
-
-async function compressImage(file: File) {
-  const imageUrl = URL.createObjectURL(file);
-
-  try {
-    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => resolve(img);
-      img.onerror = () => reject(new Error("IMAGE_LOAD_FAILED"));
-      img.src = imageUrl;
-    });
-
-    const scale = Math.min(1, MAX_DIMENSION / Math.max(image.width, image.height));
-    const width = Math.max(1, Math.round(image.width * scale));
-    const height = Math.max(1, Math.round(image.height * scale));
-
-    const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-
-    const context = canvas.getContext("2d");
-    if (!context) {
-      throw new Error("CANVAS_NOT_AVAILABLE");
-    }
-
-    context.drawImage(image, 0, 0, width, height);
-
-    const preferWebp = file.type !== "image/gif" && file.type !== "image/svg+xml";
-    const outputType = preferWebp ? "image/webp" : "image/jpeg";
-    const quality = preferWebp ? WEBP_QUALITY : JPEG_QUALITY;
-
-    const blob = await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob((result) => {
-        if (!result) {
-          reject(new Error("IMAGE_COMPRESSION_FAILED"));
-          return;
-        }
-
-        resolve(result);
-      }, outputType, quality);
-    });
-
-    const extension = getFileExtension(blob.type || outputType);
-    const baseName = file.name.replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9_-]/g, "_") || "dog-photo";
-
-    return new File([blob], `${baseName}.${extension}`, {
-      type: blob.type || outputType,
-    });
-  } finally {
-    URL.revokeObjectURL(imageUrl);
-  }
+function canUploadDogImageAsIs(file: File) {
+  return VALID_DOG_IMAGE_TYPES.has(file.type) && file.size <= MAX_DOG_UPLOAD_BYTES;
 }
 
 export function DogPhotoUpload({ language, value, onChange }: Props) {
@@ -89,9 +35,49 @@ export function DogPhotoUpload({ language, value, onChange }: Props) {
     setError("");
 
     try {
-      const compressed = await compressImage(file);
+      if (!VALID_DOG_IMAGE_TYPES.has(file.type)) {
+        setError(language === "fr" ? "Choisis une photo JPG, PNG ou WebP." : "Choose a JPG, PNG, or WebP photo.");
+        return;
+      }
+
+      if (file.size > MAX_SOURCE_IMAGE_BYTES) {
+        setError(
+          language === "fr"
+            ? `Photo trop lourde. Maximum: ${formatImageBytes(MAX_SOURCE_IMAGE_BYTES)}.`
+            : `Photo is too large. Maximum: ${formatImageBytes(MAX_SOURCE_IMAGE_BYTES)}.`,
+        );
+        return;
+      }
+
+      let imageFile = file;
+
+      if (!canUploadDogImageAsIs(file)) {
+        try {
+          imageFile = await compressImageFile(file, {
+            fileNamePrefix: "dog-photo",
+            initialQuality: 0.76,
+            maxDimension: 1200,
+            minDimension: 560,
+            targetMaxBytes: MAX_DOG_UPLOAD_BYTES,
+          });
+        } catch {
+          if (!canUploadDogImageAsIs(file)) {
+            throw new Error("IMAGE_PREPARE_FAILED");
+          }
+        }
+      }
+
+      if (imageFile.size > MAX_DOG_UPLOAD_BYTES) {
+        setError(
+          language === "fr"
+            ? "Cette photo reste trop lourde apres compression."
+            : "This photo is still too large after compression.",
+        );
+        return;
+      }
+
       const formData = new FormData();
-      formData.append("image", compressed);
+      formData.append("image", imageFile, imageFile.name);
 
       const response = await fetch("/api/account/dogs/photo", {
         method: "POST",
@@ -110,7 +96,11 @@ export function DogPhotoUpload({ language, value, onChange }: Props) {
 
       onChange(payload.image.url);
     } catch {
-      setError(language === "fr" ? "Impossible de preparer la photo." : "Unable to prepare the photo.");
+      setError(
+        language === "fr"
+          ? "Impossible de lire cette photo. Essaie une capture/export JPG ou une PNG plus petite."
+          : "Unable to read this photo. Try a JPG export or a smaller PNG.",
+      );
     } finally {
       setUploading(false);
       if (inputRef.current) {
@@ -148,17 +138,21 @@ export function DogPhotoUpload({ language, value, onChange }: Props) {
               borderRadius: 18,
               border: "1px dashed var(--border)",
               background: "rgba(239, 244, 227, 0.55)",
-              fontSize: "2rem",
+              color: "var(--muted)",
+              fontSize: "0.82rem",
+              fontWeight: 700,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
             }}
           >
-            🐶
+            Photo
           </div>
         )}
 
         <div style={{ display: "grid", gap: 8 }}>
           <input
             ref={inputRef}
-            accept="image/png,image/jpeg,image/webp"
+            accept="image/*"
             hidden
             onChange={handleUpload}
             type="file"
@@ -181,8 +175,8 @@ export function DogPhotoUpload({ language, value, onChange }: Props) {
           </div>
           <p className="small" style={{ margin: 0 }}>
             {language === "fr"
-              ? "La photo est reduite automatiquement pour prendre moins d'espace."
-              : "The photo is automatically reduced to use less storage."}
+              ? `Reduction automatique. Source max: ${formatImageBytes(MAX_SOURCE_IMAGE_BYTES)}.`
+              : `Automatic reduction. Source max: ${formatImageBytes(MAX_SOURCE_IMAGE_BYTES)}.`}
           </p>
           {error ? (
             <p className="small" style={{ margin: 0, color: "#8f3b2e" }}>

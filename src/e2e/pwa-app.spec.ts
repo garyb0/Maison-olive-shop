@@ -62,16 +62,17 @@ test.describe("Chez Olive PWA app hub", () => {
     await page.goto("/app");
     await page.waitForLoadState("domcontentloaded");
 
-    await expect(page.getByRole("heading", { name: "Chez Olive" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Bienvenue" })).toBeVisible();
     await expect(page.getByRole("banner", { name: "En-tete application" })).toBeVisible();
     await expect(page.locator(".nav-marketplace")).toHaveCount(0);
     await expect(page.locator(".pwa-app-header")).toBeVisible();
-    await expect(page.getByRole("link", { name: "Ouvrir la boutique" })).toHaveAttribute("href", "/boutique");
+    await expect(page.getByRole("link", { name: "Boutique" }).first()).toHaveAttribute("href", "/boutique");
     await expectNoHorizontalOverflow(page);
 
+    await page.locator(".pwa-more-panel > summary").click();
     await expect(page.getByRole("button", { name: "Installer l'app" })).toBeVisible();
     await page.getByRole("button", { name: "Installer l'app" }).click();
-    await expect(page.getByRole("heading", { name: "Mode app active." })).toBeVisible();
+    await expect(page.getByText(/Mode app activ/i)).toBeVisible();
 
     await page.getByLabel("Lien chauffeur ou token").fill("driver_token_123456789");
     await page.getByRole("button", { name: "Garder ce lien" }).click();
@@ -107,7 +108,8 @@ test.describe("Chez Olive PWA app hub", () => {
     await page.goto("/app");
     await page.waitForLoadState("domcontentloaded");
 
-    await expect(page.getByRole("heading", { name: "Mode app active." })).toBeVisible();
+    await page.locator(".pwa-more-panel > summary").click();
+    await expect(page.getByText(/Mode app activ/i)).toBeVisible();
     await expectNoHorizontalOverflow(page);
     await page.screenshot({ path: "test-results/pwa-app-standalone-mobile.png", fullPage: true });
   });

@@ -1,7 +1,7 @@
 import { registerUser } from "@/lib/auth";
 import { jsonError, jsonOk } from "@/lib/http";
 import { applyRateLimit } from "@/lib/rate-limit";
-import { registerSchema } from "@/lib/validators";
+import { registerRequestSchema } from "@/lib/validators";
 
 export async function POST(request: Request) {
   const rate = await applyRateLimit(request, { namespace: "auth:register", windowMs: 10 * 60_000, max: 10 });
@@ -11,15 +11,17 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const input = registerSchema.parse(body);
-    const user = await registerUser(input);
+    const { autoLogin, ...input } = registerRequestSchema.parse(body);
+    const user = await registerUser(input, autoLogin ? { autoLogin: true } : undefined);
 
-    return jsonOk({
+    const payload = {
       id: user.id,
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
-    });
+    };
+
+    return jsonOk(autoLogin ? { ...payload, role: user.role } : payload);
   } catch (error) {
     if (error instanceof Error && error.message === "EMAIL_ALREADY_EXISTS") {
       return jsonError("Email already exists", 409);

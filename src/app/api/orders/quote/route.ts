@@ -36,21 +36,50 @@ export async function POST(request: Request) {
         isActive: true,
         slug: { notIn: getHiddenStorefrontProductSlugs() },
       },
-      select: { id: true, priceCents: true },
+      select: {
+        id: true,
+        priceCents: true,
+        stock: true,
+        variants: {
+          where: { isActive: true },
+          select: {
+            id: true,
+            stock: true,
+            priceCents: true,
+          },
+        },
+      },
     });
 
     const map = new Map(products.map((p) => [p.id, p] as const));
 
-    for (const item of input.items) {
+    const resolvedItems = input.items.map((item) => {
       const product = map.get(item.productId);
       if (!product) return jsonError("Product not found", 404);
       if (item.quantity <= 0) return jsonError("Invalid quantity", 400);
-    }
 
-    const subtotalCents = input.items.reduce((sum, item) => {
-      const product = map.get(item.productId)!;
-      return sum + product.priceCents * item.quantity;
-    }, 0);
+      if (product.variants.length > 0) {
+        if (!item.variantId) return jsonError("Product variant required", 400);
+        const variant = product.variants.find((candidate) => candidate.id === item.variantId);
+        if (!variant) return jsonError("Product variant not found", 404);
+        if (variant.stock < item.quantity) return jsonError("Insufficient stock", 409);
+        return { quantity: item.quantity, unitPriceCents: variant.priceCents ?? product.priceCents };
+      }
+
+      if (product.stock < item.quantity) return jsonError("Insufficient stock", 409);
+      return { quantity: item.quantity, unitPriceCents: product.priceCents };
+    });
+
+    const earlyResponse = resolvedItems.find((item): item is Response => item instanceof Response);
+    if (earlyResponse) return earlyResponse;
+    const pricedItems = resolvedItems.filter(
+      (item): item is { quantity: number; unitPriceCents: number } => !(item instanceof Response),
+    );
+
+    const subtotalCents = pricedItems.reduce(
+      (sum, item) => sum + item.unitPriceCents * item.quantity,
+      0,
+    );
 
     const promo = await resolvePromoCodeDiscount(subtotalCents, input.promoCode);
     const quote = computeOrderAmounts(subtotalCents, promo.discountCents);

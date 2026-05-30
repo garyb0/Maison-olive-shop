@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Capacitor } from "@capacitor/core";
 import type { Language } from "@/lib/i18n";
 
 type BeforeInstallPromptEvent = Event & {
@@ -20,25 +21,26 @@ export function PwaInstallPanel({ language }: Props) {
   const [installEvent, setInstallEvent] = useState<BeforeInstallPromptEvent | null>(null);
   const [installed, setInstalled] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);
+  const [isNativeApp, setIsNativeApp] = useState(false);
   const [isIos, setIsIos] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
 
   const copy = useMemo(() => ({
     title: language === "fr" ? "Installer Chez Olive" : "Install Chez Olive",
-    ready: language === "fr" ? "L'app peut etre installee sur cet appareil." : "The app can be installed on this device.",
+    ready: language === "fr" ? "L'app peut être installée sur cet appareil." : "The app can be installed on this device.",
     install: language === "fr" ? "Installer l'app" : "Install app",
-    standalone: language === "fr" ? "Mode app active." : "App mode is active.",
+    standalone: language === "fr" ? "Mode app activé." : "App mode is active.",
     ios:
       language === "fr"
-        ? "Sur iPhone: ouvre Partager, puis choisis Sur l'ecran d'accueil."
+        ? "Sur iPhone: ouvre Partager, puis choisis Sur l'écran d'accueil."
         : "On iPhone: open Share, then choose Add to Home Screen.",
     browser:
       language === "fr"
-        ? "Si l'option n'apparait pas encore, utilise le menu du navigateur pour l'ajouter a l'ecran d'accueil."
+        ? "Si l'option n'apparaît pas encore, utilise le menu du navigateur pour l'ajouter à l'écran d'accueil."
         : "If the option does not appear yet, use the browser menu to add it to your home screen.",
     offline:
       language === "fr"
-        ? "Tu es hors ligne. Les pages sensibles comme le panier, le compte et le checkout se resynchronisent au retour du reseau."
+        ? "Tu es hors ligne. Les pages sensibles comme le panier, le compte et le checkout se resynchronisent au retour du réseau."
         : "You are offline. Sensitive pages like cart, account, and checkout will resync when the network returns.",
     offlineLink: language === "fr" ? "Voir la page hors ligne" : "Open offline page",
   }), [language]);
@@ -59,6 +61,7 @@ export function PwaInstallPanel({ language }: Props) {
     };
 
     const initialStatusId = window.setTimeout(() => {
+      setIsNativeApp(Capacitor.isNativePlatform());
       updateStandalone();
       updateOnline();
       setIsIos(isAppleMobile(navigator.userAgent));
@@ -89,6 +92,8 @@ export function PwaInstallPanel({ language }: Props) {
     }
     setInstallEvent(null);
   };
+
+  if (isNativeApp) return null;
 
   return (
     <section className="pwa-install-panel" aria-label={copy.title}>

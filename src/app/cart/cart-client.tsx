@@ -6,20 +6,25 @@ import type { Dictionary, Language } from "@/lib/i18n";
 import type { CurrentUser } from "@/lib/types";
 import { trackConversionEvent } from "@/lib/conversion-tracker";
 import { Navigation } from "@/components/Navigation";
+import { PwaAppHeader } from "@/app/app/pwa-app-header";
 
 type ProductInfo = {
   id: string;
+  productId?: string;
+  variantId?: string | null;
   name: string;
   priceCents: number;
   currency: string;
   priceLabel: string;
   stock: number;
+  requiresVariantSelection?: boolean;
 };
 
 type ProductIndex = Record<string, ProductInfo>;
 
 type CartLine = {
   productId: string;
+  variantId?: string | null;
   name?: string;
   quantity: number;
 };
@@ -58,6 +63,9 @@ const readStoredCart = (): CartLine[] => {
   }
 };
 
+const getCartLineKey = (line: { productId: string; variantId?: string | null }) =>
+  line.variantId ? `${line.productId}:${line.variantId}` : line.productId;
+
 export function CartClient({
   language,
   t,
@@ -69,6 +77,7 @@ export function CartClient({
   const [cart, setCart] = useState<CartLine[]>([]);
   const [cartLoaded, setCartLoaded] = useState(false);
   const [quote, setQuote] = useState<CartQuote | null>(null);
+  const [isMobileCart, setIsMobileCart] = useState(false);
   const cartViewTrackedRef = useRef(false);
   const locale = language === "fr" ? "fr-CA" : "en-CA";
 
@@ -79,34 +88,38 @@ export function CartClient({
     window.dispatchEvent(new StorageEvent("storage", { key: CART_STORAGE_KEY, newValue: nextValue }));
   };
 
-  const updateQty = (productId: string, qty: number) => {
+  const updateQty = (lineKey: string, qty: number) => {
     if (qty <= 0) {
-      saveCart(cart.filter((l) => l.productId !== productId));
+      saveCart(cart.filter((l) => getCartLineKey(l) !== lineKey));
     } else {
-      const maxStock = productIndex[productId]?.stock;
+      const maxStock = productIndex[lineKey]?.stock;
       const nextQty = typeof maxStock === "number" && maxStock > 0 ? Math.min(qty, maxStock) : qty;
-      saveCart(cart.map((l) => (l.productId === productId ? { ...l, quantity: nextQty } : l)));
+      saveCart(cart.map((l) => (getCartLineKey(l) === lineKey ? { ...l, quantity: nextQty } : l)));
     }
   };
 
-  const remove = (productId: string) => {
-    saveCart(cart.filter((l) => l.productId !== productId));
+  const remove = (lineKey: string) => {
+    saveCart(cart.filter((l) => getCartLineKey(l) !== lineKey));
   };
 
   const rows = cart.map((line) => {
-    const product = productIndex[line.productId];
+    const lineKey = getCartLineKey(line);
+    const product = productIndex[lineKey] ?? productIndex[line.productId];
     const currency = product?.currency ?? "CAD";
     const priceCents = product?.priceCents ?? 0;
     const subtotalCents = priceCents * line.quantity;
     const unavailableReason = !product
       ? "missing"
-      : product.stock <= 0
+      : product.requiresVariantSelection
+        ? "choose-variant"
+        : product.stock <= 0
         ? "out-of-stock"
         : line.quantity > product.stock
           ? "quantity-over-stock"
           : null;
     return {
       ...line,
+      lineKey,
       name: product?.name ?? line.name ?? (language === "fr" ? "Produit indisponible" : "Unavailable product"),
       priceLabel: product?.priceLabel ?? "-",
       subtotalLabel: fmt(subtotalCents, currency, locale),
@@ -148,6 +161,30 @@ export function CartClient({
   }, []);
 
   useEffect(() => {
+    if (typeof window.matchMedia !== "function") {
+      const syncMobileState = () => setIsMobileCart(window.innerWidth <= 760);
+      const id = window.setTimeout(syncMobileState, 0);
+      window.addEventListener("resize", syncMobileState);
+
+      return () => {
+        window.clearTimeout(id);
+        window.removeEventListener("resize", syncMobileState);
+      };
+    }
+
+    const mediaQuery = window.matchMedia("(max-width: 760px)");
+    const syncMobileState = () => setIsMobileCart(mediaQuery.matches);
+    const id = window.setTimeout(syncMobileState, 0);
+
+    mediaQuery.addEventListener("change", syncMobileState);
+
+    return () => {
+      window.clearTimeout(id);
+      mediaQuery.removeEventListener("change", syncMobileState);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!cart.length || hasBlockedRows) {
       const id = window.setTimeout(() => setQuote(null), 0);
       return () => window.clearTimeout(id);
@@ -161,7 +198,7 @@ export function CartClient({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            items: cart.map((row) => ({ productId: row.productId, quantity: row.quantity })),
+            items: cart.map((row) => ({ productId: row.productId, variantId: row.variantId ?? undefined, quantity: row.quantity })),
           }),
           signal: controller.signal,
         });
@@ -189,6 +226,22 @@ export function CartClient({
   const pricedSubtotalCents = visibleQuote?.subtotalCents ?? totalCents;
   const remainingForFreeShippingCents = Math.max(0, shippingFreeThresholdCents - pricedSubtotalCents);
   const qualifiesForFreeShipping = rows.length > 0 && visibleQuote?.shippingCents === 0;
+  const cartEstimateLabel = visibleQuote ? fmt(visibleQuote.totalCents, "CAD", locale) : totalLabel;
+  const cartEstimateTitle = visibleQuote
+    ? language === "fr"
+      ? "Total estimé"
+      : "Estimated total"
+    : language === "fr"
+      ? "Sous-total"
+      : "Subtotal";
+  const cartStockLabel = hasBlockedRows
+    ? language === "fr"
+      ? "Stock à ajuster"
+      : "Stock to review"
+    : language === "fr"
+      ? "Prêt pour checkout"
+      : "Ready for checkout";
+  const cartHelpDetailsOpen = isMobileCart ? undefined : true;
 
   useEffect(() => {
     if (!cartLoaded || cartViewTrackedRef.current) return;
@@ -201,11 +254,36 @@ export function CartClient({
   }, [cartLoaded, itemCount, language, totalCents]);
 
   return (
-    <div className="app-shell">
-      <header className="topbar">
+    <div className="app-shell cart-app-shell">
+      <div className="cart-mobile-chrome">
+        <PwaAppHeader language={language} userRole={user?.role ?? null} />
+      </div>
+      <header className="topbar cart-desktop-topbar">
         <div className="brand">{t.brandName}</div>
         <Navigation language={language} t={t} user={user} />
       </header>
+
+      {cartLoaded && rows.length > 0 ? (
+        <section
+          className={`cart-mobile-summary${hasBlockedRows ? " cart-mobile-summary--blocked" : ""}`}
+          aria-label={language === "fr" ? "Résumé mobile du panier" : "Mobile cart summary"}
+        >
+          <div className="cart-mobile-summary__top">
+            <span>{cartEstimateTitle}</span>
+            <strong>{cartEstimateLabel}</strong>
+          </div>
+          <div className="cart-mobile-summary__meta">
+            <span>{itemCountLabel}</span>
+            <span>{cartStockLabel}</span>
+          </div>
+          <div className="cart-mobile-summary__steps" aria-label={language === "fr" ? "Étapes compactes" : "Compact steps"}>
+            <span>{language === "fr" ? "Panier" : "Cart"}</span>
+            <span>{language === "fr" ? "Infos" : "Info"}</span>
+            <span>{language === "fr" ? "Livraison" : "Delivery"}</span>
+            <span>{language === "fr" ? "Paiement" : "Payment"}</span>
+          </div>
+        </section>
+      ) : null}
 
       <section className="section cart-page-header cart-market-header">
         <div className="cart-page-title-row">
@@ -295,7 +373,7 @@ export function CartClient({
                   const isOverStock = row.unavailableReason === "quantity-over-stock";
 
                   return (
-                    <article key={row.productId} className={`cart-item-card${isUnavailable ? " cart-item-card--unavailable" : ""}`}>
+                    <article key={row.lineKey} className={`cart-item-card${isUnavailable ? " cart-item-card--unavailable" : ""}`}>
                       <div className="cart-item-main">
                         <span className="cart-product-mark" aria-hidden="true">🐾</span>
                         <div className="cart-item-copy">
@@ -320,7 +398,11 @@ export function CartClient({
                                 ? language === "fr"
                                   ? `Ajuste la quantité à ${row.stock} ou moins pour continuer.`
                                   : `Adjust quantity to ${row.stock} or less to continue.`
-                                : isMissing
+                                  : row.unavailableReason === "choose-variant"
+                                    ? language === "fr"
+                                      ? "Choisis une couleur sur la fiche produit pour continuer."
+                                      : "Choose a color on the product page to continue."
+                                  : isMissing
                                   ? language === "fr"
                                     ? "Ce produit n'est plus disponible dans la boutique."
                                     : "This product is no longer available in the shop."
@@ -340,7 +422,7 @@ export function CartClient({
                           <button
                             className="cart-qty-btn"
                             type="button"
-                            onClick={() => updateQty(row.productId, row.quantity - 1)}
+                            onClick={() => updateQty(row.lineKey, row.quantity - 1)}
                             aria-label={language === "fr" ? "Diminuer" : "Decrease"}
                           >
                             -
@@ -350,12 +432,12 @@ export function CartClient({
                             type="number"
                             min={1}
                             value={row.quantity}
-                            onChange={(e) => updateQty(row.productId, Math.max(1, Number(e.target.value) || 1))}
+                            onChange={(e) => updateQty(row.lineKey, Math.max(1, Number(e.target.value) || 1))}
                           />
                           <button
                             className="cart-qty-btn"
                             type="button"
-                            onClick={() => updateQty(row.productId, row.quantity + 1)}
+                            onClick={() => updateQty(row.lineKey, row.quantity + 1)}
                             disabled={row.stock <= 0 || row.quantity >= row.stock}
                             aria-label={language === "fr" ? "Augmenter" : "Increase"}
                           >
@@ -372,7 +454,7 @@ export function CartClient({
                       <button
                         className="cart-remove-btn"
                         type="button"
-                        onClick={() => remove(row.productId)}
+                        onClick={() => remove(row.lineKey)}
                         aria-label={language === "fr" ? "Retirer" : "Remove"}
                         title={language === "fr" ? "Retirer" : "Remove"}
                       >
@@ -504,18 +586,20 @@ export function CartClient({
                   </span>
                   <span>{language === "fr" ? "Support attentionné" : "Thoughtful support"}</span>
                 </div>
-                <div className="cart-support-note">
-                  <strong>{language === "fr" ? "Besoin d'aide avant de payer?" : "Need help before paying?"}</strong>
-                  <Link href="/faq#commandes">
-                    {language === "fr" ? "Voir l'aide commande" : "View order help"}
-                  </Link>
-                  <Link href="/faq#livraison">
-                    {language === "fr" ? "Livraison locale" : "Local delivery"}
-                  </Link>
-                  <Link href="/faq#paiement">
-                    {language === "fr" ? "Paiement" : "Payment"}
-                  </Link>
-                </div>
+                <details className="cart-support-note cart-help-details" open={cartHelpDetailsOpen}>
+                  <summary>{language === "fr" ? "Besoin d'aide avant de payer?" : "Need help before paying?"}</summary>
+                  <div className="cart-help-details__links">
+                    <Link href="/faq#commandes">
+                      {language === "fr" ? "Voir l'aide commande" : "View order help"}
+                    </Link>
+                    <Link href="/faq#livraison">
+                      {language === "fr" ? "Livraison locale" : "Local delivery"}
+                    </Link>
+                    <Link href="/faq#paiement">
+                      {language === "fr" ? "Paiement" : "Payment"}
+                    </Link>
+                  </div>
+                </details>
                 <div className="cart-summary-actions">
                   {hasBlockedRows ? (
                     <button className="btn cart-checkout-btn cart-checkout-btn--disabled" type="button" disabled>

@@ -4,6 +4,7 @@ import { getCurrentLanguage } from "@/lib/language";
 import { getCurrentUser } from "@/lib/auth";
 import { getDogProfileByPublicToken } from "@/lib/dogs";
 import { DogClaimClient } from "./dog-claim-client";
+import { DogLocationShare } from "./dog-location-share";
 import { DogQrViewTracker } from "./dog-qr-view-tracker";
 
 type DogPageProps = {
@@ -148,82 +149,128 @@ export default async function DogPublicPage({ params }: DogPageProps) {
   const canCall = dog.publicProfileEnabled && dog.showPhonePublic;
   const telHref = canCall ? phoneHref(dog.ownerPhone) : null;
   const hasAnyPublicDetails = Boolean(showAge || showNotes || telHref);
+  const dogName = dog.name ?? (language === "fr" ? "Un chien adorable" : "A lovely dog");
+  const lostMode = dog.lostModeEnabled;
+  const lostModeMessage = dog.lostModeMessage?.trim();
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_#fffefb_0%,_#fbf2df_40%,_#eef4e3_100%)] px-4 py-10 text-stone-800">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_#fffefb_0%,_#fbf2df_38%,_#eef4e3_100%)] px-4 py-6 text-stone-800 sm:py-10">
       {!isOwner ? <DogQrViewTracker publicToken={dog.publicToken} /> : null}
-      <div className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-5xl items-center justify-center">
-        <section className="grid w-full items-center gap-10 rounded-[40px] border border-white/75 bg-[rgba(255,255,255,0.9)] p-6 shadow-[0_28px_90px_rgba(80,67,36,0.14)] backdrop-blur md:grid-cols-[0.9fr_1.1fr] md:p-10">
-          <div className="text-center">
-            {renderDogVisual({ photoUrl: dog.photoUrl, name: dog.name, showPhoto })}
-            <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
-              {showAge ? (
-                <span className="rounded-full bg-[#fff7e8] px-4 py-2 text-sm font-medium text-[#9a7042] ring-1 ring-[#f3dfba]">
-                  {dog.ageLabel}
+      <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-5xl items-center justify-center">
+        <section className="w-full overflow-hidden rounded-[32px] border border-white/75 bg-white/90 shadow-[0_28px_90px_rgba(80,67,36,0.14)] backdrop-blur">
+          <div className="grid md:grid-cols-[0.88fr_1.12fr]">
+            <div className="bg-[linear-gradient(180deg,rgba(255,251,244,0.96),rgba(244,249,237,0.96))] p-5 text-center sm:p-8">
+              {renderDogVisual({ photoUrl: dog.photoUrl, name: dog.name, showPhoto })}
+              <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+                {showAge ? (
+                  <span className="rounded-full bg-[#fff7e8] px-4 py-2 text-sm font-medium text-[#9a7042] ring-1 ring-[#f3dfba]">
+                    {dog.ageLabel}
+                  </span>
+                ) : null}
+                <span className={`rounded-full px-4 py-2 text-sm font-medium ring-1 ${lostMode ? "bg-[#fff1e8] text-[#9a4f27] ring-[#f0cfb7]" : "bg-[#f8fbf2] text-[#5e7745] ring-[#dfe8d0]"}`}>
+                  {lostMode
+                    ? language === "fr"
+                      ? "Mode chien perdu"
+                      : "Lost dog mode"
+                    : dog.publicProfileEnabled
+                    ? language === "fr"
+                      ? "Profil protégé"
+                      : "Protected profile"
+                    : language === "fr"
+                      ? "Mode privé"
+                      : "Private mode"}
                 </span>
-              ) : null}
-              <span className="rounded-full bg-[#f8fbf2] px-4 py-2 text-sm font-medium text-[#5e7745] ring-1 ring-[#dfe8d0]">
-                {dog.publicProfileEnabled
-                  ? language === "fr"
-                    ? "Profil protégé"
-                    : "Protected profile"
-                  : language === "fr"
-                    ? "Mode privé"
-                    : "Private mode"}
-              </span>
+              </div>
             </div>
-          </div>
 
-          <div>
-            <span className="inline-flex rounded-full bg-[#eef4e3] px-4 py-2 text-sm font-semibold text-[#4f6b36]">
-              {language === "fr" ? "Si tu m'as trouvé..." : "If you found me..."}
-            </span>
-            <h1 className="mt-5 text-5xl font-semibold leading-tight text-stone-900">
-              {dog.name ?? (language === "fr" ? "Un chien adorable" : "A lovely dog")}
-            </h1>
-            <p className="mt-5 max-w-2xl text-lg leading-8 text-stone-600">
-              {language === "fr"
-                ? "Merci de m'aider à retrouver ma famille. Les informations visibles ici sont limitées pour protéger notre vie privée."
-                : "Thank you for helping me get back to my family. The information shown here is intentionally limited to protect our privacy."}
-            </p>
+            <div className="p-6 sm:p-9">
+              <span className={`inline-flex rounded-full px-4 py-2 text-sm font-semibold ${lostMode ? "bg-[#fff1e8] text-[#9a4f27]" : "bg-[#eef4e3] text-[#4f6b36]"}`}>
+                {lostMode ? (language === "fr" ? "Chien perdu" : "Lost dog") : language === "fr" ? "Chien trouvé" : "Found dog"}
+              </span>
+              <h1 className="mt-5 text-4xl font-semibold leading-tight text-stone-900 sm:text-5xl">
+                {lostMode
+                  ? language === "fr"
+                    ? `${dogName} est recherché`
+                    : `${dogName} is missing`
+                  : dogName}
+              </h1>
+              <p className="mt-5 max-w-2xl text-lg leading-8 text-stone-600">
+                {lostMode
+                  ? language === "fr"
+                    ? "Merci d'aider sa famille. Si tu peux rester près du chien en sécurité, utilise les actions ci-dessous."
+                    : "Thank you for helping their family. If you can safely stay near the dog, use the actions below."
+                  : language === "fr"
+                  ? "Merci, tu es au bon endroit. Reste près du chien si c'est sécuritaire, puis utilise les informations autorisées par sa famille."
+                  : "Thank you, you are in the right place. Stay near the dog if it is safe, then use the information their family chose to share."}
+              </p>
 
-            <div className="mt-8 grid gap-4">
-              {telHref ? (
-                <a
-                  className="inline-flex items-center justify-center rounded-[22px] bg-[#5e7745] px-6 py-4 text-base font-semibold text-white shadow-[0_18px_34px_rgba(94,119,69,0.24)] transition hover:bg-[#51683d]"
-                  href={telHref}
-                >
-                  {language === "fr" ? "Appeler mon parent" : "Call my human"}
-                </a>
-              ) : null}
+              <div className="mt-7 grid gap-4">
+                {lostMode ? (
+                  <article className="rounded-[24px] border border-[#f0cfb7] bg-[#fff7ef] p-5">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#9a4f27]">
+                      {language === "fr" ? "Alerte famille" : "Family alert"}
+                    </p>
+                    <p className="mt-3 text-base leading-7 text-stone-700">
+                      {lostModeMessage ||
+                        (language === "fr"
+                          ? "Ce chien est déclaré perdu. Toute aide est précieuse."
+                          : "This dog has been marked as missing. Any help matters.")}
+                    </p>
+                  </article>
+                ) : null}
 
-              {showNotes ? (
-                <article className="rounded-[24px] border border-[#dfe8d0] bg-[#f8fbf2] p-5">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#5e7745]">
-                    {language === "fr" ? "Notes importantes" : "Important notes"}
-                  </p>
-                  <p className="mt-3 text-base leading-7 text-stone-700">{dog.importantNotes}</p>
-                </article>
-              ) : null}
+                {telHref ? (
+                  <div className="rounded-[24px] border border-[#dfe8d0] bg-[#f8fbf2] p-4">
+                    <p className="text-sm font-medium text-[#4f6b36]">
+                      {language === "fr"
+                        ? "La famille a autorisé l'appel direct."
+                        : "The family allowed direct calling."}
+                    </p>
+                    <a
+                      className="mt-3 inline-flex w-full items-center justify-center rounded-[20px] bg-[#4f6b36] px-6 py-5 text-lg font-semibold text-white shadow-[0_18px_34px_rgba(79,107,54,0.26)] transition hover:bg-[#455e30]"
+                      href={telHref}
+                    >
+                      {language === "fr" ? "Appeler mon parent" : "Call my human"}
+                    </a>
+                  </div>
+                ) : null}
 
-              {!hasAnyPublicDetails ? (
-                <article className="rounded-[24px] border border-[#efe3cb] bg-[#fff9ef] p-5">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#9a7042]">
-                    {language === "fr" ? "Confidentialité" : "Privacy"}
-                  </p>
-                  <p className="mt-3 text-base leading-7 text-stone-700">
-                    {language === "fr"
-                      ? "Les informations de contact sont privées pour le moment."
-                      : "Contact details are private for now."}
-                  </p>
-                </article>
-              ) : null}
+                {lostMode && !isOwner ? <DogLocationShare language={language} publicToken={dog.publicToken} /> : null}
 
-              {isOwner ? (
-                <Link className="btn btn-secondary" href="/account/dogs">
-                  {language === "fr" ? "Gérer cette fiche dans mon compte" : "Manage this profile in my account"}
-                </Link>
-              ) : null}
+                {showNotes ? (
+                  <article className="rounded-[24px] border border-[#efe3cb] bg-[#fff9ef] p-5">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#9a7042]">
+                      {language === "fr" ? "À savoir tout de suite" : "Know this first"}
+                    </p>
+                    <p className="mt-3 text-base leading-7 text-stone-700">{dog.importantNotes}</p>
+                  </article>
+                ) : null}
+
+                {!hasAnyPublicDetails ? (
+                  <article className="rounded-[24px] border border-[#efe3cb] bg-[#fff9ef] p-5">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#9a7042]">
+                      {language === "fr" ? "Confidentialité" : "Privacy"}
+                    </p>
+                    <p className="mt-3 text-base leading-7 text-stone-700">
+                      {language === "fr"
+                        ? "Les informations de contact sont privées pour le moment."
+                        : "Contact details are private for now."}
+                    </p>
+                  </article>
+                ) : null}
+
+                <p className="text-sm leading-6 text-stone-500">
+                  {language === "fr"
+                    ? "Les détails affichés ici sont volontairement limités pour protéger la vie privée du chien et de sa famille."
+                    : "The details shown here are intentionally limited to protect the dog and their family's privacy."}
+                </p>
+
+                {isOwner ? (
+                  <Link className="btn btn-secondary" href="/account/dogs">
+                    {language === "fr" ? "Gérer cette fiche dans mon compte" : "Manage this profile in my account"}
+                  </Link>
+                ) : null}
+              </div>
             </div>
           </div>
         </section>

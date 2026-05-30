@@ -13,6 +13,7 @@ export default async function ShopAliasPage({ searchParams }: ShopAliasPageProps
   const params = new URLSearchParams();
   const search = getSearchParam(query.q) ?? getSearchParam(query.search);
   const category = getSearchParam(query.category);
+  const subcategory = getSearchParam(query.subcategory);
 
   if (search?.trim()) {
     params.set("q", search.trim());
@@ -20,6 +21,10 @@ export default async function ShopAliasPage({ searchParams }: ShopAliasPageProps
 
   if (category?.trim()) {
     params.set("category", category.trim());
+  }
+
+  if (subcategory?.trim()) {
+    params.set("subcategory", subcategory.trim());
   }
 
   const destinationQuery = params.toString();

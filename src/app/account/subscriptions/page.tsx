@@ -1,4 +1,3 @@
-import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getCurrentLanguage } from "@/lib/language";
@@ -7,7 +6,7 @@ import UserSubscriptionsClient from "./user-subscriptions-client";
 export default async function UserSubscriptionsPage() {
   const user = await getCurrentUser();
   if (!user) {
-    notFound();
+    return null;
   }
 
   const language = await getCurrentLanguage();

@@ -1,4 +1,4 @@
-const CACHE_NAME = "chezolive-pwa-v1";
+const CACHE_NAME = "chezolive-pwa-v2";
 const OFFLINE_URL = "/offline";
 const STATIC_ASSETS = [
   OFFLINE_URL,

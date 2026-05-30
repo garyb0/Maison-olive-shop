@@ -8,9 +8,14 @@ const orderUpdateManyMock = vi.fn();
 const auditLogCreateMock = vi.fn();
 const productUpdateMock = vi.fn();
 const inventoryMovementCreateMock = vi.fn();
+const sendOrderSmsNotificationMock = vi.fn();
 
 vi.mock("@/lib/business", () => ({
   sendOrderConfirmationEmail: (...args: unknown[]) => sendOrderConfirmationEmailMock(...args),
+}));
+
+vi.mock("@/lib/sms", () => ({
+  sendOrderSmsNotification: (...args: unknown[]) => sendOrderSmsNotificationMock(...args),
 }));
 
 vi.mock("@/lib/prisma", () => ({
@@ -37,6 +42,7 @@ describe("Stripe order payment helpers", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    sendOrderSmsNotificationMock.mockResolvedValue({ sent: false });
 
     transactionMock.mockImplementation(async (callback: (tx: unknown) => unknown) =>
       callback({
@@ -125,6 +131,10 @@ describe("Stripe order payment helpers", () => {
       }),
     );
     expect(sendOrderConfirmationEmailMock).toHaveBeenCalledTimes(1);
+    expect(sendOrderSmsNotificationMock).toHaveBeenCalledWith({
+      orderId: "order_1",
+      type: "ORDER_PAID",
+    });
   });
 
   it("ignore un webhook paye duplique sans renvoyer de confirmation", async () => {

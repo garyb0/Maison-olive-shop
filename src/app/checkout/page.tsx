@@ -8,6 +8,8 @@ import { getDeliveryAddressesForUser } from "@/lib/delivery-addresses";
 import { env } from "@/lib/env";
 import { getCheckoutConfirmation } from "@/lib/checkout-confirmation";
 import { syncOrderPaymentFromStripeSession } from "@/lib/orders";
+import { isGoogleOAuthConfigured } from "@/lib/google-oauth";
+import { getVariantDisplayName, sumActiveVariantStock } from "@/lib/product-variants";
 
 type CatalogProduct = Awaited<ReturnType<typeof getActiveProducts>>[number];
 
@@ -54,17 +56,40 @@ export default async function CheckoutPage({ searchParams }: CheckoutPageProps) 
   const t = getDictionary(language);
 
   const productIndex = Object.fromEntries(
-    products.map((product: CatalogProduct) => [
-      product.id,
-      {
-        id: product.id,
-        name: language === "fr" ? product.nameFr : product.nameEn,
-        priceCents: product.priceCents,
-        currency: product.currency,
-        priceLabel: formatCurrency(product.priceCents, product.currency, language === "fr" ? "fr-CA" : "en-CA"),
-        stock: product.stock,
-      },
-    ]),
+    products.flatMap((product: CatalogProduct) => {
+      const productName = language === "fr" ? product.nameFr : product.nameEn;
+      const baseEntry = [
+        product.id,
+        {
+          id: product.id,
+          productId: product.id,
+          name: productName,
+          priceCents: product.priceCents,
+          currency: product.currency,
+          priceLabel: formatCurrency(product.priceCents, product.currency, language === "fr" ? "fr-CA" : "en-CA"),
+          stock: product.variants.length > 0 ? sumActiveVariantStock(product.variants) : product.stock,
+          requiresVariantSelection: product.variants.length > 0,
+        },
+      ] as const;
+      const variantEntries = product.variants.map((variant) => {
+        const priceCents = variant.priceCents ?? product.priceCents;
+        return [
+          `${product.id}:${variant.id}`,
+          {
+            id: `${product.id}:${variant.id}`,
+            productId: product.id,
+            variantId: variant.id,
+            name: getVariantDisplayName(productName, variant, language),
+            priceCents,
+            currency: product.currency,
+            priceLabel: formatCurrency(priceCents, product.currency, language === "fr" ? "fr-CA" : "en-CA"),
+            stock: variant.stock,
+          },
+        ] as const;
+      });
+
+      return [baseEntry, ...variantEntries];
+    }),
   );
 
   return (
@@ -79,6 +104,7 @@ export default async function CheckoutPage({ searchParams }: CheckoutPageProps) 
       initialConfirmation={initialConfirmation}
       initialPaymentMode={initialMode}
       initialStripeNotice={initialStripeNotice}
+      googleOAuthEnabled={isGoogleOAuthConfigured()}
     />
   );
 }

@@ -26,6 +26,8 @@ type DogPatchInput = {
   showAgePublic?: boolean;
   showPhonePublic?: boolean;
   showNotesPublic?: boolean;
+  lostModeEnabled?: boolean;
+  lostModeMessage?: string | null;
   isActive?: boolean;
 };
 
@@ -52,10 +54,38 @@ const dogSelect = {
   showAgePublic: true,
   showPhonePublic: true,
   showNotesPublic: true,
+  lostModeEnabled: true,
+  lostModeMessage: true,
+  lostModeActivatedAt: true,
   isActive: true,
   claimedAt: true,
   createdAt: true,
   updatedAt: true,
+} as const;
+
+const dogQrScanSelect = {
+  id: true,
+  eventType: true,
+  lostModeAtScan: true,
+  latitude: true,
+  longitude: true,
+  accuracyMeters: true,
+  locationSharedAt: true,
+  createdAt: true,
+} as const;
+
+const accountDogSelect = {
+  ...dogSelect,
+  dogQrScans: {
+    orderBy: { createdAt: "desc" },
+    take: 10,
+    select: dogQrScanSelect,
+  },
+  _count: {
+    select: {
+      dogQrScans: true,
+    },
+  },
 } as const;
 
 const adminDogSelect = {
@@ -111,7 +141,7 @@ export async function getDogProfilesForUser(userId: string) {
   return prisma.dogProfile.findMany({
     where: { userId },
     orderBy: { createdAt: "desc" },
-    select: dogSelect,
+    select: accountDogSelect,
   });
 }
 
@@ -162,7 +192,7 @@ export async function claimDogProfileForUser(userId: string, input: DogClaimInpu
 export async function updateDogProfileForUser(userId: string, dogId: string, input: DogPatchInput) {
   const dog = await prisma.dogProfile.findFirst({
     where: { id: dogId, userId },
-    select: { id: true, ownerPhone: true },
+    select: { id: true, ownerPhone: true, lostModeEnabled: true },
   });
 
   if (!dog) {
@@ -186,6 +216,17 @@ export async function updateDogProfileForUser(userId: string, dogId: string, inp
       ...(input.showAgePublic !== undefined ? { showAgePublic: input.showAgePublic } : {}),
       ...(input.showPhonePublic !== undefined ? { showPhonePublic: input.showPhonePublic } : {}),
       ...(input.showNotesPublic !== undefined ? { showNotesPublic: input.showNotesPublic } : {}),
+      ...(input.lostModeEnabled !== undefined
+        ? {
+            lostModeEnabled: input.lostModeEnabled,
+            ...(input.lostModeEnabled
+              ? dog.lostModeEnabled
+                ? {}
+                : { lostModeActivatedAt: new Date() }
+              : { lostModeActivatedAt: null }),
+          }
+        : {}),
+      ...(input.lostModeMessage !== undefined ? { lostModeMessage: input.lostModeMessage ?? null } : {}),
       ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
     },
     select: dogSelect,
@@ -224,6 +265,9 @@ export async function updateDogProfileByAdmin(
           showAgePublic: false,
           showPhonePublic: false,
           showNotesPublic: false,
+          lostModeEnabled: false,
+          lostModeMessage: null,
+          lostModeActivatedAt: null,
           claimedAt: null,
           isActive: input.isActive ?? true,
         },

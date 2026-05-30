@@ -71,7 +71,7 @@ describe("dog public page", () => {
     expect(screen.queryByRole("link", { name: "Appeler mon parent" })).not.toBeInTheDocument();
   });
 
-  it("affiche le bouton d'appel et les champs autorises", async () => {
+  it("affiche l'appel comme action principale et les champs autorises", async () => {
     getDogProfileByPublicTokenMock.mockResolvedValue({
       id: "dog_1",
       userId: "user_1",
@@ -98,8 +98,10 @@ describe("dog public page", () => {
 
     expect(screen.getByText("9 ans")).toBeInTheDocument();
     expect(screen.getByText("Operation au cou")).toBeInTheDocument();
+    expect(screen.getByText("À savoir tout de suite")).toBeInTheDocument();
     const callLink = screen.getByRole("link", { name: "Appeler mon parent" });
     expect(callLink).toHaveAttribute("href", "tel:4183183984");
+    expect(callLink).toHaveClass("w-full", "text-lg", "py-5");
   });
 
   it("ne montre pas le téléphone si le propriétaire n'a pas autorisé l'appel public", async () => {
@@ -128,6 +130,7 @@ describe("dog public page", () => {
     render(element);
 
     expect(screen.queryByRole("link", { name: "Appeler mon parent" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Operation au cou")).not.toBeInTheDocument();
   });
 
   it("conserve l'etat suspendu quand le collier est inactif", async () => {
@@ -157,5 +160,38 @@ describe("dog public page", () => {
 
     expect(screen.getByText("Ce médaillon est en pause")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Appeler mon parent" })).not.toBeInTheDocument();
+  });
+
+  it("met en avant le mode chien perdu et le partage de position", async () => {
+    getDogProfileByPublicTokenMock.mockResolvedValue({
+      id: "dog_1",
+      userId: "user_1",
+      publicToken: "dog-token-001",
+      name: "Kratos",
+      photoUrl: "/dogs/kratos.webp",
+      ageLabel: "9 ans",
+      ownerPhone: "4183183984",
+      importantNotes: "Operation au cou",
+      publicProfileEnabled: true,
+      showPhotoPublic: false,
+      showAgePublic: false,
+      showPhonePublic: true,
+      showNotesPublic: true,
+      lostModeEnabled: true,
+      lostModeMessage: "Approche doucement et appelle-moi.",
+      lostModeActivatedAt: new Date("2026-05-13T10:00:00.000Z"),
+      isActive: true,
+      claimedAt: new Date("2026-04-19T12:00:00.000Z"),
+      createdAt: new Date("2026-04-19T12:00:00.000Z"),
+      updatedAt: new Date("2026-04-19T12:00:00.000Z"),
+    });
+
+    const { default: DogPublicPage } = await import("@/app/dog/[publicToken]/page");
+    const element = await DogPublicPage({ params: Promise.resolve({ publicToken: "dog-token-001" }) });
+    render(element);
+
+    expect(screen.getByRole("heading", { name: "Kratos est recherché" })).toBeInTheDocument();
+    expect(screen.getByText("Approche doucement et appelle-moi.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Partager ma position" })).toBeInTheDocument();
   });
 });

@@ -8,6 +8,11 @@ import { prisma } from "@/lib/prisma";
 import { localizePromoBanner } from "@/lib/promo-banners";
 import { getCatalogPreparationBanner } from "@/lib/promo-banner-fallback";
 import { StorefrontClient } from "@/app/storefront-client";
+import { hasAvailableSubscription } from "@/lib/subscription-availability";
+import { getProductSubcategoryLabel } from "@/lib/product-subcategories";
+import { sumActiveVariantStock } from "@/lib/product-variants";
+import { isGoogleOAuthConfigured } from "@/lib/google-oauth";
+import { getFavoriteProductIdsForUser } from "@/lib/favorites";
 
 type CatalogProduct = Awaited<ReturnType<typeof getActiveProducts>>[number];
 
@@ -40,18 +45,28 @@ export default async function BoutiquePage({ searchParams }: BoutiquePageProps) 
   ]);
 
   const t = getDictionary(language);
+  const favoriteProductIds = user ? await getFavoriteProductIdsForUser(user.id) : [];
 
-  const productCards = products.map((p: CatalogProduct) => ({
-    id: p.id,
-    slug: p.slug,
-    category: p.category?.name ?? "Uncategorized",
-    name: language === "fr" ? p.nameFr : p.nameEn,
-    description: language === "fr" ? p.descriptionFr : p.descriptionEn,
-    priceCents: p.priceCents,
-    priceLabel: formatCurrency(p.priceCents, p.currency, language === "fr" ? "fr-CA" : "en-CA"),
-    stock: p.stock,
-    imageUrl: p.imageUrl ?? null,
-  }));
+  const productCards = products.map((p: CatalogProduct) => {
+    const variantStock = sumActiveVariantStock(p.variants);
+    const firstVariantImage = p.variants.find((variant) => variant.imageUrl)?.imageUrl ?? null;
+
+    return {
+      id: p.id,
+      slug: p.slug,
+      category: p.category?.name ?? "Uncategorized",
+      subcategorySlug: p.subcategory?.slug ?? null,
+      subcategoryLabel: getProductSubcategoryLabel(p.subcategory, language),
+      name: language === "fr" ? p.nameFr : p.nameEn,
+      description: language === "fr" ? p.descriptionFr : p.descriptionEn,
+      priceCents: p.priceCents,
+      priceLabel: formatCurrency(p.priceCents, p.currency, language === "fr" ? "fr-CA" : "en-CA"),
+      stock: p.variants.length > 0 ? variantStock : p.stock,
+      imageUrl: firstVariantImage ?? p.imageUrl ?? null,
+      subscriptionAvailable: hasAvailableSubscription(p),
+      variants: p.variants,
+    };
+  });
 
   const banners = productCards.length === 0
     ? [getCatalogPreparationBanner(language)]
@@ -69,6 +84,9 @@ export default async function BoutiquePage({ searchParams }: BoutiquePageProps) 
       banners={banners}
       initialSearch={(getSearchParam(query.q) ?? getSearchParam(query.search) ?? "").trim()}
       initialCategory={(getSearchParam(query.category) ?? "").trim()}
+      initialSubcategory={(getSearchParam(query.subcategory) ?? "").trim()}
+      googleOAuthEnabled={isGoogleOAuthConfigured()}
+      initialFavoriteProductIds={favoriteProductIds}
     />
   );
 }

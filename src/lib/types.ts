@@ -185,18 +185,36 @@ export type DogProfilePublic = {
   showAgePublic: boolean;
   showPhonePublic: boolean;
   showNotesPublic: boolean;
+  lostModeEnabled: boolean;
+  lostModeMessage: string | null;
+  lostModeActivatedAt: string | null;
   isActive: boolean;
   claimedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
 
+export type DogQrScanAccount = {
+  id: string;
+  eventType: string;
+  lostModeAtScan: boolean;
+  latitude: number | null;
+  longitude: number | null;
+  accuracyMeters: number | null;
+  locationSharedAt: string | null;
+  createdAt: string;
+};
+
 export type DogProfileAccount = DogProfilePublic & {
   userId: string | null;
+  scanCount?: number;
+  lastScanAt?: string | null;
+  scanHistory?: DogQrScanAccount[];
 };
 
 export type CartItemInput = {
   productId: string;
+  variantId?: string;
   quantity: number;
 };
 

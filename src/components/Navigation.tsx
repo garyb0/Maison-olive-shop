@@ -6,6 +6,8 @@ import { usePathname, useSearchParams } from "next/navigation";
 import type { Dictionary, Language } from "@/lib/i18n";
 import type { CurrentUser } from "@/lib/types";
 import Image from "next/image";
+import { NavIcon } from "@/components/NavIcon";
+import { navigationLabel, publicNavigationItems } from "@/lib/navigation";
 
 const CART_STORAGE_KEY = "chezolive_cart_v1";
 const HOME_HREF = "/?home=1";
@@ -123,6 +125,8 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
+  const isNavActive = (href: string) =>
+    href.startsWith("/?") ? pathname === "/" : isActive(href);
   const isShopRoute = pathname.startsWith("/boutique") || pathname.startsWith("/shop");
   const isAdminRoute = pathname.startsWith("/admin");
   const useMarketplaceHeader = !isAdminRoute;
@@ -198,10 +202,13 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
   }, [catalogSearch, runCatalogSearch]);
 
   const drawerCategoryLinks = isShopRoute ? marketplaceCategories : [];
+  const publicPrimaryItems = publicNavigationItems.filter((item) =>
+    item.href === HOME_HREF || item.href === "/boutique" || item.href === "/app",
+  );
 
   if (useMarketplaceHeader) {
     return (
-      <div className={`nav-marketplace${isShopRoute ? " nav-marketplace--shop" : " nav-marketplace--light"}`}>
+      <div className={`nav-marketplace${isShopRoute ? " nav-marketplace--shop" : " nav-marketplace--light"}${menuOpen ? " nav-marketplace--drawer-open" : ""}`}>
         <div className="nav-marketplace-main">
           <Link href={HOME_HREF} className="nav-marketplace-brand">
             <Image
@@ -216,12 +223,15 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
           </Link>
 
           <nav className="nav-marketplace-main-links" aria-label={language === "fr" ? "Navigation principale" : "Main navigation"}>
-            <Link className={`nav-marketplace-link${isActive("/") ? " nav-marketplace-link--active" : ""}`} href={HOME_HREF}>
-              {t.navHome}
-            </Link>
-            <Link className={`nav-marketplace-link nav-marketplace-link--shop${isActive("/boutique") || isActive("/shop") ? " nav-marketplace-link--active" : ""}`} href="/boutique">
-              {language === "fr" ? "Boutique" : "Shop"}
-            </Link>
+            {publicPrimaryItems.map((item) => (
+              <Link
+                className={`nav-marketplace-link${item.href === "/boutique" ? " nav-marketplace-link--shop" : ""}${isNavActive(item.href) ? " nav-marketplace-link--active" : ""}`}
+                href={item.href}
+                key={item.href}
+              >
+                {navigationLabel(item, language)}
+              </Link>
+            ))}
           </nav>
 
           <form
@@ -245,13 +255,13 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
               type="submit"
               aria-label={language === "fr" ? "Lancer la recherche" : "Run search"}
             >
-              ⌕
+              <NavIcon name="search" size={18} />
             </button>
           </form>
 
           <nav className="nav-marketplace-actions" aria-label={language === "fr" ? "Actions rapides" : "Quick actions"}>
             <Link className="nav-marketplace-action" href="/boutique">
-              <span className="nav-marketplace-action-icon" aria-hidden="true">⌖</span>
+              <span className="nav-marketplace-action-icon"><NavIcon name="location" size={18} /></span>
               <span>
                 <strong>Rimouski</strong>
                 <small>{language === "fr" ? "Modifier" : "Change"}</small>
@@ -260,7 +270,7 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
 
             <details className={`nav-marketplace-account${isActive("/account") || isActive("/admin") || isActive("/login") ? " nav-marketplace-account--active" : ""}`}>
               <summary className="nav-marketplace-account-trigger">
-                <span className="nav-marketplace-action-icon" aria-hidden="true">○</span>
+                <span className="nav-marketplace-action-icon"><NavIcon name="profile" size={18} /></span>
                 <span>
                   <strong>{user ? t.navAccount : t.login}</strong>
                   <small>{user ? (language === "fr" ? "Espace client" : "Customer space") : (language === "fr" ? "Se connecter" : "Sign in")}</small>
@@ -312,7 +322,7 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
                   : `Cart — ${cartCount} item${cartCount !== 1 ? "s" : ""}`
               }
             >
-              <span aria-hidden="true">🛒</span>
+              <NavIcon name="cart" size={19} />
               <strong>{language === "fr" ? "Panier" : "Cart"}</strong>
               <em className="nav-cart-count">{cartCount}</em>
             </Link>
@@ -328,7 +338,7 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
                   : `Cart — ${cartCount} item${cartCount !== 1 ? "s" : ""}`
               }
             >
-              <span aria-hidden="true">🛒</span>
+              <NavIcon name="cart" size={19} />
               <em className="nav-cart-count">{cartCount}</em>
             </Link>
             <button
@@ -382,7 +392,7 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
                 role="search"
                 onSubmit={handleCatalogSearchSubmit}
               >
-                <span className="nav-search-icon" aria-hidden="true">🔍</span>
+                <span className="nav-search-icon"><NavIcon name="search" size={18} /></span>
                 <input
                   className="nav-search-input"
                   type="search"
@@ -406,8 +416,8 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
                 href="/boutique"
                 onClick={() => setMenuOpen(false)}
               >
-                <span aria-hidden="true">📍</span>
-                <span>{language === "fr" ? "Livraison locale Rimouski" : "Local delivery Rimouski"}</span>
+                <NavIcon name="location" size={17} />
+                <span>{language === "fr" ? "Livraison locale à Rimouski" : "Local delivery in Rimouski"}</span>
               </Link>
 
               <Link
@@ -421,25 +431,25 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
 
               <div className="nav-drawer-links">
                 <Link className={`nav-drawer-link${isActive("/") ? " nav-drawer-link--active" : ""}`} href={HOME_HREF} onClick={() => setMenuOpen(false)}>
-                  <span className="nav-drawer-link-icon" aria-hidden="true">🏠</span>
+                  <span className="nav-drawer-link-icon"><NavIcon name="home" size={20} /></span>
                   <span>{t.navHome}</span>
                 </Link>
                 <Link className={`nav-drawer-link nav-drawer-link--shop${isActive("/boutique") ? " nav-drawer-link--active" : ""}`} href="/boutique" onClick={() => setMenuOpen(false)}>
-                  <span className="nav-drawer-link-icon" aria-hidden="true">🛍️</span>
+                  <span className="nav-drawer-link-icon"><NavIcon name="catalog" size={20} /></span>
                   <span>{language === "fr" ? "Magasiner" : "Shop"}</span>
                 </Link>
                 <Link className={`nav-drawer-link${isActive("/account") || isActive("/login") ? " nav-drawer-link--active" : ""}`} href={user ? "/account" : "/login"} onClick={() => setMenuOpen(false)}>
-                  <span className="nav-drawer-link-icon" aria-hidden="true">👤</span>
+                  <span className="nav-drawer-link-icon"><NavIcon name="profile" size={20} /></span>
                   <span>{user ? t.navAccount : t.login}</span>
                 </Link>
                 {user?.role === "ADMIN" && (
                   <Link className={`nav-drawer-link nav-drawer-link--admin${isActive("/admin") ? " nav-drawer-link--active" : ""}`} href="/admin" onClick={() => setMenuOpen(false)}>
-                    <span className="nav-drawer-link-icon" aria-hidden="true">⚙️</span>
+                    <span className="nav-drawer-link-icon"><NavIcon name="admin" size={20} /></span>
                     <span>{t.navAdmin}</span>
                   </Link>
                 )}
                 <Link className={`nav-drawer-link${isActive("/faq") ? " nav-drawer-link--active" : ""}`} href="/faq" onClick={() => setMenuOpen(false)}>
-                  <span className="nav-drawer-link-icon" aria-hidden="true">❓</span>
+                  <span className="nav-drawer-link-icon"><NavIcon name="help" size={20} /></span>
                   <span>{t.navFaq}</span>
                 </Link>
                 {drawerCategoryLinks.length > 0 ? (
@@ -466,7 +476,7 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
                   }
                   onClick={() => setMenuOpen(false)}
                 >
-                  <span className="nav-drawer-link-icon" aria-hidden="true">🛒</span>
+                  <span className="nav-drawer-link-icon"><NavIcon name="cart" size={20} /></span>
                   <span>
                     {language === "fr" ? "Panier" : "Cart"}
                     {cartCount > 0 && (
@@ -517,7 +527,7 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
   }
 
   return (
-    <div className="nav-header glow-border">
+    <div className={`nav-header glow-border${menuOpen ? " nav-header--drawer-open" : ""}`}>
       {/* ── Marque / Logo ── */}
       <Link href={HOME_HREF} className="nav-brand">
         <Image
@@ -540,6 +550,9 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
           <Link className={`pill-link pill-link--shop${isActive("/boutique") ? " pill-link--active" : ""}`} href="/boutique">
             {language === "fr" ? "Boutique" : "Shop"}
           </Link>
+          <Link className={`pill-link${isActive("/app") ? " pill-link--active" : ""}`} href="/app">
+            App
+          </Link>
         </nav>
 
         <form
@@ -547,7 +560,7 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
           role="search"
           onSubmit={handleCatalogSearchSubmit}
         >
-          <span className="nav-search-icon" aria-hidden="true">🔍</span>
+          <span className="nav-search-icon"><NavIcon name="search" size={18} /></span>
           <input
             className="nav-search-input"
             type="search"
@@ -567,7 +580,7 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
         </form>
 
         <Link className="nav-location-pill" href="/boutique">
-          <span aria-hidden="true">📍</span>
+          <NavIcon name="location" size={16} />
           <span>Rimouski</span>
         </Link>
 
@@ -589,7 +602,7 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
 
           <details className={`nav-account-menu${isActive("/account") || isActive("/admin") || isActive("/login") ? " nav-account-menu--active" : ""}`}>
             <summary className="nav-account-trigger">
-              <span className="nav-account-icon" aria-hidden="true">👤</span>
+              <span className="nav-account-icon"><NavIcon name="profile" size={17} /></span>
               <span className="nav-account-label">{user ? t.navAccount : t.login}</span>
               {user?.role === "ADMIN" ? (
                 <span className="nav-admin-badge">{t.navAdmin}</span>
@@ -628,7 +641,7 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
                 : `Cart — ${cartCount} item${cartCount !== 1 ? "s" : ""}`
             }
           >
-            🛒
+            <NavIcon name="cart" size={19} />
             <span className={`nav-cart-count${cartCount === 0 ? " nav-cart-empty" : ""}`}>
               {cartCount}
             </span>
@@ -647,7 +660,7 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
               : `Cart — ${cartCount} item${cartCount !== 1 ? "s" : ""}`
           }
         >
-          🛒
+          <NavIcon name="cart" size={19} />
           <span className={`nav-cart-count${cartCount === 0 ? " nav-cart-empty" : ""}`}>
             {cartCount}
           </span>
@@ -708,7 +721,7 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
               role="search"
               onSubmit={handleCatalogSearchSubmit}
             >
-              <span className="nav-search-icon" aria-hidden="true">🔍</span>
+              <span className="nav-search-icon"><NavIcon name="search" size={18} /></span>
               <input
                 className="nav-search-input"
                 type="search"
@@ -732,8 +745,8 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
               href="/boutique"
               onClick={() => setMenuOpen(false)}
             >
-              <span aria-hidden="true">📍</span>
-              <span>{language === "fr" ? "Livraison locale Rimouski" : "Local delivery Rimouski"}</span>
+              <NavIcon name="location" size={17} />
+              <span>{language === "fr" ? "Livraison locale à Rimouski" : "Local delivery in Rimouski"}</span>
             </Link>
 
             <Link
@@ -751,7 +764,7 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
                 href={HOME_HREF}
                 onClick={() => setMenuOpen(false)}
               >
-                <span className="nav-drawer-link-icon" aria-hidden="true">🏠</span>
+                <span className="nav-drawer-link-icon"><NavIcon name="home" size={20} /></span>
                 <span>{t.navHome}</span>
               </Link>
 
@@ -760,7 +773,7 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
                 href={user ? "/account" : "/login"}
                 onClick={() => setMenuOpen(false)}
               >
-                <span className="nav-drawer-link-icon" aria-hidden="true">👤</span>
+                <span className="nav-drawer-link-icon"><NavIcon name="profile" size={20} /></span>
                 <span>{user ? t.navAccount : t.login}</span>
               </Link>
 
@@ -770,7 +783,7 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
                   href="/admin"
                   onClick={() => setMenuOpen(false)}
                 >
-                  <span className="nav-drawer-link-icon" aria-hidden="true">⚙️</span>
+                  <span className="nav-drawer-link-icon"><NavIcon name="admin" size={20} /></span>
                   <span>{t.navAdmin}</span>
                 </Link>
               )}
@@ -780,7 +793,7 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
                 href="/boutique"
                 onClick={() => setMenuOpen(false)}
               >
-                <span className="nav-drawer-link-icon" aria-hidden="true">🛍️</span>
+                <span className="nav-drawer-link-icon"><NavIcon name="catalog" size={20} /></span>
                 <span>{language === "fr" ? "Magasiner" : "Shop"}</span>
               </Link>
 
@@ -789,7 +802,7 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
                 href="/faq"
                 onClick={() => setMenuOpen(false)}
               >
-                <span className="nav-drawer-link-icon" aria-hidden="true">❓</span>
+                <span className="nav-drawer-link-icon"><NavIcon name="help" size={20} /></span>
                 <span>{t.navFaq}</span>
               </Link>
 
@@ -798,7 +811,7 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
                 href="/cart"
                 onClick={() => setMenuOpen(false)}
               >
-                <span className="nav-drawer-link-icon" aria-hidden="true">🛒</span>
+                <span className="nav-drawer-link-icon"><NavIcon name="cart" size={20} /></span>
                 <span>
                   {language === "fr" ? "Panier" : "Cart"}
                   {cartCount > 0 && (

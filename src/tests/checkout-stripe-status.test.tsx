@@ -22,6 +22,10 @@ vi.mock("@/components/Navigation", () => ({
   Navigation: () => null,
 }));
 
+vi.mock("@/app/app/pwa-app-header", () => ({
+  PwaAppHeader: () => <header data-testid="checkout-pwa-header" />,
+}));
+
 vi.mock("@/components/PromoBanner", () => ({
   PromoBanner: () => null,
 }));
@@ -224,6 +228,7 @@ describe("checkout stripe status", () => {
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/orders", expect.anything()));
     await waitFor(() => expect(screen.getByTestId("stripe-inline-checkout")).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: /Préparer le paiement/i })).not.toBeInTheDocument();
 
     expect(
       screen.queryByText(

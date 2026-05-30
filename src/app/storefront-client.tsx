@@ -5,7 +5,11 @@ import Link from "next/link";
 import type { Dictionary, Language } from "@/lib/i18n";
 import type { CurrentUser } from "@/lib/types";
 import { trackConversionEvent } from "@/lib/conversion-tracker";
+import { GoogleAuthButton } from "@/components/GoogleAuthButton";
 import { Navigation } from "@/components/Navigation";
+import { ProductFavoriteButton } from "@/components/ProductFavoriteButton";
+import { ProductShareButton } from "@/components/ProductShareButton";
+import type { PublicProductVariant } from "@/lib/product-variants";
 
 type ProductCard = {
   id: string;
@@ -13,10 +17,14 @@ type ProductCard = {
   name: string;
   description: string;
   category: string;
+  subcategorySlug?: string | null;
+  subcategoryLabel?: string | null;
   priceLabel: string;
   priceCents: number;
   stock: number;
   imageUrl: string | null;
+  subscriptionAvailable?: boolean;
+  variants?: PublicProductVariant[];
 };
 
 type SortBy = "newest" | "price-asc" | "price-desc" | "name-az";
@@ -59,9 +67,13 @@ type Props = {
   initialRegisterEmail?: string;
   initialSearch?: string;
   initialCategory?: string;
+  initialSubcategory?: string;
+  googleOAuthEnabled?: boolean;
+  initialFavoriteProductIds?: string[];
 };
 
 const CART_STORAGE_KEY = "chezolive_cart_v1";
+const EMPTY_FAVORITE_PRODUCT_IDS: string[] = [];
 
 const CATEGORY_EMOJI: Record<string, string> = {
   Food: "🍖",
@@ -118,6 +130,9 @@ export function StorefrontClient({
   initialRegisterEmail = "",
   initialSearch = "",
   initialCategory = "",
+  initialSubcategory = "",
+  googleOAuthEnabled = false,
+  initialFavoriteProductIds = EMPTY_FAVORITE_PRODUCT_IDS,
 }: Props) {
   const isShopSurface = surface === "shop";
   const [cart, setCart] = useState<CartLine[]>([]);
@@ -132,10 +147,12 @@ export function StorefrontClient({
   const [error, setError] = useState<string>("");
   const [addingId, setAddingId] = useState<string | null>(null);
   const [flyItems, setFlyItems] = useState<FlyItem[]>([]);
+  const [favoriteProductIds, setFavoriteProductIds] = useState(initialFavoriteProductIds);
 
   // ── Catalog filters ──
   const [search, setSearch] = useState(initialSearch);
   const [categoryFilter, setCategoryFilter] = useState(initialCategory || "all");
+  const [subcategoryFilter, setSubcategoryFilter] = useState(initialSubcategory);
   const [sortBy, setSortBy] = useState<SortBy>("newest");
 
   useEffect(() => {
@@ -168,6 +185,7 @@ export function StorefrontClient({
 
       setSearch(nextSearch);
       setCategoryFilter("all");
+      setSubcategoryFilter("");
     };
 
     window.addEventListener("chezolive:catalog-search", handleCatalogSearch);
@@ -177,7 +195,12 @@ export function StorefrontClient({
   useEffect(() => {
     setSearch(initialSearch);
     setCategoryFilter(initialCategory || "all");
-  }, [initialCategory, initialSearch]);
+    setSubcategoryFilter(initialSubcategory);
+  }, [initialCategory, initialSearch, initialSubcategory]);
+
+  useEffect(() => {
+    setFavoriteProductIds(initialFavoriteProductIds);
+  }, [initialFavoriteProductIds]);
 
   // ── Unique categories ──
   const categories = useMemo(() => {
@@ -252,6 +275,61 @@ export function StorefrontClient({
     return `/boutique?${params.toString()}`;
   };
 
+  const updateCatalogUrl = (nextSearch: string, nextCategory: string, nextSubcategory: string) => {
+    if (!isShopSurface || typeof window === "undefined") return;
+
+    const params = new URLSearchParams();
+    const cleanSearch = nextSearch.trim();
+    if (cleanSearch) params.set("q", cleanSearch);
+    if (nextCategory !== "all") params.set("category", nextCategory);
+    if (nextCategory !== "all" && nextSubcategory) params.set("subcategory", nextSubcategory);
+
+    const nextQuery = params.toString();
+    window.history.replaceState(null, "", nextQuery ? `/boutique?${nextQuery}` : "/boutique");
+  };
+
+  const selectCategoryFilter = (nextCategory: string) => {
+    setCategoryFilter(nextCategory);
+    setSubcategoryFilter("");
+    updateCatalogUrl(search, nextCategory, "");
+  };
+
+  const selectSubcategoryFilter = (nextSubcategory: string) => {
+    setSubcategoryFilter(nextSubcategory);
+    updateCatalogUrl(search, categoryFilter, nextSubcategory);
+  };
+
+  const clearCatalogFilters = () => {
+    setSearch("");
+    setCategoryFilter("all");
+    setSubcategoryFilter("");
+    updateCatalogUrl("", "all", "");
+  };
+
+  const subcategoriesForActiveCategory = useMemo(() => {
+    if (categoryFilter === "all") return [];
+
+    const bySlug = new Map<string, string>();
+    for (const product of products) {
+      if (product.category !== categoryFilter || !product.subcategorySlug || !product.subcategoryLabel) continue;
+      bySlug.set(product.subcategorySlug, product.subcategoryLabel);
+    }
+
+    return Array.from(bySlug.entries())
+      .map(([slug, label]) => ({ slug, label }))
+      .sort((left, right) => left.label.localeCompare(right.label));
+  }, [categoryFilter, products]);
+
+  const activeSubcategoryLabel =
+    subcategoriesForActiveCategory.find((subcategory) => subcategory.slug === subcategoryFilter)?.label ?? null;
+
+  useEffect(() => {
+    if (!subcategoryFilter) return;
+    if (!subcategoriesForActiveCategory.some((subcategory) => subcategory.slug === subcategoryFilter)) {
+      setSubcategoryFilter("");
+    }
+  }, [subcategoryFilter, subcategoriesForActiveCategory]);
+
   // ── Filtered + sorted products ──
   const filteredProducts = useMemo(() => {
     let result = [...products];
@@ -263,12 +341,18 @@ export function StorefrontClient({
           p.name.toLowerCase().includes(q) ||
           p.description.toLowerCase().includes(q) ||
           p.category.toLowerCase().includes(q) ||
-          getLocalizedCategoryLabel(p.category, language).toLowerCase().includes(q),
+          getLocalizedCategoryLabel(p.category, language).toLowerCase().includes(q) ||
+          (p.subcategoryLabel?.toLowerCase().includes(q) ?? false) ||
+          (p.subcategorySlug?.toLowerCase().includes(q) ?? false),
       );
     }
 
     if (categoryFilter !== "all") {
       result = result.filter((p) => p.category === categoryFilter);
+    }
+
+    if (categoryFilter !== "all" && subcategoryFilter) {
+      result = result.filter((p) => p.subcategorySlug === subcategoryFilter);
     }
 
     const stockRank = (product: ProductCard) => (product.stock > 0 ? 0 : 1);
@@ -280,9 +364,10 @@ export function StorefrontClient({
     else result.sort(stockFirst);
 
     return result;
-  }, [products, search, categoryFilter, sortBy, language]);
+  }, [products, search, categoryFilter, subcategoryFilter, sortBy, language]);
 
   const addToCart = (product: ProductCard, x: number, y: number) => {
+    if ((product.variants?.length ?? 0) > 0) return;
     if (product.stock <= 0) return;
 
     const requestedQuantity = Math.max(1, quantities[product.id] ?? 1);
@@ -464,20 +549,23 @@ export function StorefrontClient({
             </p>
             <h1 id="home-hero-title">
               {language === "fr"
-                ? "De notre famille à la vôtre"
-                : "From our family to yours"}
+                ? "Boutique locale, achat direct"
+                : "Local shop, direct checkout"}
             </h1>
             <p className="home-hero-text">
               {language === "fr"
-                ? "Des produits choisis avec soin pour vos chiens et chats, une livraison locale à Rimouski, et une expérience d'achat simple, chaleureuse et fiable."
-                : "Carefully selected products for your dogs and cats, local Rimouski delivery, and a simple, warm, reliable shopping experience."}
+                ? "Produits utiles, livraison à Rimouski, panier clair et suivi client dans une expérience simple."
+                : "Useful products, Rimouski delivery, a clear cart, and customer follow-up in one simple experience."}
             </p>
             <div className="home-hero-actions">
               <Link className="btn home-hero-primary" href="/boutique">
                 {language === "fr" ? "Magasiner maintenant" : "Shop now"}
               </Link>
-              <Link className="btn btn-secondary home-hero-secondary" href="/faq#livraison">
-                {language === "fr" ? "Voir la livraison locale" : "See local delivery"}
+              <Link className="btn btn-secondary home-hero-secondary" href="/app">
+                {language === "fr" ? "Ouvrir l'app" : "Open app"}
+              </Link>
+              <Link className="btn btn-secondary home-hero-secondary home-hero-tertiary" href="/cart">
+                {language === "fr" ? "Voir le panier" : "View cart"}
               </Link>
             </div>
             <div className="home-category-strip" aria-label={language === "fr" ? "Catégories en vedette" : "Featured categories"}>
@@ -609,6 +697,11 @@ export function StorefrontClient({
                     </Link>
                     <div className="home-rail-bottom">
                       <strong>{product.priceLabel}</strong>
+                      {(product.variants?.length ?? 0) > 0 ? (
+                        <Link className="home-rail-add" href={`/products/${product.slug}`}>
+                          {language === "fr" ? "Choisir" : "Choose"}
+                        </Link>
+                      ) : (
                       <button
                         className="home-rail-add"
                         type="button"
@@ -622,6 +715,7 @@ export function StorefrontClient({
                           ? language === "fr" ? "Ajouté" : "Added"
                           : language === "fr" ? "Ajouter" : "Add"}
                       </button>
+                      )}
                     </div>
                   </div>
                 </article>
@@ -631,7 +725,7 @@ export function StorefrontClient({
         ) : null}
 
         {!user ? (
-          <section className="section auth-section">
+          <section className="section auth-section" id="account-access">
             <div className="auth-section-header">
               <span className="auth-section-icon">🔐</span>
               <div>
@@ -654,6 +748,17 @@ export function StorefrontClient({
             {error ? (
               <div className="auth-alert auth-alert--err">
                 <span>⚠️</span> {error}
+              </div>
+            ) : null}
+
+            {googleOAuthEnabled && !loginTwoFactorRequired ? (
+              <div className="auth-google-row">
+                <GoogleAuthButton language={language} returnTo="/account" className="btn-full" />
+                <p className="google-auth-note">
+                  {language === "fr"
+                    ? "Création ou connexion rapide avec Google. Aucun accès à Gmail ou tes contacts."
+                    : "Quick sign-up or sign-in with Google. No Gmail or contacts access."}
+                </p>
               </div>
             ) : null}
 
@@ -876,7 +981,10 @@ export function StorefrontClient({
               {search && (
                 <button
                   className="catalog-search-clear"
-                  onClick={() => setSearch("")}
+                  onClick={() => {
+                    setSearch("");
+                    updateCatalogUrl("", categoryFilter, subcategoryFilter);
+                  }}
                   aria-label={language === "fr" ? "Effacer la recherche" : "Clear search"}
                   type="button"
                 >
@@ -905,7 +1013,7 @@ export function StorefrontClient({
                 <button
                   type="button"
                   className={`catalog-side-link${categoryFilter === "all" ? " catalog-side-link--active" : ""}`}
-                  onClick={() => setCategoryFilter("all")}
+                  onClick={() => selectCategoryFilter("all")}
                 >
                   <span>{language === "fr" ? "Tout le catalogue" : "Full catalog"}</span>
                   <span aria-hidden="true">→</span>
@@ -915,7 +1023,7 @@ export function StorefrontClient({
                     type="button"
                     key={cat}
                     className={`catalog-side-link${categoryFilter === cat ? " catalog-side-link--active" : ""}`}
-                    onClick={() => setCategoryFilter(cat)}
+                    onClick={() => selectCategoryFilter(cat)}
                   >
                     <span>
                       <span aria-hidden="true">{getCategoryEmoji(cat)}</span>{" "}
@@ -924,6 +1032,28 @@ export function StorefrontClient({
                     <span aria-hidden="true">→</span>
                   </button>
                 ))}
+                {subcategoriesForActiveCategory.length > 0 ? (
+                  <div className="catalog-subcategory-panel">
+                    <h4>{language === "fr" ? "Types" : "Types"}</h4>
+                    <button
+                      type="button"
+                      className={`catalog-subcategory-link${!subcategoryFilter ? " catalog-subcategory-link--active" : ""}`}
+                      onClick={() => selectSubcategoryFilter("")}
+                    >
+                      {language === "fr" ? "Tout voir" : "Show all"}
+                    </button>
+                    {subcategoriesForActiveCategory.map((subcategory) => (
+                      <button
+                        type="button"
+                        key={subcategory.slug}
+                        className={`catalog-subcategory-link${subcategoryFilter === subcategory.slug ? " catalog-subcategory-link--active" : ""}`}
+                        onClick={() => selectSubcategoryFilter(subcategory.slug)}
+                      >
+                        {subcategory.label}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
               </aside>
             )}
 
@@ -934,7 +1064,7 @@ export function StorefrontClient({
               <button
                 type="button"
                 className={`catalog-cat-pill${categoryFilter === "all" ? " catalog-cat-pill--active" : ""}`}
-                onClick={() => setCategoryFilter("all")}
+                onClick={() => selectCategoryFilter("all")}
               >
                 {language === "fr" ? "🐾 Tous" : "🐾 All"}
               </button>
@@ -943,13 +1073,38 @@ export function StorefrontClient({
                   type="button"
                   key={cat}
                   className={`catalog-cat-pill${categoryFilter === cat ? " catalog-cat-pill--active" : ""}`}
-                  onClick={() => setCategoryFilter(cat)}
+                  onClick={() => selectCategoryFilter(cat)}
                 >
                   {getCategoryEmoji(cat)} {getLocalizedCategoryLabel(cat, language)}
                 </button>
               ))}
             </div>
           )}
+          {subcategoriesForActiveCategory.length > 0 ? (
+            <div
+              className="catalog-subcategories"
+              role="group"
+              aria-label={language === "fr" ? "Filtrer par sous-catégorie" : "Filter by subcategory"}
+            >
+              <button
+                type="button"
+                className={`catalog-subcat-pill${!subcategoryFilter ? " catalog-subcat-pill--active" : ""}`}
+                onClick={() => selectSubcategoryFilter("")}
+              >
+                {language === "fr" ? "Tous les types" : "All types"}
+              </button>
+              {subcategoriesForActiveCategory.map((subcategory) => (
+                <button
+                  type="button"
+                  key={subcategory.slug}
+                  className={`catalog-subcat-pill${subcategoryFilter === subcategory.slug ? " catalog-subcat-pill--active" : ""}`}
+                  onClick={() => selectSubcategoryFilter(subcategory.slug)}
+                >
+                  {subcategory.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
 
           {/* Compteur de résultats */}
           <p className="catalog-results-count" aria-live="polite">
@@ -961,24 +1116,10 @@ export function StorefrontClient({
               <span className="catalog-active-filter">
                 {" — "}
                 {getCategoryEmoji(categoryFilter)} {getLocalizedCategoryLabel(categoryFilter, language)}
+                {activeSubcategoryLabel ? ` / ${activeSubcategoryLabel}` : ""}
               </span>
             )}
           </p>
-
-          <div className="catalog-conversion-strip" aria-label={language === "fr" ? "Parcours d'achat" : "Purchase path"}>
-            <span><strong>1</strong>{language === "fr" ? "Ajouter un produit" : "Add a product"}</span>
-            <span><strong>2</strong>{language === "fr" ? "Vérifier le panier" : "Review cart"}</span>
-            <span><strong>3</strong>{language === "fr" ? "Finaliser" : "Checkout"}</span>
-            <Link href="/faq#livraison">
-              {language === "fr" ? "Livraison locale Rimouski" : "Local Rimouski delivery"}
-            </Link>
-            <Link href="/faq#paiement">
-              {language === "fr" ? "Paiement carte/local" : "Card/local payment"}
-            </Link>
-            <Link href="/faq#retours">
-              {language === "fr" ? "Retour ou problème" : "Return or issue"}
-            </Link>
-          </div>
 
           {/* Grille produits */}
           {filteredProducts.length > 0 ? (
@@ -993,6 +1134,21 @@ export function StorefrontClient({
                     <span className="catalog-product-category">
                       {getLocalizedCategoryLabel(product.category, language)}
                     </span>
+                    {product.subscriptionAvailable ? (
+                      <span className="catalog-subscription-badge">
+                        <span className="catalog-subscription-badge__full">
+                          {language === "fr" ? "Abonnement" : "Subscription"}
+                        </span>
+                        <span className="catalog-subscription-badge__short">Abo</span>
+                      </span>
+                    ) : null}
+                    {(product.variants?.length ?? 0) > 0 ? (
+                      <span className="catalog-variant-badge">
+                        {language === "fr"
+                          ? `${product.variants?.length ?? 0} couleurs`
+                          : `${product.variants?.length ?? 0} colors`}
+                      </span>
+                    ) : null}
                     {product.imageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={product.imageUrl} alt={product.name} className="catalog-product-img" />
@@ -1028,6 +1184,21 @@ export function StorefrontClient({
                     <p className="catalog-product-rating" aria-label={language === "fr" ? "Note cinq etoiles" : "Five star rating"}>
                       <span aria-hidden="true">★★★★★</span>
                     </p>
+                    {(product.variants?.length ?? 0) > 0 ? (
+                      <div className="catalog-variant-swatches" aria-label={language === "fr" ? "Couleurs disponibles" : "Available colors"}>
+                        {product.variants?.slice(0, 8).map((variant) => (
+                          <span
+                            className="catalog-variant-swatch"
+                            key={variant.id}
+                            style={{ background: variant.colorHex || "#d8c7aa" }}
+                            title={language === "fr" ? variant.colorNameFr ?? variant.colorNameEn ?? variant.slug : variant.colorNameEn ?? variant.colorNameFr ?? variant.slug}
+                          />
+                        ))}
+                        {(product.variants?.length ?? 0) > 8 ? (
+                          <span className="catalog-variant-more">+{(product.variants?.length ?? 0) - 8}</span>
+                        ) : null}
+                      </div>
+                    ) : null}
                     <p className="catalog-product-fast-note">
                       {product.stock > 0
                         ? language === "fr"
@@ -1043,6 +1214,12 @@ export function StorefrontClient({
                   <div className="catalog-product-footer">
                     <strong className="catalog-product-price">{product.priceLabel}</strong>
                     <div className="catalog-product-actions">
+                      {(product.variants?.length ?? 0) > 0 ? (
+                        <Link className="catalog-product-add" href={`/products/${product.slug}`}>
+                          {language === "fr" ? "Voir les couleurs" : "View colors"}
+                        </Link>
+                      ) : (
+                      <>
                       <input
                         className="catalog-product-qty"
                         type="number"
@@ -1079,7 +1256,34 @@ export function StorefrontClient({
                               ? "Ajouter au panier"
                               : "Add to cart"}
                       </button>
+                      </>
+                      )}
                     </div>
+                  </div>
+
+                  <div className="catalog-product-secondary-actions">
+                    <ProductFavoriteButton
+                      productId={product.id}
+                      initialFavorited={favoriteProductIds.includes(product.id)}
+                      isAuthenticated={Boolean(user)}
+                      language={language}
+                      className="catalog-product-favorite"
+                      onChange={(productId, favorited) => {
+                        setFavoriteProductIds((current) =>
+                          favorited
+                            ? [...new Set([...current, productId])]
+                            : current.filter((id) => id !== productId),
+                        );
+                      }}
+                    />
+
+                    {/* Partage rapide */}
+                    <ProductShareButton
+                      slug={product.slug}
+                      name={product.name}
+                      priceLabel={product.priceLabel}
+                      language={language}
+                    />
                   </div>
 
                   {/* Lien vers la fiche détaillée */}
@@ -1118,8 +1322,7 @@ export function StorefrontClient({
                   type="button"
                   className="btn btn-secondary"
                   onClick={() => {
-                    setSearch("");
-                    setCategoryFilter("all");
+                    clearCatalogFilters();
                   }}
                 >
                   {language === "fr" ? "Réinitialiser les filtres" : "Reset filters"}

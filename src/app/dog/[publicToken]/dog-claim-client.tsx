@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { CurrentUser } from "@/lib/types";
 import type { Language } from "@/lib/i18n";
+import { normalizeDogPublicTokenInput } from "@/lib/dog-token";
 import { DogPhotoUpload } from "@/components/DogPhotoUpload";
 
 type Props = {
@@ -38,6 +39,11 @@ export function DogClaimClient({
   const [ageLabel, setAgeLabel] = useState(initialAgeLabel ?? "");
   const [ownerPhone, setOwnerPhone] = useState(initialOwnerPhone ?? "");
   const [importantNotes, setImportantNotes] = useState(initialImportantNotes ?? "");
+  const [publicProfileEnabled, setPublicProfileEnabled] = useState(true);
+  const [showPhotoPublic, setShowPhotoPublic] = useState(false);
+  const [showAgePublic, setShowAgePublic] = useState(false);
+  const [showPhonePublic, setShowPhonePublic] = useState(false);
+  const [showNotesPublic, setShowNotesPublic] = useState(false);
 
   const authSuccessMessage =
     language === "fr"
@@ -48,6 +54,25 @@ export function DogClaimClient({
     language === "fr"
       ? "Collier activé avec succès."
       : "Collar activated successfully.";
+
+  const visibleDetails = [
+    showPhotoPublic ? (language === "fr" ? "photo" : "photo") : null,
+    showAgePublic ? (language === "fr" ? "âge/descriptif" : "age/label") : null,
+    showPhonePublic ? (language === "fr" ? "appel direct" : "direct call") : null,
+    showNotesPublic ? (language === "fr" ? "notes" : "notes") : null,
+  ].filter(Boolean);
+
+  const visibilitySummary = !publicProfileEnabled
+    ? language === "fr"
+      ? "Le QR masquera les détails; seul le nom restera visible."
+      : "The QR will hide the details; only the name will remain visible."
+    : visibleDetails.length > 0
+      ? language === "fr"
+        ? `Visible au public: ${visibleDetails.join(", ")}.`
+        : `Visible publicly: ${visibleDetails.join(", ")}.`
+      : language === "fr"
+        ? "Mode privé strict: seul le nom sera visible."
+        : "Strict private mode: only the name will be visible.";
 
   const handleLogin = async (formData: FormData) => {
     setError("");
@@ -130,16 +155,31 @@ export function DogClaimClient({
     setClaimLoading(true);
 
     try {
+      if (!name.trim() || !ownerPhone.trim()) {
+        setError(
+          language === "fr"
+            ? "Ajoute au minimum le nom du chien et un numéro pour te joindre."
+            : "Add at least the dog's name and a phone number where you can be reached.",
+        );
+        return;
+      }
+
+      const normalizedToken = normalizeDogPublicTokenInput(publicToken);
       const response = await fetch("/api/account/dogs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          publicToken,
+          publicToken: normalizedToken,
           name,
           photoUrl,
           ageLabel,
           ownerPhone,
           importantNotes,
+          publicProfileEnabled,
+          showPhotoPublic,
+          showAgePublic,
+          showPhonePublic,
+          showNotesPublic,
         }),
       });
 
@@ -291,6 +331,62 @@ export function DogClaimClient({
           value={importantNotes}
           onChange={(event) => setImportantNotes(event.target.value)}
         />
+        <div className="rounded-[24px] border border-[#dfe8d0] bg-[#f8fbf2] p-4">
+          <label className="dog-checkbox-row dog-checkbox-row--strong">
+            <input
+              checked={publicProfileEnabled}
+              onChange={(event) => setPublicProfileEnabled(event.target.checked)}
+              type="checkbox"
+            />
+            <span>{language === "fr" ? "Activer la fiche publique du QR" : "Enable the QR public profile"}</span>
+          </label>
+          <p className="small mt-2 text-stone-600">
+            {language === "fr"
+              ? "Tu choisis ce que les gens verront s'ils scannent le collier. Tu pourras modifier ces réglages dans ton compte."
+              : "Choose what people will see when they scan the collar. You can change these settings in your account."}
+          </p>
+
+          <div className="mt-4 grid gap-3" data-disabled={publicProfileEnabled ? "false" : "true"}>
+            <label className="dog-checkbox-row">
+              <input
+                checked={showPhotoPublic}
+                disabled={!publicProfileEnabled}
+                onChange={(event) => setShowPhotoPublic(event.target.checked)}
+                type="checkbox"
+              />
+              <span>{language === "fr" ? "Afficher la photo" : "Show the photo"}</span>
+            </label>
+            <label className="dog-checkbox-row">
+              <input
+                checked={showAgePublic}
+                disabled={!publicProfileEnabled}
+                onChange={(event) => setShowAgePublic(event.target.checked)}
+                type="checkbox"
+              />
+              <span>{language === "fr" ? "Afficher l'âge ou le descriptif" : "Show age or short label"}</span>
+            </label>
+            <label className="dog-checkbox-row">
+              <input
+                checked={showPhonePublic}
+                disabled={!publicProfileEnabled}
+                onChange={(event) => setShowPhonePublic(event.target.checked)}
+                type="checkbox"
+              />
+              <span>{language === "fr" ? "Afficher le bouton d'appel" : "Show the call button"}</span>
+            </label>
+            <label className="dog-checkbox-row">
+              <input
+                checked={showNotesPublic}
+                disabled={!publicProfileEnabled}
+                onChange={(event) => setShowNotesPublic(event.target.checked)}
+                type="checkbox"
+              />
+              <span>{language === "fr" ? "Afficher les notes importantes" : "Show important notes"}</span>
+            </label>
+          </div>
+
+          <p className="small mt-4 font-medium text-[#4f6b36]">{visibilitySummary}</p>
+        </div>
       </div>
 
       {message ? (
@@ -311,8 +407,8 @@ export function DogClaimClient({
               ? "Activation..."
               : "Activating..."
             : language === "fr"
-              ? "Activer et publier"
-              : "Activate and publish"}
+              ? "Activer ce collier"
+              : "Activate this collar"}
         </button>
       </div>
     </section>

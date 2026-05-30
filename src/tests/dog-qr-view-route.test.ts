@@ -3,6 +3,7 @@ export {};
 const applyRateLimitMock = vi.fn();
 const getCurrentUserMock = vi.fn();
 const createDogQrScanNotificationMock = vi.fn();
+const recordDogQrScanMock = vi.fn();
 
 const prismaMock = {
   dogProfile: {
@@ -22,6 +23,10 @@ vi.mock("@/lib/app-notifications", () => ({
   createDogQrScanNotification: (...args: unknown[]) => createDogQrScanNotificationMock(...args),
 }));
 
+vi.mock("@/lib/dog-scans", () => ({
+  recordDogQrScan: (...args: unknown[]) => recordDogQrScanMock(...args),
+}));
+
 vi.mock("@/lib/prisma", () => ({
   prisma: prismaMock,
 }));
@@ -33,12 +38,14 @@ describe("POST /api/dog/[publicToken]/view", () => {
     applyRateLimitMock.mockResolvedValue({ ok: true, remaining: 29, retryAfterSeconds: 0 });
     getCurrentUserMock.mockResolvedValue(null);
     createDogQrScanNotificationMock.mockResolvedValue({ id: "notif_1" });
+    recordDogQrScanMock.mockResolvedValue({ id: "scan_1" });
     prismaMock.dogProfile.findUnique.mockResolvedValue({
       id: "dog_1",
       userId: "user_1",
       name: "Kratos",
       isActive: true,
       claimedAt: new Date("2026-05-03T10:00:00.000Z"),
+      lostModeEnabled: false,
     });
   });
 
@@ -57,6 +64,14 @@ describe("POST /api/dog/[publicToken]/view", () => {
       userId: "user_1",
       dogId: "dog_1",
       dogName: "Kratos",
+      lostMode: false,
+    });
+    expect(recordDogQrScanMock).toHaveBeenCalledWith({
+      dogId: "dog_1",
+      viewerUserId: null,
+      eventType: "VIEW",
+      lostModeAtScan: false,
+      request: expect.any(Request),
     });
   });
 

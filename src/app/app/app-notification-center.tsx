@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { Capacitor } from "@capacitor/core";
 import type {
   AppNotificationDTO,
   AppNotificationPreferencesDTO,
@@ -75,6 +76,7 @@ export function AppNotificationCenter({
   const [unreadCount, setUnreadCount] = useState(initialUnreadCount);
   const [preferences, setPreferences] = useState(initialPreferences);
   const [isSupported, setIsSupported] = useState(false);
+  const [isNativeApp, setIsNativeApp] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [permission, setPermission] = useState<BrowserPushPermission>("unsupported");
   const [message, setMessage] = useState("");
@@ -108,7 +110,10 @@ export function AppNotificationCenter({
   }), [language]);
 
   const pushStatus = useMemo(() => {
-    if (!isSupported) {
+    if (isNativeApp && preferences.pushEnabled) {
+      return { label: copy.pushActive, tone: "ok" as const };
+    }
+    if (!isSupported && !isNativeApp) {
       return { label: copy.notSupported, tone: "muted" as const };
     }
     if (permission === "denied") {
@@ -118,7 +123,7 @@ export function AppNotificationCenter({
       return { label: copy.pushActive, tone: "ok" as const };
     }
     return { label: copy.pushDisabled, tone: "warn" as const };
-  }, [copy.blocked, copy.notSupported, copy.pushActive, copy.pushDisabled, isSubscribed, isSupported, permission, preferences.pushEnabled]);
+  }, [copy.blocked, copy.notSupported, copy.pushActive, copy.pushDisabled, isNativeApp, isSubscribed, isSupported, permission, preferences.pushEnabled]);
 
   const preferenceItems: Array<{ key: keyof AppNotificationPreferencesDTO; label: string; description: string }> = useMemo(() => {
     const items: Array<{ key: keyof AppNotificationPreferencesDTO; label: string; description: string }> = [
@@ -156,6 +161,7 @@ export function AppNotificationCenter({
   }, [language, userRole]);
 
   useEffect(() => {
+    setIsNativeApp(Capacitor.isNativePlatform());
     const supported = canUsePush(publicKey);
     setIsSupported(supported);
     setPermission(getBrowserPermission());
@@ -207,6 +213,13 @@ export function AppNotificationCenter({
     }
     const payload = (await response.json()) as { preferences?: AppNotificationPreferencesDTO };
     if (payload.preferences) setPreferences(payload.preferences);
+    if (Object.prototype.hasOwnProperty.call(patch, "pushEnabled")) {
+      window.dispatchEvent(
+        new CustomEvent("chezolive:native-push-sync", {
+          detail: { pushEnabled: payload.preferences?.pushEnabled ?? patch.pushEnabled },
+        }),
+      );
+    }
     return true;
   };
 
@@ -219,6 +232,17 @@ export function AppNotificationCenter({
   };
 
   const subscribe = async () => {
+    if (isNativeApp) {
+      setBusy(true);
+      try {
+        await updatePreferences({ pushEnabled: true });
+        setMessage(copy.enabled);
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+
     if (!isSupported) {
       setMessage(copy.unsupported);
       return;
@@ -269,6 +293,12 @@ export function AppNotificationCenter({
   const unsubscribe = async () => {
     setBusy(true);
     try {
+      if (isNativeApp) {
+        await updatePreferences({ pushEnabled: false });
+        setMessage(copy.inApp);
+        return;
+      }
+
       const registration = await navigator.serviceWorker?.ready.catch(() => null);
       const subscription = await registration?.pushManager.getSubscription();
       await subscription?.unsubscribe();
@@ -337,12 +367,12 @@ export function AppNotificationCenter({
       </div>
 
       <div className="pwa-notification-actions">
-        {isSubscribed && preferences.pushEnabled ? (
+        {(isNativeApp ? preferences.pushEnabled : isSubscribed && preferences.pushEnabled) ? (
           <button className="btn btn-secondary" type="button" onClick={() => void unsubscribe()} disabled={busy}>
             {copy.disable}
           </button>
         ) : (
-          <button className="btn" type="button" onClick={() => void subscribe()} disabled={busy || !isSupported}>
+          <button className="btn" type="button" onClick={() => void subscribe()} disabled={busy || (!isSupported && !isNativeApp)}>
             {copy.enable}
           </button>
         )}
@@ -378,7 +408,7 @@ export function AppNotificationCenter({
       </div>
 
       {message ? <p className="small pwa-notification-message">{message}</p> : null}
-      {!isSupported ? <p className="small">{copy.inApp}</p> : null}
+      {!isSupported && !isNativeApp ? <p className="small">{copy.inApp}</p> : null}
 
       <div className="pwa-notification-list">
         {notifications.length > 0 ? (
