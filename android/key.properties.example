@@ -1,0 +1,6 @@
+# Copy to android/key.properties after creating the release keystore.
+# Never commit android/key.properties or the keystore file.
+storeFile=app/chezolive-release.keystore
+storePassword=REPLACE_WITH_STRONG_STORE_PASSWORD
+keyAlias=chezolive
+keyPassword=REPLACE_WITH_STRONG_KEY_PASSWORD
