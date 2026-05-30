@@ -17,7 +17,7 @@ describe("admin products privacy", () => {
     productFindManyMock.mockResolvedValue([]);
   });
 
-  it("ne selectionne pas costCents pour la page admin/products", async () => {
+  it("selectionne les champs internes requis par la page admin/products", async () => {
     const { getAdminProducts } = await import("@/lib/admin");
 
     await getAdminProducts();
@@ -26,12 +26,14 @@ describe("admin products privacy", () => {
     const select = productFindManyMock.mock.calls[0]?.[0]?.select;
 
     expect(select).toMatchObject({
+      sku: true,
+      barcode: true,
+      costCents: true,
       _count: {
         select: {
           orderItems: true,
         },
       },
     });
-    expect(select).not.toHaveProperty("costCents");
   });
 });

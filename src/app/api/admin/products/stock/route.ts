@@ -15,8 +15,8 @@ export async function POST(request: Request) {
       return jsonError("Invalid stock adjustment payload", 400);
     }
 
-    const { productId, quantityChange, reason } = parsed.data;
-    const result = await adjustAdminProductStock(productId, quantityChange, admin.id, reason);
+    const { productId, variantId, quantityChange, reason } = parsed.data;
+    const result = await adjustAdminProductStock(productId, quantityChange, admin.id, reason, variantId);
     const crossedCriticalThreshold =
       result.previousStock > 3 && result.product.stock > 0 && result.product.stock <= 3;
     const crossedOutOfStockThreshold = result.previousStock > 0 && result.product.stock <= 0;
@@ -43,7 +43,7 @@ export async function POST(request: Request) {
       route: "/api/admin/products/stock",
       event: "ADMIN_PRODUCT_STOCK_UPDATED",
       status: 200,
-      details: { productId, quantityChange, reason: reason ?? "ADMIN_STOCK_ADJUSTMENT" },
+      details: { productId, variantId, quantityChange, reason: reason ?? "ADMIN_STOCK_ADJUSTMENT" },
     });
 
     return jsonOk(result);
@@ -56,6 +56,9 @@ export async function POST(request: Request) {
     }
     if (error instanceof Error && error.message === "PRODUCT_NOT_FOUND") {
       return jsonError("Product not found", 404);
+    }
+    if (error instanceof Error && error.message === "PRODUCT_VARIANT_NOT_FOUND") {
+      return jsonError("Product variant not found", 404);
     }
     if (error instanceof Error && error.message === "INSUFFICIENT_STOCK") {
       return jsonError("Insufficient stock", 409);

@@ -94,7 +94,7 @@ enum SupportSenderType {
 model User {
   id                        String    @id @default(cuid())
   email                     String    @unique
-  passwordHash              String
+  passwordHash              String?
   firstName                 String
   lastName                  String
   role                      UserRole  @default(CUSTOMER)
@@ -107,6 +107,7 @@ model User {
   updatedAt                 DateTime  @updatedAt
 
   sessions                     Session[]
+  oauthAccounts                OAuthAccount[]
   orders                       Order[]
   logs                         AuditLog[]
   customerSupportConversations SupportConversation[] @relation("CustomerSupportConversations")
@@ -120,8 +121,29 @@ model User {
   subscriptions                Subscription[]
   deliveryAddresses            UserDeliveryAddress[]
   dogProfiles                  DogProfile[]
+  dogQrScans                   DogQrScan[]
   webPushSubscriptions         WebPushSubscription[]
+  nativePushTokens             NativePushToken[]
   appNotifications             AppNotification[]
+  productFavorites             ProductFavorite[]
+  smsRecipientPreferences      SmsRecipientPreference[]
+  smsNotificationLogs          SmsNotificationLog[]
+}
+
+model OAuthAccount {
+  id                String   @id @default(cuid())
+  userId            String
+  provider          String
+  providerAccountId String
+  email             String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@index([email])
 }
 
 model DogProfile {
@@ -138,15 +160,41 @@ model DogProfile {
   showAgePublic        Boolean @default(false)
   showPhonePublic      Boolean @default(false)
   showNotesPublic      Boolean @default(false)
+  lostModeEnabled      Boolean @default(false)
+  lostModeMessage      String?
+  lostModeActivatedAt  DateTime?
   isActive       Boolean  @default(true)
   claimedAt      DateTime?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  dogQrScans DogQrScan[]
 
   @@index([userId, createdAt])
   @@index([publicToken, isActive])
+}
+
+model DogQrScan {
+  id              String   @id @default(cuid())
+  dogId           String
+  viewerUserId    String?
+  eventType       String   @default("VIEW")
+  lostModeAtScan  Boolean  @default(false)
+  latitude        Float?
+  longitude       Float?
+  accuracyMeters  Float?
+  locationSharedAt DateTime?
+  userAgent       String?
+  ipHash          String?
+  createdAt       DateTime @default(now())
+
+  dog DogProfile @relation(fields: [dogId], references: [id], onDelete: Cascade)
+  viewer User? @relation(fields: [viewerUserId], references: [id], onDelete: SetNull)
+
+  @@index([dogId, createdAt])
+  @@index([eventType, createdAt])
+  @@index([viewerUserId, createdAt])
 }
 
 model UserDeliveryAddress {
@@ -201,6 +249,8 @@ enum SubscriptionStatus {
 model Product {
   id            String   @id @default(cuid())
   slug          String   @unique
+  sku           String?  @unique
+  barcode       String?  @unique
   nameFr        String
   nameEn        String
   descriptionFr String
@@ -231,13 +281,64 @@ model Product {
 
   orderItems          OrderItem[]
   inventoryMovements  InventoryMovement[]
+  variants            ProductVariant[]
   categoryId          String?
   category            Category? @relation(fields: [categoryId], references: [id])
+  subcategoryId       String?
+  subcategory         ProductSubcategory? @relation(fields: [subcategoryId], references: [id], onDelete: SetNull)
   subscriptions       Subscription[]
+  favoritedBy         ProductFavorite[]
 
   @@index([isActive])
   @@index([slug])
   @@index([categoryId])
+  @@index([subcategoryId])
+}
+
+model ProductVariant {
+  id            String   @id @default(cuid())
+  productId     String
+  slug          String
+  sku           String   @unique
+  barcode       String?  @unique
+  colorNameFr   String?
+  colorNameEn   String?
+  colorHex      String?
+  sizeNameFr    String?
+  sizeNameEn    String?
+  sizeCode      String?
+  sizeSortOrder Int?
+  imageUrl      String?
+  stock         Int      @default(0)
+  priceCents    Int?
+  costCents     Int?
+  isActive      Boolean  @default(true)
+  sortOrder     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  product            Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
+  orderItems         OrderItem[]
+  inventoryMovements InventoryMovement[]
+
+  @@unique([productId, slug])
+  @@index([productId, isActive, sortOrder])
+  @@index([productId, stock])
+  @@index([sizeCode])
+}
+
+model ProductFavorite {
+  id        String   @id @default(cuid())
+  userId    String
+  productId String
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@index([userId, createdAt])
+  @@index([productId])
 }
 
 model Order {
@@ -279,6 +380,8 @@ model Order {
   deliverySlot       DeliverySlot?       @relation(fields: [deliverySlotId], references: [id], onDelete: SetNull)
   deliveryStops      DeliveryStop[]
   supportConversations SupportConversation[]
+  smsRecipientPreferences SmsRecipientPreference[]
+  smsNotificationLogs     SmsNotificationLog[]
 
   @@index([userId, createdAt])
   @@index([status])
@@ -489,6 +592,23 @@ model WebPushSubscription {
   @@index([audience, enabled])
 }
 
+model NativePushToken {
+  id          String   @id @default(cuid())
+  userId      String
+  tokenHash   String   @unique
+  token       String
+  platform    String   @default("ANDROID")
+  enabled     Boolean  @default(true)
+  lastSeenAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, enabled])
+  @@index([platform, enabled])
+}
+
 model NotificationPreference {
   id               String   @id @default(cuid())
   userId           String   @unique
@@ -527,6 +647,76 @@ model AppNotification {
   @@index([type, createdAt])
 }
 
+model SmsRecipientPreference {
+  id          String    @id @default(cuid())
+  userId      String?
+  orderId     String?
+  phoneE164   String
+  language    String    @default("fr")
+  optedIn     Boolean   @default(false)
+  optedOut    Boolean   @default(false)
+  optInSource String
+  optInAt     DateTime?
+  optOutAt    DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  order Order? @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  logs SmsNotificationLog[]
+
+  @@unique([orderId, phoneE164])
+  @@index([userId])
+  @@index([orderId])
+  @@index([phoneE164, optedOut])
+}
+
+model SmsNotificationLog {
+  id                    String    @id @default(cuid())
+  eventKey              String    @unique
+  type                  String
+  orderId               String?
+  userId                String?
+  recipientPreferenceId String?
+  toPhoneE164           String
+  language              String    @default("fr")
+  bodyPreview           String?
+  status                String    @default("PENDING")
+  dryRun                Boolean   @default(false)
+  twilioMessageSid      String?   @unique
+  twilioAccountSid      String?
+  twilioMessagingServiceSid String?
+  errorCode             String?
+  errorMessage          String?
+  attemptedAt           DateTime?
+  sentAt                DateTime?
+  deliveredAt           DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  order Order? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  recipientPreference SmsRecipientPreference? @relation(fields: [recipientPreferenceId], references: [id], onDelete: SetNull)
+
+  @@index([orderId, type])
+  @@index([userId, createdAt])
+  @@index([toPhoneE164, createdAt])
+  @@index([status, createdAt])
+}
+
+model SmsInboundMessage {
+  id           String   @id @default(cuid())
+  messageSid   String   @unique
+  fromPhoneE164 String
+  toPhoneE164   String?
+  optOutType   String?
+  bodyPreview  String?
+  createdAt    DateTime @default(now())
+
+  @@index([fromPhoneE164, createdAt])
+  @@index([optOutType, createdAt])
+}
+
 model GeocodedAddressCache {
   id               String   @id @default(cuid())
   addressKey       String   @unique
@@ -551,6 +741,7 @@ model OrderItem {
   id                    String   @id @default(cuid())
   orderId               String
   productId             String
+  variantId             String?
   quantity              Int
   unitPriceCents        Int
   lineTotalCents        Int
@@ -560,9 +751,11 @@ model OrderItem {
 
   order   Order   @relation(fields: [orderId], references: [id], onDelete: Restrict)
   product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
 
   @@index([orderId])
   @@index([productId])
+  @@index([variantId])
 }
 
 model ConversionEvent {
@@ -598,15 +791,18 @@ model ConversionEvent {
 model InventoryMovement {
   id             String   @id @default(cuid())
   productId      String
+  variantId      String?
   orderId        String?
   quantityChange Int
   reason         String
   createdAt      DateTime @default(now())
 
   product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
   order   Order?  @relation(fields: [orderId], references: [id], onDelete: Restrict)
 
   @@index([productId, createdAt])
+  @@index([variantId, createdAt])
   @@index([orderId])
 }
 
@@ -745,11 +941,27 @@ model SupportQuickReply {
 }
 
 model Category {
-  id        String    @id @default(uuid())
-  name      String    @unique
-  products  Product[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id            String               @id @default(uuid())
+  name          String               @unique
+  products      Product[]
+  subcategories ProductSubcategory[]
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+}
+
+model ProductSubcategory {
+  id         String    @id @default(uuid())
+  categoryId String
+  category   Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  slug       String
+  nameFr     String
+  nameEn     String
+  products   Product[]
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@unique([categoryId, slug])
+  @@index([categoryId])
 }
 
 model PasswordReset {

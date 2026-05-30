@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { PrismaLibSql } from "@prisma/adapter-libsql";
+import { PRODUCT_SUBCATEGORY_DEFINITIONS, getSubcategoryDefinition } from "../src/lib/product-subcategories";
 
 const adapter = new PrismaLibSql({
   url: process.env.DATABASE_URL || "file:./dev.db",
@@ -19,6 +20,7 @@ const products = [
   {
     slug: "croquettes-premium-bulldog",
     categoryName: "Food",
+    subcategorySlug: "croquettes",
     nameFr: "Croquettes Premium Bulldog",
     nameEn: "Premium Bulldog Kibble",
     descriptionFr: "Croquettes premium pour bulldog français, digestion sensible.",
@@ -32,6 +34,7 @@ const products = [
   {
     slug: "harnais-confort-olive",
     categoryName: "Accessories",
+    subcategorySlug: "harnais",
     nameFr: "Harnais Confort Olive",
     nameEn: "Olive Comfort Harness",
     descriptionFr: "Harnais respirant et réglable pour promenades quotidiennes.",
@@ -45,6 +48,7 @@ const products = [
   {
     slug: "jouet-corde-resistante",
     categoryName: "Toys",
+    subcategorySlug: "cordes",
     nameFr: "Jouet Corde Résistante",
     nameEn: "Durable Rope Toy",
     descriptionFr: "Jouet corde robuste pour mastication et jeux de traction.",
@@ -58,6 +62,7 @@ const products = [
   {
     slug: "shampoing-peau-sensible",
     categoryName: "Hygiene",
+    subcategorySlug: "shampoings",
     nameFr: "Shampoing Peau Sensible",
     nameEn: "Sensitive Skin Shampoo",
     descriptionFr: "Shampoing doux sans parfum pour peau sensible.",
@@ -71,6 +76,7 @@ const products = [
   {
     slug: "lit-douillet-anti-stress",
     categoryName: "Beds",
+    subcategorySlug: "lits",
     nameFr: "Lit Douillet Anti-Stress",
     nameEn: "Calming Cozy Bed",
     descriptionFr: "Lit moelleux anti-stress pour un sommeil profond.",
@@ -92,6 +98,36 @@ async function main() {
     });
   }
 
+  for (const definition of PRODUCT_SUBCATEGORY_DEFINITIONS) {
+    const categoryName = definition.categoryNames.find((name) => categories.some((category) => category.name === name));
+    if (!categoryName) continue;
+
+    const category = await prisma.category.findUnique({
+      where: { name: categoryName },
+    });
+
+    if (!category) continue;
+
+    await prisma.productSubcategory.upsert({
+      where: {
+        categoryId_slug: {
+          categoryId: category.id,
+          slug: definition.slug,
+        },
+      },
+      update: {
+        nameFr: definition.nameFr,
+        nameEn: definition.nameEn,
+      },
+      create: {
+        categoryId: category.id,
+        slug: definition.slug,
+        nameFr: definition.nameFr,
+        nameEn: definition.nameEn,
+      },
+    });
+  }
+
   for (const product of products) {
     const category = await prisma.category.findUnique({
       where: { name: product.categoryName },
@@ -100,6 +136,18 @@ async function main() {
     if (!category) {
       throw new Error(`Category ${product.categoryName} not found`);
     }
+
+    const subcategoryDefinition = getSubcategoryDefinition(product.categoryName, product.subcategorySlug);
+    const subcategory = subcategoryDefinition
+      ? await prisma.productSubcategory.findUnique({
+          where: {
+            categoryId_slug: {
+              categoryId: category.id,
+              slug: subcategoryDefinition.slug,
+            },
+          },
+        })
+      : null;
 
     await prisma.product.upsert({
       where: { slug: product.slug },
@@ -114,6 +162,7 @@ async function main() {
         stock: product.stock,
         isActive: product.isActive,
         category: { connect: { id: category.id } },
+        subcategory: subcategory ? { connect: { id: subcategory.id } } : undefined,
       },
       create: {
         slug: product.slug,
@@ -127,6 +176,7 @@ async function main() {
         stock: product.stock,
         isActive: product.isActive,
         category: { connect: { id: category.id } },
+        subcategory: subcategory ? { connect: { id: subcategory.id } } : undefined,
       },
     });
   }

@@ -1,7 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { compressImageFile, formatImageBytes } from "@/lib/client-image-compression";
 
 export type ImageInfo = {
   name: string;
@@ -16,6 +17,11 @@ type ImageSelectorProps = {
   language: "fr" | "en";
 };
 
+const MAX_SOURCE_IMAGE_BYTES = 12 * 1024 * 1024;
+const MAX_ADMIN_IMAGE_BYTES = 2.2 * 1024 * 1024;
+const MAX_ADMIN_DIRECT_UPLOAD_BYTES = 5 * 1024 * 1024;
+const VALID_ADMIN_IMAGE_TYPES = new Set(["image/gif", "image/jpeg", "image/png", "image/webp"]);
+
 export function ImageSelector({ isOpen, onClose, onSelect, language }: ImageSelectorProps) {
   const [images, setImages] = useState<ImageInfo[]>([]);
   const [loading, setLoading] = useState(false);
@@ -26,19 +32,22 @@ export function ImageSelector({ isOpen, onClose, onSelect, language }: ImageSele
 
   useEffect(() => {
     if (isOpen) {
-      fetchImages();
+      void fetchImages();
     }
   }, [isOpen]);
 
   const fetchImages = async () => {
     setLoading(true);
     setError(null);
+
     try {
       const res = await fetch("/api/admin/images");
-      const data = await res.json();
+      const data = (await res.json()) as { error?: string; images?: ImageInfo[] };
+
       if (!res.ok) {
         throw new Error(data.error || "Erreur lors du chargement des images");
       }
+
       setImages(data.images || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur inconnue");
@@ -56,33 +65,70 @@ export function ImageSelector({ isOpen, onClose, onSelect, language }: ImageSele
     setSuccessMessage(null);
 
     try {
+      if (!VALID_ADMIN_IMAGE_TYPES.has(file.type)) {
+        throw new Error(language === "fr" ? "Choisis une image PNG, JPG, GIF ou WebP." : "Choose a PNG, JPG, GIF, or WebP image.");
+      }
+
+      if (file.size > MAX_SOURCE_IMAGE_BYTES) {
+        throw new Error(
+          language === "fr"
+            ? `Image trop lourde. Maximum: ${formatImageBytes(MAX_SOURCE_IMAGE_BYTES)}.`
+            : `Image is too large. Maximum: ${formatImageBytes(MAX_SOURCE_IMAGE_BYTES)}.`,
+        );
+      }
+
+      let imageFile = file;
+
+      if (file.type !== "image/gif" && file.size > MAX_ADMIN_IMAGE_BYTES) {
+        try {
+          imageFile = await compressImageFile(file, {
+            fileNamePrefix: "catalog-image",
+            initialQuality: 0.78,
+            maxDimension: 1600,
+            minDimension: 720,
+            targetMaxBytes: MAX_ADMIN_IMAGE_BYTES,
+          });
+        } catch {
+          if (file.size > MAX_ADMIN_DIRECT_UPLOAD_BYTES) {
+            throw new Error(
+              language === "fr"
+                ? "Impossible de lire cette image. Essaie un export JPG ou PNG plus petit."
+                : "Unable to read this image. Try a smaller JPG or PNG export.",
+            );
+          }
+        }
+      }
+
+      if (imageFile.size > MAX_ADMIN_DIRECT_UPLOAD_BYTES) {
+        throw new Error(
+          language === "fr"
+            ? "Cette image reste trop lourde apres compression."
+            : "This image is still too large after compression.",
+        );
+      }
+
       const formData = new FormData();
-      formData.append("image", file);
+      formData.append("image", imageFile, imageFile.name);
 
       const res = await fetch("/api/admin/images", {
         method: "POST",
         body: formData,
       });
 
-      const data = await res.json();
+      const data = (await res.json()) as { error?: string; image?: { url?: string } };
 
-      if (!res.ok) {
+      if (!res.ok || !data.image?.url) {
         throw new Error(data.error || "Erreur lors de l'upload");
       }
 
-      setSuccessMessage(
-        language === "fr" ? "Image téléchargée avec succès!" : "Image uploaded successfully!"
-      );
-      // Rafraîchir la liste
+      setSuccessMessage(language === "fr" ? "Image téléchargée avec succès!" : "Image uploaded successfully!");
       await fetchImages();
-      // Sélectionner la nouvelle image
       onSelect(data.image.url);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur inconnue");
     } finally {
       setUploading(false);
-      // Reset the input
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
@@ -127,10 +173,9 @@ export function ImageSelector({ isOpen, onClose, onSelect, language }: ImageSele
         }}
       >
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-          <h3 style={{ margin: 0 }}>
-            {language === "fr" ? "📁 Choisir une image" : "📁 Choose an image"}
-          </h3>
+          <h3 style={{ margin: 0 }}>{language === "fr" ? "Choisir une image" : "Choose an image"}</h3>
           <button
+            aria-label={language === "fr" ? "Fermer" : "Close"}
             onClick={onClose}
             style={{
               background: "none",
@@ -139,12 +184,13 @@ export function ImageSelector({ isOpen, onClose, onSelect, language }: ImageSele
               cursor: "pointer",
               padding: "0 8px",
             }}
+            type="button"
           >
             ×
           </button>
         </div>
 
-        {error && (
+        {error ? (
           <div
             style={{
               backgroundColor: "#fee2e2",
@@ -156,9 +202,9 @@ export function ImageSelector({ isOpen, onClose, onSelect, language }: ImageSele
           >
             {error}
           </div>
-        )}
+        ) : null}
 
-        {successMessage && (
+        {successMessage ? (
           <div
             style={{
               backgroundColor: "#dcfce7",
@@ -170,9 +216,8 @@ export function ImageSelector({ isOpen, onClose, onSelect, language }: ImageSele
           >
             {successMessage}
           </div>
-        )}
+        ) : null}
 
-        {/* Upload section */}
         <div style={{ marginBottom: "20px", padding: "16px", backgroundColor: "#f9fafb", borderRadius: "8px" }}>
           <p style={{ margin: "0 0 8px 0", fontWeight: "500" }}>
             {language === "fr" ? "Télécharger une nouvelle image" : "Upload a new image"}
@@ -181,35 +226,32 @@ export function ImageSelector({ isOpen, onClose, onSelect, language }: ImageSele
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml"
+              accept="image/*"
               onChange={handleUpload}
               disabled={uploading}
               style={{ flex: 1 }}
             />
-            {uploading && <span>{language === "fr" ? "Upload..." : "Uploading..."}</span>}
+            {uploading ? <span>{language === "fr" ? "Upload..." : "Uploading..."}</span> : null}
           </div>
           <p style={{ margin: "8px 0 0 0", fontSize: "12px", color: "#666" }}>
             {language === "fr"
-              ? "Formats acceptés: PNG, JPG, GIF, WebP, SVG (max 5MB)"
-              : "Accepted formats: PNG, JPG, GIF, WebP, SVG (max 5MB)"}
+              ? `PNG, JPG, GIF, WebP. Reduction automatique jusqu'a ${formatImageBytes(MAX_SOURCE_IMAGE_BYTES)}.`
+              : `PNG, JPG, GIF, WebP. Automatic reduction up to ${formatImageBytes(MAX_SOURCE_IMAGE_BYTES)}.`}
           </p>
         </div>
 
-        {/* Images grid */}
         <div>
           <p style={{ margin: "0 0 12px 0", fontWeight: "500" }}>
             {language === "fr" ? "Images disponibles:" : "Available images:"}
           </p>
 
-          {loading && <p>{language === "fr" ? "Chargement..." : "Loading..."}</p>}
+          {loading ? <p>{language === "fr" ? "Chargement..." : "Loading..."}</p> : null}
 
-          {!loading && images.length === 0 && (
+          {!loading && images.length === 0 ? (
             <p style={{ color: "#666" }}>
-              {language === "fr"
-                ? "Aucune image trouvée dans public/Logo/"
-                : "No images found in public/Logo/"}
+              {language === "fr" ? "Aucune image trouvée dans public/Logo/" : "No images found in public/Logo/"}
             </p>
-          )}
+          ) : null}
 
           <div
             style={{
@@ -219,7 +261,7 @@ export function ImageSelector({ isOpen, onClose, onSelect, language }: ImageSele
             }}
           >
             {images.map((image) => (
-              <div
+              <button
                 key={image.url}
                 onClick={() => handleSelect(image.url)}
                 style={{
@@ -229,9 +271,11 @@ export function ImageSelector({ isOpen, onClose, onSelect, language }: ImageSele
                   padding: "8px",
                   textAlign: "center",
                   transition: "border-color 0.2s",
+                  background: "#fff",
                 }}
                 onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#3b82f6")}
                 onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#e5e7eb")}
+                type="button"
               >
                 <Image
                   src={image.url}
@@ -246,8 +290,9 @@ export function ImageSelector({ isOpen, onClose, onSelect, language }: ImageSele
                     marginBottom: "8px",
                   }}
                 />
-                <p
+                <span
                   style={{
+                    display: "block",
                     margin: 0,
                     fontSize: "11px",
                     color: "#666",
@@ -256,8 +301,8 @@ export function ImageSelector({ isOpen, onClose, onSelect, language }: ImageSele
                   }}
                 >
                   {image.name}
-                </p>
-              </div>
+                </span>
+              </button>
             ))}
           </div>
         </div>
@@ -265,4 +310,3 @@ export function ImageSelector({ isOpen, onClose, onSelect, language }: ImageSele
     </div>
   );
 }
-

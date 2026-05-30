@@ -76,6 +76,7 @@ describe("admin product cost validation", () => {
     expect(
       adminProductCreateSchema.safeParse({
         slug: "collier-qr",
+        sku: "ACCESS-COLLIER-QR",
         category: "Accessories",
         nameFr: "Collier QR",
         nameEn: "QR Collar",
@@ -99,6 +100,7 @@ describe("admin product cost validation", () => {
     expect(
       adminProductCreateSchema.safeParse({
         slug: "collier-qr",
+        sku: "ACCESS-COLLIER-QR",
         category: "Accessories",
         nameFr: "Collier QR",
         nameEn: "QR Collar",
@@ -114,6 +116,43 @@ describe("admin product cost validation", () => {
       adminProductUpdateSchema.safeParse({
         id: "prod_1",
         costCents: -50,
+      }).success,
+    ).toBe(false);
+  });
+
+  it("normalizes and validates SKU and barcode fields", () => {
+    const parsed = adminProductCreateSchema.safeParse({
+      slug: "collier-qr",
+      sku: " access-collier-qr ",
+      barcode: " upc-123 ",
+      category: "Accessories",
+      nameFr: "Collier QR",
+      nameEn: "QR Collar",
+      descriptionFr: "Description FR",
+      descriptionEn: "Description EN",
+      priceCents: 1500,
+      costCents: 600,
+      stock: 10,
+    });
+
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.sku).toBe("ACCESS-COLLIER-QR");
+      expect(parsed.data.barcode).toBe("UPC-123");
+    }
+
+    expect(
+      adminProductCreateSchema.safeParse({
+        slug: "collier-qr",
+        sku: "no spaces please",
+        category: "Accessories",
+        nameFr: "Collier QR",
+        nameEn: "QR Collar",
+        descriptionFr: "Description FR",
+        descriptionEn: "Description EN",
+        priceCents: 1500,
+        costCents: 600,
+        stock: 10,
       }).success,
     ).toBe(false);
   });

@@ -4,6 +4,8 @@ import { publicProductSelect } from "@/lib/catalog";
 describe("publicProductSelect", () => {
   it("does not expose internal cost fields", () => {
     expect("costCents" in publicProductSelect).toBe(false);
+    expect("sku" in publicProductSelect).toBe(false);
+    expect("barcode" in publicProductSelect).toBe(false);
   });
 
   it("keeps the public catalog fields needed by storefront and product pages", () => {
@@ -24,6 +26,14 @@ describe("publicProductSelect", () => {
       priceMonthly: true,
       priceQuarterly: true,
       categoryId: true,
+      subcategory: {
+        select: {
+          id: true,
+          slug: true,
+          nameFr: true,
+          nameEn: true,
+        },
+      },
     });
   });
 });

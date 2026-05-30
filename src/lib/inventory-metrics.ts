@@ -1,6 +1,7 @@
 export type AdminInventoryMetricInput = {
   id: string;
   slug: string;
+  sku?: string | null;
   nameFr: string;
   nameEn: string;
   stock: number;
@@ -23,6 +24,7 @@ export type AdminInventoryMetricInput = {
 export type AdminInventoryMetricRow = {
   id: string;
   slug: string;
+  sku?: string | null;
   nameFr: string;
   nameEn: string;
   stock: number;
@@ -71,6 +73,7 @@ export function calculateAdminInventoryMetrics(products: AdminInventoryMetricInp
     return {
       id: product.id,
       slug: product.slug,
+      sku: product.sku,
       nameFr: product.nameFr,
       nameEn: product.nameEn,
       stock: product.stock,

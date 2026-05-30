@@ -7,9 +7,28 @@ import { adminProductCreateSchema, adminProductDeleteSchema, adminProductUpdateS
 const isPrismaUniqueError = (error: unknown) =>
   typeof error === "object" && error !== null && "code" in error && error.code === "P2002";
 
+const getUniqueProductMessage = (error: unknown) => {
+  const target = typeof error === "object" && error !== null && "meta" in error
+    ? (error as { meta?: { target?: unknown } }).meta?.target
+    : undefined;
+  const targetText = Array.isArray(target) ? target.join(" ").toLowerCase() : String(target ?? "").toLowerCase();
+
+  if (targetText.includes("sku")) return "A product with this SKU already exists";
+  if (targetText.includes("barcode")) return "A product with this barcode already exists";
+  return "A product with this slug already exists";
+};
+
 const getInvalidProductPayloadMessage = (issues: Array<{ path: PropertyKey[] }>) => {
   if (issues.some((issue) => issue.path[0] === "slug")) {
     return "Invalid product slug. Use only letters, numbers, and hyphens.";
+  }
+
+  if (issues.some((issue) => issue.path[0] === "sku")) {
+    return "Invalid product SKU. Use 3-64 uppercase letters, numbers, and hyphens.";
+  }
+
+  if (issues.some((issue) => issue.path[0] === "barcode")) {
+    return "Invalid product barcode.";
   }
 
   return "Invalid product payload";
@@ -57,7 +76,10 @@ export async function POST(request: Request) {
       return jsonError("Forbidden", 403);
     }
     if (isPrismaUniqueError(error)) {
-      return jsonError("A product with this slug already exists", 409);
+      return jsonError(getUniqueProductMessage(error), 409);
+    }
+    if (error instanceof Error && error.message === "INVALID_SUBCATEGORY") {
+      return jsonError("Product subcategory must belong to the selected category", 400);
     }
 
     logApiEvent({
@@ -105,7 +127,10 @@ export async function PATCH(request: Request) {
       return jsonError("Product not found", 404);
     }
     if (isPrismaUniqueError(error)) {
-      return jsonError("A product with this slug already exists", 409);
+      return jsonError(getUniqueProductMessage(error), 409);
+    }
+    if (error instanceof Error && error.message === "INVALID_SUBCATEGORY") {
+      return jsonError("Product subcategory must belong to the selected category", 400);
     }
 
     logApiEvent({

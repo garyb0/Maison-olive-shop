@@ -1,3 +1,5 @@
+export {};
+
 const requireAdminMock = vi.fn();
 const adjustAdminProductStockMock = vi.fn();
 const createAdminAppNotificationMock = vi.fn();

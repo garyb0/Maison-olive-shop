@@ -8,6 +8,23 @@ import {
   getAdminNotificationOpsSnapshot,
   type AdminNotificationOpsSnapshot,
 } from "@/lib/app-notifications";
+import { getVariantOptionLabel, type PublicProductVariant } from "@/lib/product-variants";
+
+const OUT_OF_STOCK_THRESHOLD = 0;
+const LOW_STOCK_THRESHOLD = 3;
+
+type StockAlertItem = {
+  id: string;
+  slug: string;
+  nameFr: string;
+  nameEn: string;
+  stock: number;
+  variantId?: string | null;
+  variantSku?: string | null;
+  variantNameFr?: string | null;
+  variantNameEn?: string | null;
+  isVariant?: boolean;
+};
 
 export type OwnerTodaySnapshot = {
   dateKey: string;
@@ -58,21 +75,9 @@ export type OwnerTodaySnapshot = {
   }>;
   todaySalesCents: number;
   outOfStockCount: number;
-  outOfStockProducts: Array<{
-    id: string;
-    slug: string;
-    nameFr: string;
-    nameEn: string;
-    stock: number;
-  }>;
+  outOfStockProducts: StockAlertItem[];
   lowStockCount: number;
-  lowStockProducts: Array<{
-    id: string;
-    slug: string;
-    nameFr: string;
-    nameEn: string;
-    stock: number;
-  }>;
+  lowStockProducts: StockAlertItem[];
   backup: {
     status: "ok" | "warn" | "unknown";
     label: string;
@@ -105,6 +110,117 @@ function readBackupSnapshot(): OwnerTodaySnapshot["backup"] {
   };
 }
 
+function sortStockAlertItems(items: StockAlertItem[]) {
+  return [...items].sort((a, b) => {
+    if (a.stock !== b.stock) return a.stock - b.stock;
+    return a.nameFr.localeCompare(b.nameFr, "fr-CA");
+  });
+}
+
+function getVariantName(variant: PublicProductVariant, language: "fr" | "en") {
+  return getVariantOptionLabel(variant, language);
+}
+
+async function getStockAlertRows(threshold: number) {
+  const variantWhere = {
+    isActive: true,
+    stock: { lte: threshold },
+    product: { isActive: true },
+  };
+  const simpleProductWhere = {
+    isActive: true,
+    stock: { lte: threshold },
+    variants: { none: {} },
+  };
+
+  const [variantCount, variantRows, simpleProductCount, simpleProducts] = await Promise.all([
+    prisma.productVariant.count({ where: variantWhere }),
+    prisma.productVariant.findMany({
+      where: variantWhere,
+      orderBy: [{ stock: "asc" }, { updatedAt: "desc" }],
+      take: 5,
+      select: {
+        id: true,
+        slug: true,
+        sku: true,
+        colorNameFr: true,
+        colorNameEn: true,
+        sizeNameFr: true,
+        sizeNameEn: true,
+        sizeCode: true,
+        stock: true,
+        product: {
+          select: {
+            id: true,
+            slug: true,
+            nameFr: true,
+            nameEn: true,
+          },
+        },
+      },
+    }),
+    prisma.product.count({ where: simpleProductWhere }),
+    prisma.product.findMany({
+      where: simpleProductWhere,
+      orderBy: [{ stock: "asc" }, { updatedAt: "desc" }],
+      take: 5,
+      select: {
+        id: true,
+        slug: true,
+        nameFr: true,
+        nameEn: true,
+        stock: true,
+      },
+    }),
+  ]);
+
+  const variantItems: StockAlertItem[] = variantRows.map((variant) => {
+    const variantNameFr = getVariantName(variant, "fr");
+    const variantNameEn = getVariantName(variant, "en");
+
+    return {
+      id: variant.product.id,
+      slug: variant.product.slug,
+      nameFr: `${variant.product.nameFr} - ${variantNameFr}`,
+      nameEn: `${variant.product.nameEn} - ${variantNameEn}`,
+      stock: variant.stock,
+      variantId: variant.id,
+      variantSku: variant.sku,
+      variantNameFr,
+      variantNameEn,
+      isVariant: true,
+    };
+  });
+
+  const productItems: StockAlertItem[] = simpleProducts.map((product) => ({
+    id: product.id,
+    slug: product.slug,
+    nameFr: product.nameFr,
+    nameEn: product.nameEn,
+    stock: product.stock,
+    isVariant: false,
+  }));
+
+  return {
+    count: variantCount + simpleProductCount,
+    products: sortStockAlertItems([...variantItems, ...productItems]).slice(0, 5),
+  };
+}
+
+async function getStockAlertSnapshot() {
+  const [outOfStock, lowStock] = await Promise.all([
+    getStockAlertRows(OUT_OF_STOCK_THRESHOLD),
+    getStockAlertRows(LOW_STOCK_THRESHOLD),
+  ]);
+
+  return {
+    outOfStockCount: outOfStock.count,
+    outOfStockProducts: outOfStock.products,
+    lowStockCount: lowStock.count,
+    lowStockProducts: lowStock.products,
+  };
+}
+
 export async function getOwnerTodaySnapshot(): Promise<OwnerTodaySnapshot> {
   const startOfDay = startOfLocalDay();
   const dateKey = localDateKey(startOfDay);
@@ -120,10 +236,7 @@ export async function getOwnerTodaySnapshot(): Promise<OwnerTodaySnapshot> {
     activeRunCount,
     activeRuns,
     todaySales,
-    outOfStockCount,
-    outOfStockProducts,
-    lowStockCount,
-    lowStockProducts,
+    stockAlerts,
     conversion,
     notifications,
   ] = await Promise.all([
@@ -223,36 +336,7 @@ export async function getOwnerTodaySnapshot(): Promise<OwnerTodaySnapshot> {
       },
       _sum: { totalCents: true },
     }),
-    prisma.product.count({
-      where: { isActive: true, stock: { lte: 0 } },
-    }),
-    prisma.product.findMany({
-      where: { isActive: true, stock: { lte: 0 } },
-      orderBy: [{ stock: "asc" }, { updatedAt: "desc" }],
-      take: 5,
-      select: {
-        id: true,
-        slug: true,
-        nameFr: true,
-        nameEn: true,
-        stock: true,
-      },
-    }),
-    prisma.product.count({
-      where: { isActive: true, stock: { lte: 3 } },
-    }),
-    prisma.product.findMany({
-      where: { isActive: true, stock: { lte: 3 } },
-      orderBy: [{ stock: "asc" }, { updatedAt: "desc" }],
-      take: 5,
-      select: {
-        id: true,
-        slug: true,
-        nameFr: true,
-        nameEn: true,
-        stock: true,
-      },
-    }),
+    getStockAlertSnapshot(),
     getConversionDashboardSnapshot().catch(() => getEmptyConversionDashboardSnapshot()),
     getAdminNotificationOpsSnapshot().catch(() => ({
       recent: [],
@@ -309,10 +393,10 @@ export async function getOwnerTodaySnapshot(): Promise<OwnerTodaySnapshot> {
       stopCount: run._count.stops,
     })),
     todaySalesCents: todaySales._sum.totalCents ?? 0,
-    outOfStockCount,
-    outOfStockProducts,
-    lowStockCount,
-    lowStockProducts,
+    outOfStockCount: stockAlerts.outOfStockCount,
+    outOfStockProducts: stockAlerts.outOfStockProducts,
+    lowStockCount: stockAlerts.lowStockCount,
+    lowStockProducts: stockAlerts.lowStockProducts,
     backup: readBackupSnapshot(),
     conversion,
     notifications,

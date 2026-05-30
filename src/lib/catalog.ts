@@ -26,6 +26,34 @@ export const publicProductSelect = {
       name: true,
     },
   },
+  subcategory: {
+    select: {
+      id: true,
+      slug: true,
+      nameFr: true,
+      nameEn: true,
+    },
+  },
+  variants: {
+    where: { isActive: true },
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    select: {
+      id: true,
+      slug: true,
+      colorNameFr: true,
+      colorNameEn: true,
+      colorHex: true,
+      sizeNameFr: true,
+      sizeNameEn: true,
+      sizeCode: true,
+      sizeSortOrder: true,
+      imageUrl: true,
+      stock: true,
+      priceCents: true,
+      isActive: true,
+      sortOrder: true,
+    },
+  },
 } satisfies Prisma.ProductSelect;
 
 export async function getActiveProducts() {
