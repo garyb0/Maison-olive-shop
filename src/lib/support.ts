@@ -150,6 +150,11 @@ function normalizePriority(priority: string | null | undefined): SupportConversa
   return priority === "LOW" || priority === "HIGH" || priority === "URGENT" ? priority : "NORMAL";
 }
 
+function supportTopicToTag(topic: string | null | undefined) {
+  if (!topic) return null;
+  return topic.toLowerCase().replaceAll("_", "-");
+}
+
 function getSupportSlaDueAt(priority: string | null | undefined, from = new Date()) {
   const normalizedPriority = normalizePriority(priority);
   return new Date(from.getTime() + SUPPORT_DEFAULT_SLA_MINUTES[normalizedPriority] * 60_000);
@@ -424,6 +429,8 @@ export async function createSupportConversation(input: {
   name?: string;
   email?: string;
   message: string;
+  orderId?: string;
+  topic?: string;
 }) {
   const adminAvailable = await isAnyAdminAvailable();
   const nextStatus = adminAvailable ? "OPEN" : "WAITING";
@@ -431,6 +438,18 @@ export async function createSupportConversation(input: {
   if (input.user && input.user.role === "ADMIN") {
     throw new Error("FORBIDDEN");
   }
+
+  const linkedOrder = input.user && input.orderId
+    ? await prisma.order.findFirst({
+        where: {
+          id: input.orderId,
+          userId: input.user.id,
+        },
+        select: { id: true },
+      })
+    : null;
+  const linkedOrderId = linkedOrder?.id ?? null;
+  const topicTag = supportTopicToTag(input.topic);
 
   if (input.user) {
     const existing = await prisma.supportConversation.findFirst({
@@ -442,6 +461,16 @@ export async function createSupportConversation(input: {
     });
 
     if (existing) {
+      const nextTags = topicTag ? normalizeTags([...parseTags(existing.tagsJson), topicTag]) : null;
+      if ((linkedOrderId && existing.orderId !== linkedOrderId) || nextTags) {
+        await prisma.supportConversation.update({
+          where: { id: existing.id },
+          data: {
+            ...(linkedOrderId && existing.orderId !== linkedOrderId ? { orderId: linkedOrderId } : {}),
+            ...(nextTags ? { tagsJson: JSON.stringify(nextTags) } : {}),
+          },
+        });
+      }
       return createSupportMessageAsCustomer(existing.id, input.user, input.message);
     }
   }
@@ -458,6 +487,8 @@ export async function createSupportConversation(input: {
         customerName: getDisplayName(input.user, input.name),
         priority: SUPPORT_DEFAULT_PRIORITY,
         source: SUPPORT_DEFAULT_SOURCE,
+        orderId: linkedOrderId ?? undefined,
+        tagsJson: topicTag ? JSON.stringify(normalizeTags([topicTag])) : undefined,
         slaDueAt: getSupportSlaDueAt(SUPPORT_DEFAULT_PRIORITY),
         status: nextStatus,
         lastMessageAt: new Date(),
@@ -479,7 +510,7 @@ export async function createSupportConversation(input: {
         action: "SUPPORT_CONVERSATION_CREATED",
         entity: "SupportConversation",
         entityId: conversation.id,
-        metadata: JSON.stringify({ status: nextStatus, guest: !input.user }),
+        metadata: JSON.stringify({ status: nextStatus, guest: !input.user, orderId: linkedOrderId, topic: input.topic }),
       },
     });
 

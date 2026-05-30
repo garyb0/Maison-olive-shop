@@ -20,6 +20,8 @@ export async function POST(request: Request) {
       name: parsed.data.name,
       email: parsed.data.email,
       message: parsed.data.message,
+      orderId: parsed.data.orderId,
+      topic: parsed.data.topic,
     });
     const guestAccessToken = !user
       ? createSupportGuestAccessToken(conversation.id, conversation.customerEmail)

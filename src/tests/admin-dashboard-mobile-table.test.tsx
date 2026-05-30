@@ -45,7 +45,16 @@ describe("AdminDashboardClient mobile table labels", () => {
           activeRunCount: 1,
           todaySalesLabel: "90,81 $",
           outOfStockCount: 1,
-          outOfStockProducts: [{ id: "prod_out", name: "Produit rupture", slug: "produit-rupture", stock: 0 }],
+          outOfStockProducts: [{
+            id: "prod_bed",
+            name: "Lit Douillet Anti-Stress - Rouge",
+            slug: "lit-douillet",
+            stock: 0,
+            variantId: "variant_red",
+            variantSku: "BED-ROUGE",
+            variantName: "Rouge",
+            isVariant: true,
+          }],
           lowStockCount: 2,
           lowStockProducts: [{ id: "prod_1", name: "Produit test", slug: "produit-test", stock: 3 }],
           actionQueues: {
@@ -199,9 +208,10 @@ describe("AdminDashboardClient mobile table labels", () => {
     expect(screen.getByRole("link", { name: /Voir les commandes/ })).toHaveAttribute("href", "/admin/orders");
     expect(screen.getByRole("link", { name: /Ouvrir support/ })).toHaveAttribute("href", "/admin/support");
     expect(screen.getByText("Backup")).toBeInTheDocument();
-    expect(screen.getByText("Produit rupture")).toBeInTheDocument();
-    expect(screen.getByText("Actif, visible, achat public bloque.")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Produit rupture/ })).toHaveAttribute(
+    expect(screen.getByText("Lit Douillet Anti-Stress - Rouge")).toBeInTheDocument();
+    expect(screen.getByText("BED-ROUGE - lit-douillet")).toBeInTheDocument();
+    expect(screen.getByText("0 unite(s) en stock pour cette couleur.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Lit Douillet Anti-Stress - Rouge/ })).toHaveAttribute(
       "href",
       "/admin/products#stock-actions",
     );

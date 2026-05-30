@@ -358,8 +358,8 @@ describe("DriverRunClient French copy", () => {
       />,
     );
 
-    expect(screen.getByText("Recevoir les alertes de cette tournee")).toBeInTheDocument();
-    expect(screen.getByText(/Tu peux livrer meme sans l'activer/i)).toBeInTheDocument();
+    expect(screen.getByText("Recevoir les alertes de cette tournée")).toBeInTheDocument();
+    expect(screen.getByText(/Tu peux livrer même sans l'activer/i)).toBeInTheDocument();
     const enableButton = await screen.findByRole("button", { name: "Recevoir les alertes" });
     fireEvent.click(enableButton);
 
@@ -368,6 +368,6 @@ describe("DriverRunClient French copy", () => {
       "/api/driver/run/token_1/push/subscribe",
       expect.objectContaining({ method: "POST" }),
     ));
-    expect(await screen.findByText("Alertes de tournee activees.")).toBeInTheDocument();
+    expect(await screen.findByText("Alertes de tournée activées.")).toBeInTheDocument();
   });
 });

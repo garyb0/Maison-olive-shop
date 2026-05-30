@@ -4,6 +4,7 @@ const sendNotificationMock = vi.fn();
 
 const prismaMock = {
   $queryRaw: vi.fn(),
+  $transaction: vi.fn(),
   appNotification: {
     create: vi.fn(),
     findFirst: vi.fn(),
@@ -12,6 +13,10 @@ const prismaMock = {
   },
   notificationPreference: {
     findUnique: vi.fn(),
+    upsert: vi.fn(),
+  },
+  nativePushToken: {
+    upsert: vi.fn(),
   },
   webPushSubscription: {
     findMany: vi.fn(),
@@ -44,7 +49,11 @@ describe("app notifications", () => {
       { name: "WebPushSubscription" },
       { name: "NotificationPreference" },
       { name: "AppNotification" },
+      { name: "NativePushToken" },
     ]);
+    prismaMock.$transaction.mockImplementation(async (callback: (tx: typeof prismaMock) => unknown) =>
+      callback(prismaMock),
+    );
     prismaMock.appNotification.create.mockResolvedValue({
       id: "notif_1",
       type: "ORDER_UPDATE",
@@ -63,6 +72,20 @@ describe("app notifications", () => {
       dogQrUpdates: true,
       adminAlerts: true,
       driverRunUpdates: true,
+    });
+    prismaMock.notificationPreference.upsert.mockResolvedValue({
+      pushEnabled: true,
+      orderUpdates: true,
+      deliveryUpdates: true,
+      supportUpdates: true,
+      dogQrUpdates: true,
+      adminAlerts: true,
+      driverRunUpdates: true,
+    });
+    prismaMock.nativePushToken.upsert.mockResolvedValue({
+      id: "native_1",
+      platform: "ANDROID",
+      enabled: true,
     });
     prismaMock.webPushSubscription.findMany.mockResolvedValue([
       {
@@ -153,5 +176,40 @@ describe("app notifications", () => {
         href: "/admin/orders/order_1",
       }),
     );
+  });
+
+  it("enregistre un token natif Android separe du Web Push", async () => {
+    const { registerNativePushTokenForUser } = await import("@/lib/app-notifications");
+
+    const result = await registerNativePushTokenForUser(
+      {
+        id: "user_1",
+        email: "client@chezolive.ca",
+        firstName: "Client",
+        lastName: "Olive",
+        role: "CUSTOMER",
+        language: "fr",
+      },
+      { token: "fcm-token-android-1234567890", platform: "ANDROID" },
+    );
+
+    expect(result).toEqual({
+      id: "native_1",
+      platform: "ANDROID",
+      enabled: true,
+      nativePushAvailable: false,
+    });
+    expect(prismaMock.nativePushToken.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      create: expect.objectContaining({
+        userId: "user_1",
+        platform: "ANDROID",
+        enabled: true,
+      }),
+      update: expect.objectContaining({
+        userId: "user_1",
+        platform: "ANDROID",
+        enabled: true,
+      }),
+    }));
   });
 });

@@ -51,6 +51,10 @@ type Props = {
       name: string;
       slug: string;
       stock: number;
+      variantId?: string | null;
+      variantSku?: string | null;
+      variantName?: string | null;
+      isVariant?: boolean;
     }>;
     lowStockCount: number;
     lowStockProducts: Array<{
@@ -58,6 +62,10 @@ type Props = {
       name: string;
       slug: string;
       stock: number;
+      variantId?: string | null;
+      variantSku?: string | null;
+      variantName?: string | null;
+      isVariant?: boolean;
     }>;
     actionQueues: {
       ordersToPrepare: AdminActionItem[];
@@ -542,24 +550,34 @@ export function AdminDashboardClient({
       : language === "fr"
         ? `${todayCockpit.backup.ageHours.toFixed(1)} h`
         : `${todayCockpit.backup.ageHours.toFixed(1)}h`;
-  const outOfStockProductIds = new Set(todayCockpit.outOfStockProducts.map((product) => product.id));
+  const getStockAlertKey = (product: { id: string; variantId?: string | null }) =>
+    product.variantId ? `${product.id}:${product.variantId}` : product.id;
+  const outOfStockProductIds = new Set(todayCockpit.outOfStockProducts.map(getStockAlertKey));
   const stockProducts = [
     ...todayCockpit.outOfStockProducts,
-    ...todayCockpit.lowStockProducts.filter((product) => !outOfStockProductIds.has(product.id)),
+    ...todayCockpit.lowStockProducts.filter((product) => !outOfStockProductIds.has(getStockAlertKey(product))),
   ];
   const lowStockActionItems: AdminActionItem[] = stockProducts.map((product) => ({
-    id: product.id,
-    href: product.stock <= 0 ? "/admin/products#stock-actions" : "/admin/products",
+    id: getStockAlertKey(product),
+    href: "/admin/products#stock-actions",
     title: product.name,
-    meta: product.slug,
+    meta: product.variantSku ? `${product.variantSku} - ${product.slug}` : product.slug,
     detail:
       product.stock <= 0
         ? language === "fr"
-          ? "Actif, visible, achat public bloque."
-          : "Active, visible, public purchase blocked."
+          ? product.isVariant
+            ? "0 unite(s) en stock pour cette couleur."
+            : "Actif, visible, achat public bloque."
+          : product.isVariant
+            ? "0 unit(s) in stock for this color."
+            : "Active, visible, public purchase blocked."
         : language === "fr"
-          ? `${product.stock} unite(s) en stock`
-          : `${product.stock} unit(s) in stock`,
+          ? product.isVariant
+            ? `${product.stock} unite(s) en stock pour cette couleur.`
+            : `${product.stock} unite(s) en stock`
+          : product.isVariant
+            ? `${product.stock} unit(s) in stock for this color.`
+            : `${product.stock} unit(s) in stock`,
     badge: product.stock <= 0 ? (language === "fr" ? "Rupture" : "Out") : language === "fr" ? "Bas" : "Low",
   }));
   const lowButAvailableCount = Math.max(0, todayCockpit.lowStockCount - todayCockpit.outOfStockCount);

@@ -11,7 +11,7 @@ vi.mock("next/link", () => ({
   ),
 }));
 
-describe("AdminOrdersClient mobile table labels", () => {
+describe("AdminOrdersClient operational inbox", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", vi.fn());
   });
@@ -20,7 +20,7 @@ describe("AdminOrdersClient mobile table labels", () => {
     vi.unstubAllGlobals();
   });
 
-  it("expose des labels par cellule pour le rendu mobile en cartes", () => {
+  it("affiche les files rapides, la recherche par numéro et le lien support lié", () => {
     const { container } = render(
       <AdminOrdersClient
         language="fr"
@@ -41,16 +41,27 @@ describe("AdminOrdersClient mobile table labels", () => {
             deliveryStatus: "UNSCHEDULED",
             deliveryPhone: "4185551212",
             deliveryInstructions: null,
+            supportConversations: [
+              {
+                id: "support_1",
+                status: "OPEN",
+                priority: "HIGH",
+                lastMessageAtLabel: "28 avril 2026",
+              },
+            ],
           },
         ]}
       />,
     );
 
-    expect(container.querySelector(".admin-orders-table-wrap")).not.toBeNull();
-    expect(container.querySelector(".admin-orders-table")).not.toBeNull();
-    expect(screen.getByText("MO-20260428-0001").closest("td")).toHaveAttribute("data-label", "Commande");
-    expect(screen.getByText("client@example.com").closest("td")).toHaveAttribute("data-label", "Email");
-    expect(screen.getByText("90,81 $").closest("td")).toHaveAttribute("data-label", "Total");
-    expect(screen.getByText("Voir détails").closest("td")).toHaveClass("admin-order-actions-cell");
+    expect(container.querySelector(".admin-order-queue-grid")).not.toBeNull();
+    expect(screen.getByRole("button", { name: /À vérifier/i })).toBeInTheDocument();
+    expect(screen.getByText("#MO-20260428-0001")).toBeInTheDocument();
+    expect(screen.getByText(/client@example\.com/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Conversation support liée/i })).toHaveAttribute(
+      "href",
+      "/admin/support?conversationId=support_1",
+    );
+    expect(screen.getByRole("link", { name: "Détails" })).toHaveAttribute("href", "/admin/orders/order_1");
   });
 });

@@ -2,9 +2,45 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import type { Viewport } from "next";
 import { GlobalSupportChat } from "@/components/GlobalSupportChat";
+import { NativeAppChrome } from "@/components/NativeAppChrome";
 import { SiteFooter } from "@/components/SiteFooter";
 import { env } from "@/lib/env";
 import "./globals.css";
+
+const nativeAppBootstrap = `
+(() => {
+  const host = window.location.hostname;
+  const params = new URLSearchParams(window.location.search);
+  const capacitor = window.Capacitor;
+  const isNative = Boolean(capacitor && typeof capacitor.isNativePlatform === "function" && capacitor.isNativePlatform());
+  const isPreview = params.get("native") === "1" && (host === "localhost" || host === "127.0.0.1" || host === "::1");
+  if (!isNative && !isPreview) return;
+
+  const hasClientChrome = !/^\\/(admin|driver|dog)(\\/|$)/.test(window.location.pathname);
+  const apply = () => {
+    document.documentElement.classList.add("is-capacitor-native");
+    document.documentElement.dataset.nativeApp = "chezolive";
+    document.documentElement.classList.toggle("has-native-client-chrome", hasClientChrome);
+    if (!document.body) return;
+    document.body.classList.add("is-capacitor-native");
+    document.body.dataset.nativeApp = "chezolive";
+    document.body.classList.toggle("has-native-client-chrome", hasClientChrome);
+  };
+
+  apply();
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", apply, { once: true });
+  }
+
+  try {
+    const plugins = capacitor && capacitor.Plugins ? capacitor.Plugins : {};
+    if (isNative && plugins.SplashScreen && typeof plugins.SplashScreen.hide === "function") {
+      plugins.SplashScreen.hide();
+    }
+  } catch {
+  }
+})();
+`;
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -92,8 +128,11 @@ export default function RootLayout({
     <html
       lang="fr"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full flex flex-col" suppressHydrationWarning>
+        <script dangerouslySetInnerHTML={{ __html: nativeAppBootstrap }} />
+        <NativeAppChrome />
         {children}
         <SiteFooter />
         <GlobalSupportChat />

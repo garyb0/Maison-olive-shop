@@ -19,10 +19,12 @@ describe("help center redirects", () => {
           destination: "/faq#retours",
           permanent: true,
         }),
+      ]),
+    );
+    expect(redirects).not.toEqual(
+      expect.arrayContaining([
         expect.objectContaining({
           source: "/terms",
-          destination: "/faq#conditions",
-          permanent: true,
         }),
       ]),
     );

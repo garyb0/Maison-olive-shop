@@ -47,23 +47,24 @@ function referrerPath() {
   }
 }
 
+function compactTopLevelPayload(payload: Record<string, unknown>) {
+  return Object.fromEntries(
+    Object.entries(payload).filter(([, value]) => value !== null && value !== undefined),
+  );
+}
+
 export function trackConversionEvent(type: ConversionEventType, payload: ConversionClientPayload = {}) {
   if (typeof window === "undefined") return;
 
-  const body = JSON.stringify({
+  const body = JSON.stringify(compactTopLevelPayload({
     type,
     sessionKey: getConversionSessionKey(),
     ...payload,
     path: currentPath(),
     referrerPath: referrerPath(),
-  });
+  }));
 
   try {
-    if (typeof navigator.sendBeacon === "function") {
-      const sent = navigator.sendBeacon("/api/conversion-events", new Blob([body], { type: "application/json" }));
-      if (sent) return;
-    }
-
     void fetch("/api/conversion-events", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

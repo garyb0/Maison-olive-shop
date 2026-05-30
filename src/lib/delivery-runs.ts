@@ -35,9 +35,20 @@ import {
   isDynamicDeliverySlotId,
   parseDynamicDeliverySlotId,
 } from "@/lib/delivery-mode";
+import { sendOrderSmsNotification } from "@/lib/sms";
 
 const DRIVER_TOKEN_TTL_MS = 12 * 60 * 60 * 1000;
 const EARTH_RADIUS_METERS = 6371000;
+
+function sendDeliveryRunSmsUpdates(orderIds: string[], type: "DELIVERY_OUT_FOR_DELIVERY" | "DELIVERY_DELIVERED" | "DELIVERY_FAILED") {
+  for (const orderId of orderIds) {
+    sendOrderSmsNotification({
+      orderId,
+      type,
+      dedupeKey: type,
+    }).catch(() => undefined);
+  }
+}
 
 const deliveryRunDetailInclude = Prisma.validator<Prisma.DeliveryRunInclude>()({
   driver: true,
@@ -1309,6 +1320,9 @@ export async function startDriverRun(token: string, input?: DeliveryRunStartLoca
   assertRunCanBeStarted(access.run);
 
   const orderIds = access.run.stops.map((stop) => stop.orderId);
+  const outForDeliveryOrderIds = access.run.stops
+    .filter((stop) => ["SCHEDULED", "RESCHEDULED"].includes(stop.order.deliveryStatus))
+    .map((stop) => stop.orderId);
   const hasOriginOverride = input?.lat !== undefined && input?.lng !== undefined;
   const recordedAt =
     input?.recordedAt && !Number.isNaN(new Date(input.recordedAt).getTime())
@@ -1364,6 +1378,8 @@ export async function startDriverRun(token: string, input?: DeliveryRunStartLoca
       include: deliveryRunDetailInclude,
     });
   });
+
+  sendDeliveryRunSmsUpdates(outForDeliveryOrderIds, "DELIVERY_OUT_FOR_DELIVERY");
 
   if (hasOriginOverride) {
     let plannedRoute: Awaited<ReturnType<typeof planOrderedStops>> | null = null;
@@ -1872,6 +1888,11 @@ export async function completeDriverStop(
       },
     });
   });
+
+  sendDeliveryRunSmsUpdates(
+    [stop.orderId],
+    input.result === "DELIVERED" ? "DELIVERY_DELIVERED" : "DELIVERY_FAILED",
+  );
 
   return getDeliveryRunDetail(access.run.id);
 }

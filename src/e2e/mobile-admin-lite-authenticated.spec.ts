@@ -63,6 +63,7 @@ test.describe("authenticated mobile admin lite smoke", () => {
     await page.goto("/app");
     await page.waitForLoadState("domcontentloaded");
 
+    await page.locator(".pwa-more-panel > summary").click();
     await expect(page.getByRole("heading", { name: "Centre d'actions" })).toBeVisible();
     await expect(page.getByText("In-app actif")).toBeVisible();
     await expect(page.getByText("Alertes admin")).toBeVisible();

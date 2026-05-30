@@ -54,6 +54,14 @@ export const env = {
   resendApiKey: process.env.RESEND_API_KEY ?? "",
   resendFromEmail: process.env.RESEND_FROM_EMAIL ?? "Chez Olive <onboarding@resend.dev>",
   adminSmsEmail: process.env.ADMIN_SMS_EMAIL ?? "",
+  smsNotificationsEnabled: process.env.SMS_NOTIFICATIONS_ENABLED === "true",
+  smsDryRun:
+    process.env.SMS_DRY_RUN === undefined
+      ? nodeEnv !== "production"
+      : process.env.SMS_DRY_RUN === "true",
+  twilioAccountSid: process.env.TWILIO_ACCOUNT_SID ?? "",
+  twilioAuthToken: process.env.TWILIO_AUTH_TOKEN ?? "",
+  twilioMessagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID ?? "",
   // SMTP configuration for sending emails
   smtpHost: process.env.SMTP_HOST ?? "",
   smtpPort: parsedSmtpPort,
@@ -76,6 +84,13 @@ export const env = {
   webPushPublicKey: process.env.WEB_PUSH_PUBLIC_KEY ?? process.env.NEXT_PUBLIC_WEB_PUSH_PUBLIC_KEY ?? "",
   webPushPrivateKey: process.env.WEB_PUSH_PRIVATE_KEY ?? "",
   webPushSubject: process.env.WEB_PUSH_SUBJECT ?? `mailto:${process.env.BUSINESS_SUPPORT_EMAIL ?? "support@chezolive.ca"}`,
+  firebaseProjectId: process.env.FIREBASE_PROJECT_ID ?? "",
+  firebaseClientEmail: process.env.FIREBASE_CLIENT_EMAIL ?? "",
+  firebasePrivateKey: process.env.FIREBASE_PRIVATE_KEY ?? "",
+  googleOAuthClientId: process.env.GOOGLE_OAUTH_CLIENT_ID ?? "",
+  googleOAuthClientSecret: process.env.GOOGLE_OAUTH_CLIENT_SECRET ?? "",
+  googleOAuthRedirectUri:
+    process.env.GOOGLE_OAUTH_REDIRECT_URI ?? `${normalizeSiteUrl(process.env.NEXT_PUBLIC_SITE_URL)}/api/auth/google/callback`,
 } as const;
 
 export type EnvValidationReport = {
@@ -117,6 +132,23 @@ export function validateEnv(target: "development" | "production" = "development"
 
     if (env.databaseUrl.includes("dev.db")) {
       errors.push("DATABASE_URL still points to dev.db; use a production database before go-live.");
+    }
+
+    const hasAnyGoogleOAuthConfig = Boolean(
+      env.googleOAuthClientId.trim() ||
+      env.googleOAuthClientSecret.trim() ||
+      process.env.GOOGLE_OAUTH_REDIRECT_URI?.trim()
+    );
+    const hasAllGoogleOAuthConfig = Boolean(
+      env.googleOAuthClientId.trim() &&
+      env.googleOAuthClientSecret.trim() &&
+      env.googleOAuthRedirectUri.trim()
+    );
+
+    if (hasAnyGoogleOAuthConfig && !hasAllGoogleOAuthConfig) {
+      warnings.push(
+        "Google OAuth is partially configured. Set GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET, and GOOGLE_OAUTH_REDIRECT_URI to enable Google sign-in."
+      );
     }
 
     const hasStripeSecretKey = env.stripeSecretKey.length > 0;
@@ -188,6 +220,37 @@ export function validateEnv(target: "development" | "production" = "development"
       errors.push("Email provider required in production (RESEND_API_KEY or SMTP_HOST).");
     }
 
+    const hasAnyTwilioSmsConfig = Boolean(
+      env.twilioAccountSid || env.twilioAuthToken || env.twilioMessagingServiceSid,
+    );
+    const hasCompleteTwilioSmsConfig = Boolean(
+      env.twilioAccountSid && env.twilioAuthToken && env.twilioMessagingServiceSid,
+    );
+
+    if (hasAnyTwilioSmsConfig && !hasCompleteTwilioSmsConfig) {
+      errors.push(
+        "Twilio SMS is partially configured. Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_MESSAGING_SERVICE_SID together."
+      );
+    }
+
+    if (env.smsNotificationsEnabled && !env.smsDryRun && !hasCompleteTwilioSmsConfig) {
+      errors.push(
+        "SMS_NOTIFICATIONS_ENABLED=true requires complete Twilio SMS credentials unless SMS_DRY_RUN=true."
+      );
+    }
+
+    if (env.smsNotificationsEnabled && env.smsDryRun) {
+      warnings.push("SMS_NOTIFICATIONS_ENABLED=true with SMS_DRY_RUN=true will log SMS attempts without sending through Twilio.");
+    }
+
+    if (env.twilioAccountSid && !env.twilioAccountSid.startsWith("AC")) {
+      warnings.push("TWILIO_ACCOUNT_SID format looks unusual (expected prefix AC).");
+    }
+
+    if (env.twilioMessagingServiceSid && !env.twilioMessagingServiceSid.startsWith("MG")) {
+      warnings.push("TWILIO_MESSAGING_SERVICE_SID format looks unusual (expected prefix MG).");
+    }
+
     if (env.supportAiEnabled && !env.openAiApiKey) {
       errors.push("OPENAI_API_KEY is required when SUPPORT_AI_ENABLED=true.");
     }
@@ -255,6 +318,14 @@ export function validateEnv(target: "development" | "production" = "development"
     if (hasAnyWebPush && !hasCompleteWebPush) {
       warnings.push(
         "Web Push is partially configured. Set WEB_PUSH_PUBLIC_KEY, NEXT_PUBLIC_WEB_PUSH_PUBLIC_KEY, WEB_PUSH_PRIVATE_KEY, and WEB_PUSH_SUBJECT for push delivery."
+      );
+    }
+
+    const hasAnyFirebase = Boolean(env.firebaseProjectId || env.firebaseClientEmail || env.firebasePrivateKey);
+    const hasCompleteFirebase = Boolean(env.firebaseProjectId && env.firebaseClientEmail && env.firebasePrivateKey);
+    if (hasAnyFirebase && !hasCompleteFirebase) {
+      warnings.push(
+        "Firebase native push is partially configured. Set FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, and FIREBASE_PRIVATE_KEY for Android FCM delivery."
       );
     }
   }

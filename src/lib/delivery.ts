@@ -63,7 +63,7 @@ async function hasDeliverySchemaTables() {
     const names = new Set(rows.map((row) => row.name));
     return names.has("DeliverySlot") && names.has("DeliveryException");
   } catch {
-    // Si la DB n'est pas SQLite (ou metadonnees indisponibles), on garde le comportement normal.
+    // Si la DB n'est pas SQLite (ou métadonnées indisponibles), on garde le comportement normal.
     return true;
   }
 }

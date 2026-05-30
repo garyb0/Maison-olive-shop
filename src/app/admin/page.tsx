@@ -12,7 +12,7 @@ const orderStatusLabel = (status: string, language: "fr" | "en") => {
   const labels: Record<string, Record<"fr" | "en", string>> = {
     PENDING: { fr: "A verifier", en: "To review" },
     PAID: { fr: "Payee", en: "Paid" },
-    PROCESSING: { fr: "En preparation", en: "Processing" },
+    PROCESSING: { fr: "En préparation", en: "Processing" },
     SHIPPED: { fr: "Expediee", en: "Shipped" },
     DELIVERED: { fr: "Livree", en: "Delivered" },
     CANCELLED: { fr: "Annulee", en: "Cancelled" },
@@ -39,7 +39,7 @@ const deliveryStatusLabel = (status: string, language: "fr" | "en") => {
     DELIVERED: { fr: "Livree", en: "Delivered" },
     FAILED: { fr: "Echec", en: "Failed" },
     RESCHEDULED: { fr: "A replanifier", en: "Rescheduled" },
-    UNSCHEDULED: { fr: "Non planifiee", en: "Unscheduled" },
+    UNSCHEDULED: { fr: "Non planifiée", en: "Unscheduled" },
   };
 
   return labels[status]?.[language] ?? status;
@@ -159,6 +159,12 @@ export default async function AdminDashboardPage() {
           name: language === "fr" ? product.nameFr : product.nameEn,
           slug: product.slug,
           stock: product.stock,
+          variantId: product.variantId ?? null,
+          variantSku: product.variantSku ?? null,
+          variantName: language === "fr"
+            ? product.variantNameFr ?? product.variantNameEn ?? null
+            : product.variantNameEn ?? product.variantNameFr ?? null,
+          isVariant: product.isVariant ?? false,
         })),
         lowStockCount: todaySnapshot.lowStockCount,
         lowStockProducts: todaySnapshot.lowStockProducts.map((product) => ({
@@ -166,6 +172,12 @@ export default async function AdminDashboardPage() {
           name: language === "fr" ? product.nameFr : product.nameEn,
           slug: product.slug,
           stock: product.stock,
+          variantId: product.variantId ?? null,
+          variantSku: product.variantSku ?? null,
+          variantName: language === "fr"
+            ? product.variantNameFr ?? product.variantNameEn ?? null
+            : product.variantNameEn ?? product.variantNameFr ?? null,
+          isVariant: product.isVariant ?? false,
         })),
         actionQueues: {
           ordersToPrepare: todaySnapshot.ordersToPrepare.map((order) => ({

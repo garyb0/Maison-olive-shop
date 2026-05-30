@@ -6,6 +6,7 @@ import { requireAdmin } from '@/lib/permissions';
 import { adminOrderUpdateSchema, adminOrdersQuerySchema } from '@/lib/validators';
 import { prisma } from '@/lib/prisma';
 import { createAppNotification } from '@/lib/app-notifications';
+import { sendOrderSmsNotification, type SmsNotificationType } from '@/lib/sms';
 
 function datesMatch(a: Date | null, b: Date | null) {
   if (!a && !b) return true;
@@ -57,21 +58,54 @@ function mapAdminOrderForResponse(order: {
 
 const orderStatusLabelsFr: Record<string, string> = {
   PENDING: "a verifier",
-  PAID: "payee",
-  PROCESSING: "en preparation",
-  SHIPPED: "expediee",
-  DELIVERED: "livree",
-  CANCELLED: "annulee",
+  PAID: "payée",
+  PROCESSING: "en préparation",
+  SHIPPED: "expédiée",
+  DELIVERED: "livrée",
+  CANCELLED: "annulée",
 };
 
 const deliveryStatusLabelsFr: Record<string, string> = {
-  SCHEDULED: "planifiee",
+  SCHEDULED: "planifiée",
   OUT_FOR_DELIVERY: "sur la route",
-  DELIVERED: "livree",
-  FAILED: "en probleme",
-  RESCHEDULED: "replanifiee",
+  DELIVERED: "livrée",
+  FAILED: "en problème",
+  RESCHEDULED: "replanifiée",
   UNSCHEDULED: "a planifier",
 };
+
+function smsTypeForDeliveryStatus(deliveryStatus: string): SmsNotificationType | null {
+  switch (deliveryStatus) {
+    case "SCHEDULED":
+      return "DELIVERY_SCHEDULED";
+    case "RESCHEDULED":
+      return "DELIVERY_RESCHEDULED";
+    case "OUT_FOR_DELIVERY":
+      return "DELIVERY_OUT_FOR_DELIVERY";
+    case "DELIVERED":
+      return "DELIVERY_DELIVERED";
+    case "FAILED":
+      return "DELIVERY_FAILED";
+    default:
+      return null;
+  }
+}
+
+function deliverySmsDedupeKey(order: {
+  deliveryStatus: string;
+  deliveryWindowStartAt: Date | null;
+  deliveryWindowEndAt: Date | null;
+}) {
+  if (["OUT_FOR_DELIVERY", "DELIVERED", "FAILED"].includes(order.deliveryStatus)) {
+    return order.deliveryStatus;
+  }
+
+  return [
+    order.deliveryStatus,
+    order.deliveryWindowStartAt?.toISOString() ?? "no-start",
+    order.deliveryWindowEndAt?.toISOString() ?? "no-end",
+  ].join(":");
+}
 
 function notifyCustomerOrderStatus(input: {
   userId: string | null;
@@ -347,6 +381,15 @@ export async function PATCH(request: Request) {
           fromDeliveryStatus: updated.order.deliveryStatus,
           scheduleChanged: updated.scheduleChanged,
         });
+
+        const smsType = smsTypeForDeliveryStatus(updated.nextOrder.deliveryStatus);
+        if (smsType) {
+          sendOrderSmsNotification({
+            orderId: updated.nextOrder.id,
+            type: smsType,
+            dedupeKey: deliverySmsDedupeKey(updated.nextOrder),
+          }).catch(() => undefined);
+        }
       }
 
       logApiEvent({
@@ -500,6 +543,13 @@ export async function PATCH(request: Request) {
     }
 
     if (paymentStatus !== undefined && paymentStatus !== updated.order.paymentStatus) {
+      if (paymentStatus === 'PAID') {
+        sendOrderSmsNotification({
+          orderId: updated.nextOrder.id,
+          type: "ORDER_PAID",
+        }).catch(() => undefined);
+      }
+
       logApiEvent({
         level: 'INFO',
         route: '/api/admin/orders',
@@ -517,6 +567,15 @@ export async function PATCH(request: Request) {
         deliveryStatus,
         fromDeliveryStatus: updated.order.deliveryStatus,
       });
+
+      const smsType = smsTypeForDeliveryStatus(deliveryStatus);
+      if (smsType) {
+        sendOrderSmsNotification({
+          orderId: updated.nextOrder.id,
+          type: smsType,
+          dedupeKey: deliverySmsDedupeKey(updated.nextOrder),
+        }).catch(() => undefined);
+      }
 
       logApiEvent({
         level: 'INFO',

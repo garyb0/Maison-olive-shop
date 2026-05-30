@@ -651,8 +651,8 @@ export function DriverRunClient({ language, token, gpsTrackingEnabled, pushPubli
         body: JSON.stringify({ result, note }),
       });
       setMessage(result === "DELIVERED"
-        ? language === "fr" ? "Arret marque comme livre." : "Stop marked as delivered."
-        : language === "fr" ? "Arret marque en echec." : "Stop marked as failed.");
+        ? language === "fr" ? "Arrêt marqué comme livré." : "Stop marked as delivered."
+        : language === "fr" ? "Arrêt marqué en échec." : "Stop marked as failed.");
     } catch (completionError) {
       if (!isNetworkFailure(completionError)) throw completionError;
       enqueueAction({
@@ -696,7 +696,7 @@ export function DriverRunClient({ language, token, gpsTrackingEnabled, pushPubli
     if (!pushSupported) {
       setPushMessage(
         language === "fr"
-          ? "Alertes non disponibles ici. Sur iPhone, ajoute l'app a l'ecran d'accueil."
+          ? "Alertes non disponibles ici. Sur iPhone, ajoute l'app à l'écran d'accueil."
           : "Alerts unavailable here. On iPhone, add the app to the Home Screen.",
       );
       return;
@@ -737,7 +737,7 @@ export function DriverRunClient({ language, token, gpsTrackingEnabled, pushPubli
       }
 
       setPushSubscribed(true);
-      setPushMessage(language === "fr" ? "Alertes de tournee activees." : "Run alerts enabled.");
+      setPushMessage(language === "fr" ? "Alertes de tournée activées." : "Run alerts enabled.");
     } finally {
       setPushBusy(false);
     }
@@ -757,7 +757,7 @@ export function DriverRunClient({ language, token, gpsTrackingEnabled, pushPubli
         body: JSON.stringify(subscription ?? {}),
       });
       setPushSubscribed(false);
-      setPushMessage(language === "fr" ? "Alertes de tournee desactivees." : "Run alerts disabled.");
+      setPushMessage(language === "fr" ? "Alertes de tournée désactivées." : "Run alerts disabled.");
     } finally {
       setPushBusy(false);
     }
@@ -793,10 +793,10 @@ export function DriverRunClient({ language, token, gpsTrackingEnabled, pushPubli
               <span className="admin-page-header__eyebrow">
                 {language === "fr" ? "Alertes optionnelles" : "Optional alerts"}
               </span>
-              <h2>{language === "fr" ? "Recevoir les alertes de cette tournee" : "Receive alerts for this run"}</h2>
+              <h2>{language === "fr" ? "Recevoir les alertes de cette tournée" : "Receive alerts for this run"}</h2>
               <p className="small">
                 {language === "fr"
-                  ? "Utile si la tournee est modifiee. Tu peux livrer meme sans l'activer."
+                  ? "Utile si la tournée est modifiée. Tu peux livrer même sans l'activer."
                   : "Useful if the run changes. You can deliver without enabling it."}
               </p>
             </div>
@@ -814,7 +814,7 @@ export function DriverRunClient({ language, token, gpsTrackingEnabled, pushPubli
             )}
             <span className="small">
               {language === "fr"
-                ? "iPhone: ajoute l'app a l'ecran d'accueil pour le push web."
+                ? "iPhone: ajoute l'app à l'écran d'accueil pour le push web."
                 : "iPhone: add the app to the Home Screen for web push."}
             </span>
           </div>

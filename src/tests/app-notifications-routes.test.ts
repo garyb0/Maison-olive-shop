@@ -7,7 +7,9 @@ const createAppNotificationMock = vi.fn();
 const isWebPushConfiguredMock = vi.fn();
 const listAppNotificationsForUserMock = vi.fn();
 const markAppNotificationsReadMock = vi.fn();
+const registerNativePushTokenForUserMock = vi.fn();
 const registerWebPushSubscriptionForUserMock = vi.fn();
+const unregisterNativePushTokenForUserMock = vi.fn();
 const unregisterWebPushSubscriptionForUserMock = vi.fn();
 const updateAppNotificationPreferencesMock = vi.fn();
 
@@ -25,7 +27,9 @@ vi.mock("@/lib/app-notifications", () => ({
   isWebPushConfigured: (...args: unknown[]) => isWebPushConfiguredMock(...args),
   listAppNotificationsForUser: (...args: unknown[]) => listAppNotificationsForUserMock(...args),
   markAppNotificationsRead: (...args: unknown[]) => markAppNotificationsReadMock(...args),
+  registerNativePushTokenForUser: (...args: unknown[]) => registerNativePushTokenForUserMock(...args),
   registerWebPushSubscriptionForUser: (...args: unknown[]) => registerWebPushSubscriptionForUserMock(...args),
+  unregisterNativePushTokenForUser: (...args: unknown[]) => unregisterNativePushTokenForUserMock(...args),
   unregisterWebPushSubscriptionForUser: (...args: unknown[]) => unregisterWebPushSubscriptionForUserMock(...args),
   updateAppNotificationPreferences: (...args: unknown[]) => updateAppNotificationPreferencesMock(...args),
 }));
@@ -53,7 +57,14 @@ describe("notification and push routes", () => {
     vi.clearAllMocks();
     applyRateLimitMock.mockResolvedValue({ ok: true, remaining: 10, retryAfterSeconds: 0 });
     requireUserMock.mockResolvedValue(user);
+    registerNativePushTokenForUserMock.mockResolvedValue({
+      id: "native_1",
+      platform: "ANDROID",
+      enabled: true,
+      nativePushAvailable: true,
+    });
     registerWebPushSubscriptionForUserMock.mockResolvedValue({ id: "push_1", enabled: true });
+    unregisterNativePushTokenForUserMock.mockResolvedValue({ ok: true });
     unregisterWebPushSubscriptionForUserMock.mockResolvedValue({ ok: true });
     getAppNotificationPreferencesMock.mockResolvedValue({ pushEnabled: false, orderUpdates: true });
     createAppNotificationMock.mockResolvedValue({
@@ -194,5 +205,58 @@ describe("notification and push routes", () => {
       href: "/app",
       metadata: { test: true },
     }));
+  });
+
+  it("enregistre un token FCM Android pour l'app native", async () => {
+    const { POST } = await import("@/app/api/notifications/native-push/route");
+    const tokenValue = "fcm-token-android-1234567890";
+
+    const response = await POST(
+      new Request("http://localhost:3101/api/notifications/native-push", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ token: tokenValue, platform: "ANDROID" }),
+      }),
+    );
+    const payload = (await response.json()) as { ok?: boolean; token?: { id?: string } };
+
+    expect(response.status).toBe(200);
+    expect(payload.ok).toBe(true);
+    expect(payload.token?.id).toBe("native_1");
+    expect(registerNativePushTokenForUserMock).toHaveBeenCalledWith(user, {
+      token: tokenValue,
+      platform: "ANDROID",
+    });
+  });
+
+  it("refuse un token FCM Android invalide", async () => {
+    const { POST } = await import("@/app/api/notifications/native-push/route");
+
+    const response = await POST(
+      new Request("http://localhost:3101/api/notifications/native-push", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ token: "short", platform: "ANDROID" }),
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(registerNativePushTokenForUserMock).not.toHaveBeenCalled();
+  });
+
+  it("desactive un token FCM Android pour l'utilisateur courant", async () => {
+    const { DELETE } = await import("@/app/api/notifications/native-push/route");
+    const tokenValue = "fcm-token-android-1234567890";
+
+    const response = await DELETE(
+      new Request("http://localhost:3101/api/notifications/native-push", {
+        method: "DELETE",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ token: tokenValue }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(unregisterNativePushTokenForUserMock).toHaveBeenCalledWith("user_1", tokenValue);
   });
 });

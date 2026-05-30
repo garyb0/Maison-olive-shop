@@ -53,6 +53,14 @@ export default async function AdminOrdersPage() {
         deliveryStatus: order.deliveryStatus,
         deliveryPhone: order.deliveryPhone,
         deliveryInstructions: order.deliveryInstructions,
+        supportConversations: order.supportConversations.map((conversation) => ({
+          id: conversation.id,
+          status: conversation.status,
+          priority: conversation.priority,
+          lastMessageAtLabel: conversation.lastMessageAt
+            ? formatDate(conversation.lastMessageAt, language === "fr" ? "fr-CA" : "en-CA")
+            : null,
+        })),
       }))}
     />
   );

@@ -34,6 +34,12 @@ type SupportStatePayload = {
   activeConversation?: SupportConversation | null;
 };
 
+type SupportOpenDetail = {
+  draft?: string;
+  orderId?: string;
+  topic?: "DELIVERY" | "PRODUCT" | "PAYMENT" | "CHANGE_CANCEL" | "OTHER";
+};
+
 const STORAGE_KEY = "support_conv";
 const AVATAR_URL = "/Logo/Olive.png";
 
@@ -145,6 +151,8 @@ export function SupportChatWidget({ language, user }: Props) {
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
   const [sendState, setSendState] = useState<"idle" | "sent" | "failed">("idle");
   const [readMarking, setReadMarking] = useState(false);
+  const [contextOrderId, setContextOrderId] = useState<string | null>(null);
+  const [contextTopic, setContextTopic] = useState<SupportOpenDetail["topic"] | null>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
   const previousMessageCount = useRef(0);
 
@@ -210,9 +218,19 @@ export function SupportChatWidget({ language, user }: Props) {
   const statusLabel = getConversationStatusLabel(conversation?.status, language);
 
   useEffect(() => {
-    const openFromHelpCenter = () => {
+    const openFromHelpCenter = (event: Event) => {
+      const detail =
+        event instanceof CustomEvent && typeof event.detail === "object" && event.detail !== null
+          ? (event.detail as SupportOpenDetail)
+          : {};
+
       setOpen(true);
       setUnread(0);
+      if (detail.draft) {
+        setDraft((current) => current.trim() ? current : detail.draft ?? "");
+      }
+      setContextOrderId(detail.orderId ?? null);
+      setContextTopic(detail.topic ?? null);
     };
 
     window.addEventListener("chezolive:support-open", openFromHelpCenter);
@@ -389,7 +407,7 @@ export function SupportChatWidget({ language, user }: Props) {
       let response: Response;
       const guestSession = !user ? loadGuestSession() : null;
 
-      if (conversation) {
+      if (conversation && !(user && contextOrderId)) {
         if (!user && !guestSession?.token) {
           clearGuestSession();
           setConversation(null);
@@ -414,6 +432,8 @@ export function SupportChatWidget({ language, user }: Props) {
             name: user ? undefined : guestName.trim(),
             email: user ? undefined : guestEmail.trim(),
             message: draft.trim(),
+            orderId: user ? contextOrderId ?? undefined : undefined,
+            topic: user ? contextTopic ?? undefined : undefined,
           }),
         });
       }
@@ -441,6 +461,8 @@ export function SupportChatWidget({ language, user }: Props) {
         saveGuestSession(payload.conversation.id, guestEmail.trim(), guestName.trim(), guestToken);
       }
       setDraft("");
+      setContextOrderId(null);
+      setContextTopic(null);
       setSendState("sent");
       window.setTimeout(() => setSendState("idle"), 2200);
     } catch {

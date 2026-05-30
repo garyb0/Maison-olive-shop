@@ -18,6 +18,37 @@ import {
   deliverySlotsQuerySchema,
 } from "@/lib/validators";
 
+type AdminDeliverySlotList = Awaited<ReturnType<typeof getAdminDeliverySlots>>;
+type AdminDeliveryMappedSlot = AdminDeliverySlotList[number];
+type DeliverySlotFallback = {
+  id?: string;
+  startAt?: Date;
+  endAt?: Date;
+};
+
+async function getMappedSlotOrFallback<T extends DeliverySlotFallback>(
+  slot: T,
+  event: "ADMIN_DELIVERY_POST_REFRESH_FAILED" | "ADMIN_DELIVERY_PATCH_REFRESH_FAILED",
+): Promise<T | AdminDeliveryMappedSlot> {
+  if (!(slot.startAt instanceof Date) || !(slot.endAt instanceof Date)) {
+    return slot;
+  }
+
+  try {
+    const slots = await getAdminDeliverySlots({ from: slot.startAt, to: slot.endAt });
+    return slots.find((mappedSlot) => mappedSlot.id === slot.id) ?? slots[0] ?? slot;
+  } catch (error) {
+    logApiEvent({
+      level: "WARN",
+      route: "/api/admin/delivery",
+      event,
+      status: 200,
+      details: { error, slotId: slot.id },
+    });
+    return slot;
+  }
+}
+
 export async function GET(request: Request) {
   try {
     await requireAdmin();
@@ -67,8 +98,8 @@ export async function POST(request: Request) {
     }
 
     const slot = await createAdminDeliverySlot(parsedSlot.data);
-    const [mappedSlot] = await getAdminDeliverySlots({ from: slot.startAt, to: slot.endAt });
-    return jsonOk({ slot: mappedSlot ?? slot });
+    const mappedSlot = await getMappedSlotOrFallback(slot, "ADMIN_DELIVERY_POST_REFRESH_FAILED");
+    return jsonOk({ slot: mappedSlot });
   } catch (error) {
     if (error instanceof Error && error.message === "UNAUTHORIZED") {
       return jsonError("Unauthorized", 401);
@@ -118,8 +149,8 @@ export async function PATCH(request: Request) {
     }
 
     const slot = await updateAdminDeliverySlot(parsedSlot.data);
-    const [mappedSlot] = await getAdminDeliverySlots({ from: slot.startAt, to: slot.endAt });
-    return jsonOk({ slot: mappedSlot ?? slot });
+    const mappedSlot = await getMappedSlotOrFallback(slot, "ADMIN_DELIVERY_PATCH_REFRESH_FAILED");
+    return jsonOk({ slot: mappedSlot });
   } catch (error) {
     if (error instanceof Error && error.message === "UNAUTHORIZED") {
       return jsonError("Unauthorized", 401);

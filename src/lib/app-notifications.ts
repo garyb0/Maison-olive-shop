@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, createSign } from "node:crypto";
 import * as webpush from "web-push";
 import { env } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
@@ -83,6 +83,8 @@ const NOTIFICATION_TYPE_LABELS: Record<AppNotificationType, keyof AppNotificatio
   SYSTEM: "pushEnabled",
 };
 
+let firebaseAccessTokenCache: { token: string; expiresAtMs: number } | null = null;
+
 function hashValue(value: string) {
   return createHash("sha256").update(value).digest("hex");
 }
@@ -140,6 +142,20 @@ export async function hasAppNotificationSchemaTables() {
     `;
     const names = new Set(rows.map((row) => row.name));
     return names.has("WebPushSubscription") && names.has("NotificationPreference") && names.has("AppNotification");
+  } catch {
+    return true;
+  }
+}
+
+export async function hasNativePushTokenSchemaTable() {
+  try {
+    const rows = await prisma.$queryRaw<Array<{ name: string }>>`
+      SELECT name
+      FROM sqlite_master
+      WHERE type = 'table'
+        AND name = 'NativePushToken'
+    `;
+    return rows.some((row) => row.name === "NativePushToken");
   } catch {
     return true;
   }
@@ -384,6 +400,126 @@ async function deliverPushNotification(input: {
   );
 }
 
+function isFirebaseNativePushConfigured() {
+  return Boolean(env.firebaseProjectId && env.firebaseClientEmail && env.firebasePrivateKey);
+}
+
+function base64Url(value: Buffer | string) {
+  return Buffer.from(value)
+    .toString("base64")
+    .replaceAll("+", "-")
+    .replaceAll("/", "_")
+    .replaceAll("=", "");
+}
+
+function firebasePrivateKey() {
+  return env.firebasePrivateKey.replace(/\\n/g, "\n");
+}
+
+async function getFirebaseAccessToken() {
+  if (!isFirebaseNativePushConfigured()) return null;
+  const now = Date.now();
+  if (firebaseAccessTokenCache && firebaseAccessTokenCache.expiresAtMs - 60_000 > now) {
+    return firebaseAccessTokenCache.token;
+  }
+
+  const issuedAt = Math.floor(now / 1000);
+  const expiresAt = issuedAt + 3600;
+  const header = base64Url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
+  const claim = base64Url(JSON.stringify({
+    iss: env.firebaseClientEmail,
+    scope: "https://www.googleapis.com/auth/firebase.messaging",
+    aud: "https://oauth2.googleapis.com/token",
+    iat: issuedAt,
+    exp: expiresAt,
+  }));
+  const unsignedJwt = `${header}.${claim}`;
+  const signature = createSign("RSA-SHA256").update(unsignedJwt).sign(firebasePrivateKey());
+  const jwt = `${unsignedJwt}.${base64Url(signature)}`;
+
+  const response = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion: jwt,
+    }),
+  });
+
+  if (!response.ok) return null;
+  const payload = (await response.json().catch(() => ({}))) as { access_token?: string; expires_in?: number };
+  if (!payload.access_token) return null;
+
+  firebaseAccessTokenCache = {
+    token: payload.access_token,
+    expiresAtMs: now + Math.max(60, payload.expires_in ?? 3600) * 1000,
+  };
+  return payload.access_token;
+}
+
+async function deliverNativePushNotification(input: {
+  userId?: string | null;
+  type: AppNotificationType;
+  title: string;
+  body: string;
+  href: string | null;
+}) {
+  if (!input.userId || !isFirebaseNativePushConfigured()) return;
+  if (!(await hasNativePushTokenSchemaTable())) return;
+
+  const preferences = await getAppNotificationPreferences(input.userId);
+  if (!shouldSendPush(input.type, preferences)) return;
+
+  const accessToken = await getFirebaseAccessToken();
+  if (!accessToken) return;
+
+  const tokens = await prisma.nativePushToken.findMany({
+    where: { userId: input.userId, enabled: true, platform: "ANDROID" },
+    select: { id: true, token: true, tokenHash: true },
+  });
+
+  if (tokens.length < 1) return;
+
+  const endpoint = `https://fcm.googleapis.com/v1/projects/${env.firebaseProjectId}/messages:send`;
+  await Promise.all(tokens.map(async (nativeToken) => {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        message: {
+          token: nativeToken.token,
+          notification: {
+            title: input.title,
+            body: input.body,
+          },
+          data: {
+            type: input.type,
+            href: input.href ?? "/app",
+          },
+          android: {
+            notification: {
+              channel_id: "chezolive-updates",
+              icon: "ic_stat_chez_olive",
+              color: "#545D2E",
+            },
+          },
+        },
+      }),
+    });
+
+    if (response.ok) return;
+    if ([400, 404, 410].includes(response.status)) {
+      await prisma.nativePushToken.updateMany({
+        where: { tokenHash: nativeToken.tokenHash },
+        data: { enabled: false },
+      });
+    }
+  }));
+}
+
 export async function createAppNotification(input: {
   userId?: string | null;
   driverRunId?: string | null;
@@ -431,6 +567,14 @@ export async function createAppNotification(input: {
     href,
   }).catch(() => undefined);
 
+  await deliverNativePushNotification({
+    userId: input.userId ?? null,
+    type: input.type,
+    title,
+    body,
+    href,
+  }).catch(() => undefined);
+
   return serializeNotification(notification);
 }
 
@@ -469,16 +613,23 @@ export async function createDogQrScanNotification(input: {
   userId: string;
   dogId: string;
   dogName: string | null;
+  lostMode?: boolean;
+  locationShared?: boolean;
 }) {
   if (!(await hasAppNotificationSchemaTables())) return null;
 
-  const dedupeSince = new Date(Date.now() - 30 * 60 * 1000);
+  const event = input.locationShared ? "location" : input.lostMode ? "lost-scan" : "scan";
+  const dedupeWindowMs = input.locationShared ? 5 * 60 * 1000 : input.lostMode ? 10 * 60 * 1000 : 30 * 60 * 1000;
+  const dedupeSince = new Date(Date.now() - dedupeWindowMs);
   const existing = await prisma.appNotification.findFirst({
     where: {
       userId: input.userId,
       type: "DOG_QR_UPDATE",
       createdAt: { gte: dedupeSince },
-      metadataJson: { contains: `"dogId":"${input.dogId}"` },
+      AND: [
+        { metadataJson: { contains: `"dogId":"${input.dogId}"` } },
+        { metadataJson: { contains: `"event":"${event}"` } },
+      ],
     },
     select: { id: true },
   });
@@ -486,14 +637,19 @@ export async function createDogQrScanNotification(input: {
   if (existing) return null;
 
   const dogLabel = input.dogName?.trim() || "Ton chien";
+  const body = input.locationShared
+    ? `${dogLabel}: une position a ete partagee depuis son medaillon.`
+    : input.lostMode
+      ? `Le QR de ${dogLabel} vient d'etre scanne pendant le mode perdu.`
+      : `${dogLabel} vient d'etre consulte depuis son medaillon.`;
   return createAppNotification({
     userId: input.userId,
     audience: "CUSTOMER",
     type: "DOG_QR_UPDATE",
     title: "Profil QR consulté",
-    body: `${dogLabel} vient d'etre consulte depuis son medaillon.`,
+    body,
     href: "/account/dogs",
-    metadata: { dogId: input.dogId },
+    metadata: { dogId: input.dogId, event },
   });
 }
 
@@ -556,6 +712,73 @@ export async function unregisterWebPushSubscriptionForUser(userId: string, endpo
 
   await prisma.$transaction(async (tx) => {
     await tx.webPushSubscription.updateMany({
+      where,
+      data: { enabled: false },
+    });
+    await tx.notificationPreference.upsert({
+      where: { userId },
+      create: { userId, ...DEFAULT_PREFERENCES, pushEnabled: false },
+      update: { pushEnabled: false },
+    });
+  });
+
+  return { ok: true };
+}
+
+export async function registerNativePushTokenForUser(
+  user: CurrentUser,
+  input: { token: string; platform: "ANDROID" },
+) {
+  if (!(await hasNativePushTokenSchemaTable())) {
+    return { id: null, enabled: false, platform: input.platform, nativePushAvailable: false };
+  }
+
+  const tokenHash = hashValue(input.token);
+  const saved = await prisma.$transaction(async (tx) => {
+    await tx.notificationPreference.upsert({
+      where: { userId: user.id },
+      create: { userId: user.id, ...DEFAULT_PREFERENCES, pushEnabled: true },
+      update: { pushEnabled: true },
+    });
+
+    return tx.nativePushToken.upsert({
+      where: { tokenHash },
+      create: {
+        userId: user.id,
+        tokenHash,
+        token: input.token,
+        platform: input.platform,
+        enabled: true,
+        lastSeenAt: new Date(),
+      },
+      update: {
+        userId: user.id,
+        token: input.token,
+        platform: input.platform,
+        enabled: true,
+        lastSeenAt: new Date(),
+      },
+      select: { id: true, platform: true, enabled: true },
+    });
+  });
+
+  return {
+    id: saved.id,
+    platform: saved.platform,
+    enabled: saved.enabled,
+    nativePushAvailable: isFirebaseNativePushConfigured(),
+  };
+}
+
+export async function unregisterNativePushTokenForUser(userId: string, token?: string | null) {
+  if (!(await hasNativePushTokenSchemaTable())) return { ok: true };
+
+  const where = token
+    ? { userId, tokenHash: hashValue(token) }
+    : { userId };
+
+  await prisma.$transaction(async (tx) => {
+    await tx.nativePushToken.updateMany({
       where,
       data: { enabled: false },
     });

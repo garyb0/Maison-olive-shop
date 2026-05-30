@@ -17,14 +17,20 @@ const REQUIRED_MODEL_DELEGATES = [
   "deliveryGpsSample",
   "geocodedAddressCache",
   "dogProfile",
+  "dogQrScan",
   "supportNotificationPreference",
   "notificationPreference",
   "webPushSubscription",
+  "nativePushToken",
   "appNotification",
+  "smsRecipientPreference",
+  "smsNotificationLog",
+  "smsInboundMessage",
   "supportInternalNote",
   "supportQuickReply",
   "rateLimitBucket",
   "conversionEvent",
+  "oAuthAccount",
 ] as const;
 
 function hasRequiredModelDelegates(client: PrismaClient) {

@@ -7,6 +7,7 @@ const updateMock = vi.fn();
 const createAuditLogMock = vi.fn();
 const resolveDeliverySelectionForOrderMock = vi.fn();
 const createAppNotificationMock = vi.fn();
+const sendOrderSmsNotificationMock = vi.fn();
 
 vi.mock("@/lib/permissions", () => ({
   requireAdmin: (...args: unknown[]) => requireAdminMock(...args),
@@ -37,6 +38,10 @@ vi.mock("@/lib/observability", () => ({
 
 vi.mock("@/lib/app-notifications", () => ({
   createAppNotification: (...args: unknown[]) => createAppNotificationMock(...args),
+}));
+
+vi.mock("@/lib/sms", () => ({
+  sendOrderSmsNotification: (...args: unknown[]) => sendOrderSmsNotificationMock(...args),
 }));
 
 describe("PATCH /api/admin/orders updates", () => {
@@ -73,6 +78,7 @@ describe("PATCH /api/admin/orders updates", () => {
     });
     createAuditLogMock.mockResolvedValue({});
     createAppNotificationMock.mockResolvedValue(null);
+    sendOrderSmsNotificationMock.mockResolvedValue({ sent: false });
     transactionMock.mockImplementation(async (callback: (tx: unknown) => unknown) =>
       callback({
         order: {
