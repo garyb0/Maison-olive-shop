@@ -1,4 +1,5 @@
 import { createHash, createSign } from "node:crypto";
+import { isIP } from "node:net";
 import * as webpush from "web-push";
 import { env } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
@@ -83,10 +84,90 @@ const NOTIFICATION_TYPE_LABELS: Record<AppNotificationType, keyof AppNotificatio
   SYSTEM: "pushEnabled",
 };
 
+const DEFAULT_WEB_PUSH_ALLOWED_HOSTS = [
+  "fcm.googleapis.com",
+  "updates.push.services.mozilla.com",
+  "web.push.apple.com",
+  "*.push.apple.com",
+  "*.notify.windows.com",
+  "*.wns.windows.com",
+];
+
 let firebaseAccessTokenCache: { token: string; expiresAtMs: number } | null = null;
 
 function hashValue(value: string) {
   return createHash("sha256").update(value).digest("hex");
+}
+
+function parseAllowedWebPushHosts() {
+  const configured = env.webPushAllowedHosts
+    .split(/[,\s]+/)
+    .map((host) => host.trim().toLowerCase())
+    .filter(Boolean);
+  return [...DEFAULT_WEB_PUSH_ALLOWED_HOSTS, ...configured];
+}
+
+function hostMatchesAllowedPattern(host: string, pattern: string) {
+  if (pattern.startsWith("*.")) {
+    const suffix = pattern.slice(2);
+    return host === suffix || host.endsWith(`.${suffix}`);
+  }
+  return host === pattern;
+}
+
+function isPrivateIpv4(host: string) {
+  const parts = host.split(".").map((part) => Number.parseInt(part, 10));
+  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) {
+    return false;
+  }
+
+  const [a, b] = parts;
+  return (
+    a === 0 ||
+    a === 10 ||
+    a === 127 ||
+    (a === 100 && b >= 64 && b <= 127) ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168) ||
+    (a === 198 && (b === 18 || b === 19))
+  );
+}
+
+function isUnsafeIpLiteral(hostname: string) {
+  const host = hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  const version = isIP(host);
+  if (version === 4) return isPrivateIpv4(host);
+  if (version !== 6) return false;
+
+  if (host === "::" || host === "::1") return true;
+  if (host.startsWith("fe80:") || host.startsWith("fc") || host.startsWith("fd")) return true;
+  if (host.startsWith("::ffff:")) {
+    return isPrivateIpv4(host.slice("::ffff:".length));
+  }
+  return false;
+}
+
+export function validateWebPushEndpoint(endpoint: string) {
+  let url: URL;
+  try {
+    url = new URL(endpoint);
+  } catch {
+    return false;
+  }
+
+  const hostname = url.hostname.toLowerCase();
+  if (url.protocol !== "https:") return false;
+  if (!hostname || hostname === "localhost" || hostname.endsWith(".localhost")) return false;
+  if (isUnsafeIpLiteral(hostname)) return false;
+
+  return parseAllowedWebPushHosts().some((pattern) => hostMatchesAllowedPattern(hostname, pattern));
+}
+
+function assertWebPushEndpointAllowed(endpoint: string) {
+  if (!validateWebPushEndpoint(endpoint)) {
+    throw new Error("WEB_PUSH_ENDPOINT_NOT_ALLOWED");
+  }
 }
 
 function sanitizeString(value: string, maxLength: number) {
@@ -658,6 +739,7 @@ export async function registerWebPushSubscriptionForUser(
   subscription: PushSubscriptionInput,
   userAgent?: string | null,
 ) {
+  assertWebPushEndpointAllowed(subscription.endpoint);
   const endpointHash = hashValue(subscription.endpoint);
   const audience = audienceFromRole(user.role);
 
@@ -802,6 +884,7 @@ export async function registerWebPushSubscriptionForDriverToken(input: {
   subscription: PushSubscriptionInput;
   userAgent?: string | null;
 }) {
+  assertWebPushEndpointAllowed(input.subscription.endpoint);
   const endpointHash = hashValue(input.subscription.endpoint);
   const driverTokenHash = hashDeliveryRunToken(input.token);
 

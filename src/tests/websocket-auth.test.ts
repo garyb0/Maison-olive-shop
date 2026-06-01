@@ -11,8 +11,10 @@ vi.mock("@/lib/prisma", () => ({
 }));
 
 vi.mock("@/lib/env", () => ({
+  DEV_SESSION_SECRET: "dev-secret",
   env: {
     sessionCookieName: "chezolive_session",
+    sessionSecret: "socket-test-secret",
   },
 }));
 
@@ -36,6 +38,7 @@ describe("resolveSocketUserFromCookieHeader", () => {
     });
 
     const { resolveSocketUserFromCookieHeader } = await import("@/lib/websocket");
+    const { hashSessionToken } = await import("@/lib/auth");
     const user = await resolveSocketUserFromCookieHeader("chezolive_session=server-token; userRole=ADMIN");
 
     expect(user).toEqual({
@@ -45,7 +48,7 @@ describe("resolveSocketUserFromCookieHeader", () => {
       userName: "Client Olive",
     });
     expect(findUniqueMock).toHaveBeenCalledWith({
-      where: { token: "server-token" },
+      where: { tokenHash: hashSessionToken("server-token") },
       include: { user: true },
     });
   });

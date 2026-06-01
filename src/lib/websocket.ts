@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { logApiEvent } from "@/lib/observability";
 import { resolvePublicSiteUrl } from "@/lib/site-url";
 import { env } from "@/lib/env";
+import { hashSessionToken } from "@/lib/auth";
 
 type ConversationMessagePayload = Record<string, unknown>;
 
@@ -89,7 +90,7 @@ export async function resolveSocketUserFromCookieHeader(cookieHeader: string | u
   if (!sessionToken) return null;
 
   const session = await prisma.session.findUnique({
-    where: { token: sessionToken },
+    where: { tokenHash: hashSessionToken(sessionToken) },
     include: { user: true },
   });
 

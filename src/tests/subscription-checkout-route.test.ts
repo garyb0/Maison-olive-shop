@@ -8,6 +8,9 @@ const prismaMock = {
     findFirst: vi.fn(),
     update: vi.fn(),
   },
+  subscriptionCheckoutIntent: {
+    create: vi.fn(),
+  },
 };
 
 const stripeSessionsCreateMock = vi.fn();
@@ -77,6 +80,7 @@ describe("POST /api/checkout/subscription", () => {
       id: "cs_test_1",
       client_secret: "cs_test_secret_1",
     });
+    prismaMock.subscriptionCheckoutIntent.create.mockResolvedValue({ id: "intent_1" });
 
     stripePricesRetrieveMock.mockResolvedValue({
       id: "price_weekly_1",
@@ -167,8 +171,30 @@ describe("POST /api/checkout/subscription", () => {
         mode: "subscription",
         ui_mode: "custom",
         return_url: expect.stringContaining("/products/croquettes-premium?"),
+        client_reference_id: "prod_1",
+        metadata: expect.objectContaining({
+          userId: "user_1",
+          productId: "prod_1",
+          priceId: "price_weekly_1",
+          interval: "WEEKLY",
+          quantity: "1",
+          amountCents: "1299",
+          currency: "CAD",
+        }),
       }),
     );
+    expect(prismaMock.subscriptionCheckoutIntent.create).toHaveBeenCalledWith({
+      data: {
+        userId: "user_1",
+        productId: "prod_1",
+        priceId: "price_weekly_1",
+        interval: "WEEKLY",
+        quantity: 1,
+        amountCents: 1299,
+        currency: "CAD",
+        stripeSessionId: "cs_test_1",
+      },
+    });
   });
 
   it("recree un prix Stripe quand l'identifiant stocke appartient a un autre mode Stripe", async () => {

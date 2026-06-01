@@ -26,6 +26,9 @@ export async function POST(request: Request) {
     return jsonOk({ ok: true, subscription });
   } catch (error) {
     if (error instanceof Error && error.message === "UNAUTHORIZED") return jsonError("Unauthorized", 401);
+    if (error instanceof Error && error.message === "WEB_PUSH_ENDPOINT_NOT_ALLOWED") {
+      return jsonError("Invalid push subscription", 400);
+    }
     return jsonError("Unable to subscribe to push", 500);
   }
 }

@@ -6,6 +6,7 @@ import { getHiddenStorefrontProductSlugs } from "@/lib/launch-guards";
 import { computeOrderAmounts } from "@/lib/taxes";
 import { sendOrderConfirmationEmail } from "@/lib/business";
 import { sendOrderSmsNotification } from "@/lib/sms";
+import { createAdminAppNotification } from "@/lib/app-notifications";
 import { stripe, stripeEnabled } from "@/lib/stripe";
 import type { PaymentMethod } from "@/lib/types";
 import { isRimouskiDeliveryAddress } from "@/lib/delivery-zone";
@@ -46,6 +47,7 @@ type CreateOrderInput = {
   deliveryWindowEndAt?: string;
   deliveryInstructions?: string;
   deliveryPhone?: string;
+  reserveInventory?: boolean;
 };
 
 type EffectiveDeliveryAddress = {
@@ -118,6 +120,8 @@ export async function createOrderSafely(input: CreateOrderInput) {
   }
 
   return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const shouldReserveInventory = input.reserveInventory ?? true;
+    const reservationTimestamp = shouldReserveInventory ? new Date() : null;
     const savedAddress = input.userId && input.deliveryAddressId
       ? await getDeliveryAddressForUser(input.userId, input.deliveryAddressId, tx)
       : null;
@@ -194,6 +198,7 @@ export async function createOrderSafely(input: CreateOrderInput) {
           deliverySlotId: deliverySelection.deliverySlotId,
           status: { not: "CANCELLED" },
           paymentStatus: { not: "FAILED" },
+          deliveryCapacityReservedAt: { not: null },
         },
       });
       if (reservedCount >= slot.capacity) {
@@ -301,6 +306,8 @@ export async function createOrderSafely(input: CreateOrderInput) {
         deliveryStatus: deliverySelection.deliveryStatus,
         deliveryInstructions: effectiveAddress.deliveryInstructions,
         deliveryPhone: effectiveAddress.deliveryPhone,
+        inventoryReservedAt: reservationTimestamp,
+        deliveryCapacityReservedAt: deliverySelection.deliveryStatus === "SCHEDULED" ? reservationTimestamp : null,
       },
     });
 
@@ -318,31 +325,33 @@ export async function createOrderSafely(input: CreateOrderInput) {
         },
       });
 
-      if (item.variant) {
-        await tx.productVariant.update({
-          where: { id: item.variant.id },
-          data: { stock: { decrement: item.quantity } },
-        });
-        await tx.product.update({
-          where: { id: item.product.id },
-          data: { stock: { decrement: item.quantity } },
-        });
-      } else {
-        await tx.product.update({
-          where: { id: item.product.id },
-          data: { stock: { decrement: item.quantity } },
+      if (shouldReserveInventory) {
+        if (item.variant) {
+          await tx.productVariant.update({
+            where: { id: item.variant.id },
+            data: { stock: { decrement: item.quantity } },
+          });
+          await tx.product.update({
+            where: { id: item.product.id },
+            data: { stock: { decrement: item.quantity } },
+          });
+        } else {
+          await tx.product.update({
+            where: { id: item.product.id },
+            data: { stock: { decrement: item.quantity } },
+          });
+        }
+
+        await tx.inventoryMovement.create({
+          data: {
+            productId: item.product.id,
+            variantId: item.variant?.id,
+            orderId: order.id,
+            quantityChange: -item.quantity,
+            reason: "ORDER_PLACED",
+          },
         });
       }
-
-      await tx.inventoryMovement.create({
-        data: {
-          productId: item.product.id,
-          variantId: item.variant?.id,
-          orderId: order.id,
-          quantityChange: -item.quantity,
-          reason: "ORDER_PLACED",
-        },
-      });
     }
 
     await tx.auditLog.create({
@@ -647,6 +656,146 @@ export async function syncOrderPaymentFromStripeSession(sessionId: string, expec
 const getStripeOrderIdFromSession = (session: Stripe.Checkout.Session) =>
   session.client_reference_id ?? session.metadata?.orderId ?? null;
 
+const getPresentStripeOrderRefs = (session: Stripe.Checkout.Session) =>
+  [session.client_reference_id, session.metadata?.orderId].filter((value): value is string => Boolean(value));
+
+function validateStripePaymentSessionForOrder(
+  session: Stripe.Checkout.Session,
+  order: {
+    id: string;
+    stripeSessionId: string | null;
+    totalCents: number;
+    currency: string;
+  },
+) {
+  if (session.id !== order.stripeSessionId) return "SESSION_MISMATCH";
+  if (session.mode !== "payment") return "MODE_MISMATCH";
+  if (session.payment_status !== "paid") return "PAYMENT_NOT_PAID";
+  if (session.amount_total !== order.totalCents) return "AMOUNT_MISMATCH";
+  if ((session.currency ?? "").toUpperCase() !== order.currency.toUpperCase()) return "CURRENCY_MISMATCH";
+
+  const refs = getPresentStripeOrderRefs(session);
+  if (refs.length < 1 || !refs.includes(order.id) || refs.some((ref) => ref !== order.id)) {
+    return "ORDER_REFERENCE_MISMATCH";
+  }
+
+  return null;
+}
+
+function isStripeOrderReservationError(error: unknown) {
+  return error instanceof Error && [
+    "INSUFFICIENT_STOCK",
+    "DELIVERY_SLOT_FULL",
+    "DELIVERY_WINDOW_FULL",
+    "DELIVERY_SLOT_CLOSED",
+    "DELIVERY_WINDOW_PAST",
+  ].includes(error.message);
+}
+
+async function reserveOrderAfterStripePayment(
+  tx: Prisma.TransactionClient,
+  order: {
+    id: string;
+    deliverySlotId: string | null;
+    deliveryWindowStartAt: Date | null;
+    deliveryWindowEndAt: Date | null;
+    deliveryStatus: string;
+    inventoryReservedAt: Date | null;
+    deliveryCapacityReservedAt: Date | null;
+    items: Array<{
+      productId: string;
+      variantId: string | null;
+      quantity: number;
+    }>;
+  },
+) {
+  if (!order.deliveryCapacityReservedAt && (order.deliverySlotId || order.deliveryWindowStartAt)) {
+    await resolveDeliverySelectionForOrder(tx, {
+      deliverySlotId: order.deliverySlotId ?? undefined,
+      deliveryWindowStartAt: order.deliveryWindowStartAt ?? undefined,
+      deliveryWindowEndAt: order.deliveryWindowEndAt ?? undefined,
+      excludeOrderId: order.id,
+    });
+  }
+
+  if (order.inventoryReservedAt) {
+    return;
+  }
+
+  for (const item of order.items) {
+    if (item.variantId) {
+      const variantUpdate = await tx.productVariant.updateMany({
+        where: { id: item.variantId, stock: { gte: item.quantity } },
+        data: { stock: { decrement: item.quantity } },
+      });
+      if (variantUpdate.count !== 1) throw new Error("INSUFFICIENT_STOCK");
+    }
+
+    const productUpdate = await tx.product.updateMany({
+      where: { id: item.productId, stock: { gte: item.quantity } },
+      data: { stock: { decrement: item.quantity } },
+    });
+    if (productUpdate.count !== 1) throw new Error("INSUFFICIENT_STOCK");
+
+    await tx.inventoryMovement.create({
+      data: {
+        productId: item.productId,
+        variantId: item.variantId,
+        orderId: order.id,
+        quantityChange: -item.quantity,
+        reason: "STRIPE_PAYMENT_SETTLED",
+      },
+    });
+  }
+}
+
+async function markStripePaidOrderRequiresRefund(input: {
+  order: {
+    id: string;
+    userId: string | null;
+    orderNumber: string;
+  };
+  session: Stripe.Checkout.Session;
+  source: string;
+  reason: string;
+}) {
+  await prisma.$transaction(async (tx) => {
+    await tx.order.updateMany({
+      where: { id: input.order.id, paymentStatus: "PENDING" },
+      data: {
+        paymentStatus: "PAID",
+        status: "PENDING",
+        stripeSessionId: input.session.id,
+      },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        actorUserId: input.order.userId,
+        action: "STRIPE_ORDER_REQUIRES_REFUND",
+        entity: "Order",
+        entityId: input.order.id,
+        metadata: JSON.stringify({
+          source: input.source,
+          reason: input.reason,
+          sessionId: input.session.id,
+          paymentIntentId: typeof input.session.payment_intent === "string"
+            ? input.session.payment_intent
+            : input.session.payment_intent?.id,
+        }),
+      },
+    });
+  });
+
+  createAdminAppNotification({
+    type: "ADMIN_ORDER",
+    title: "Remboursement Stripe requis",
+    body: `Commande #${input.order.orderNumber} payee, mais stock ou capacite indisponible.`,
+    href: `/admin/orders/${input.order.id}`,
+    metadata: { orderId: input.order.id, orderNumber: input.order.orderNumber, sessionId: input.session.id },
+  }).catch(() => undefined);
+}
+
 export async function markOrderPaidFromStripeSession(
   session: Stripe.Checkout.Session,
   source: string,
@@ -673,37 +822,91 @@ export async function markOrderPaidFromStripeSession(
     return { orderId, transitionedToPaid: false, reason: "ORDER_NOT_FOUND" as const };
   }
 
-  const result = await prisma.$transaction(async (tx) => {
-    const updated = await tx.order.updateMany({
-      where: { id: order.id, paymentStatus: "PENDING" },
-      data: {
-        paymentStatus: "PAID",
-        status: "PAID",
-        stripeSessionId: session.id,
-      },
-    });
-
-    if (updated.count === 0) {
-      return { transitionedToPaid: false };
-    }
-
-    await tx.auditLog.create({
+  const validationError = validateStripePaymentSessionForOrder(session, order);
+  if (validationError) {
+    await prisma.auditLog.create({
       data: {
         actorUserId: order.userId,
-        action: "STRIPE_ORDER_PAID",
+        action: "STRIPE_ORDER_SESSION_REJECTED",
         entity: "Order",
         entityId: order.id,
         metadata: JSON.stringify({
-          sessionId: session.id,
           source,
-          paymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id,
-          totalCents: order.totalCents,
+          reason: validationError,
+          sessionId: session.id,
+          expectedSessionId: order.stripeSessionId,
+          amountTotal: session.amount_total,
+          expectedTotalCents: order.totalCents,
+          currency: session.currency,
+          expectedCurrency: order.currency,
         }),
       },
     });
+    return { orderId: order.id, transitionedToPaid: false, reason: validationError };
+  }
 
-    return { transitionedToPaid: true };
-  });
+  let result: { transitionedToPaid: boolean };
+  try {
+    result = await prisma.$transaction(async (tx) => {
+      const currentOrder = await tx.order.findUnique({
+        where: { id: order.id },
+        include: { items: true },
+      });
+
+      if (!currentOrder || currentOrder.paymentStatus !== "PENDING" || currentOrder.stripeSessionId !== session.id) {
+        return { transitionedToPaid: false };
+      }
+
+      await reserveOrderAfterStripePayment(tx, currentOrder);
+      const now = new Date();
+      const hasDeliveryReservation = Boolean(currentOrder.deliverySlotId || currentOrder.deliveryWindowStartAt);
+
+      const updated = await tx.order.updateMany({
+        where: { id: order.id, paymentStatus: "PENDING" },
+        data: {
+          paymentStatus: "PAID",
+          status: "PAID",
+          stripeSessionId: session.id,
+          inventoryReservedAt: currentOrder.inventoryReservedAt ?? now,
+          deliveryCapacityReservedAt: hasDeliveryReservation ? (currentOrder.deliveryCapacityReservedAt ?? now) : currentOrder.deliveryCapacityReservedAt,
+        },
+      });
+
+      if (updated.count === 0) {
+        return { transitionedToPaid: false };
+      }
+
+      await tx.auditLog.create({
+        data: {
+          actorUserId: order.userId,
+          action: "STRIPE_ORDER_PAID",
+          entity: "Order",
+          entityId: order.id,
+          metadata: JSON.stringify({
+            sessionId: session.id,
+            source,
+            paymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : session.payment_intent?.id,
+            totalCents: order.totalCents,
+          }),
+        },
+      });
+
+      return { transitionedToPaid: true };
+    });
+  } catch (error) {
+    if (!isStripeOrderReservationError(error)) {
+      throw error;
+    }
+
+    await markStripePaidOrderRequiresRefund({
+      order,
+      session,
+      source,
+      reason: error instanceof Error ? error.message : "RESERVATION_FAILED",
+    });
+
+    return { orderId: order.id, transitionedToPaid: false, reason: "REQUIRES_REFUND" as const };
+  }
 
   if (!result.transitionedToPaid) {
     return { orderId: order.id, transitionedToPaid: false, reason: "ALREADY_FINALIZED" as const };
@@ -768,6 +971,8 @@ export async function markOrderStripePaymentFailed(orderId: string, source: stri
         paymentStatus: true,
         status: true,
         stripeSessionId: true,
+        inventoryReservedAt: true,
+        deliveryCapacityReservedAt: true,
         items: {
           select: {
             productId: true,
@@ -791,6 +996,8 @@ export async function markOrderStripePaymentFailed(orderId: string, source: stri
       data: {
         paymentStatus: "FAILED",
         stripeSessionId: stripeSessionId ?? order.stripeSessionId,
+        inventoryReservedAt: null,
+        deliveryCapacityReservedAt: null,
       },
     });
 
@@ -800,32 +1007,34 @@ export async function markOrderStripePaymentFailed(orderId: string, source: stri
 
     const restockReason = restockReasonForStripeFailure(source);
 
-    for (const item of order.items) {
-      if (item.variantId) {
-        await tx.productVariant.update({
-          where: { id: item.variantId },
-          data: { stock: { increment: item.quantity } },
-        });
-        await tx.product.update({
-          where: { id: item.productId },
-          data: { stock: { increment: item.quantity } },
-        });
-      } else {
-        await tx.product.update({
-          where: { id: item.productId },
-          data: { stock: { increment: item.quantity } },
+    if (order.inventoryReservedAt) {
+      for (const item of order.items) {
+        if (item.variantId) {
+          await tx.productVariant.update({
+            where: { id: item.variantId },
+            data: { stock: { increment: item.quantity } },
+          });
+          await tx.product.update({
+            where: { id: item.productId },
+            data: { stock: { increment: item.quantity } },
+          });
+        } else {
+          await tx.product.update({
+            where: { id: item.productId },
+            data: { stock: { increment: item.quantity } },
+          });
+        }
+
+        await tx.inventoryMovement.create({
+          data: {
+            productId: item.productId,
+            variantId: item.variantId,
+            orderId: order.id,
+            quantityChange: item.quantity,
+            reason: restockReason,
+          },
         });
       }
-
-      await tx.inventoryMovement.create({
-        data: {
-          productId: item.productId,
-          variantId: item.variantId,
-          orderId: order.id,
-          quantityChange: item.quantity,
-          reason: restockReason,
-        },
-      });
     }
 
     await tx.auditLog.create({
@@ -843,20 +1052,22 @@ export async function markOrderStripePaymentFailed(orderId: string, source: stri
       },
     });
 
-    await tx.auditLog.create({
-      data: {
-        actorUserId: order.userId,
-        action: "STRIPE_ORDER_RESTOCKED",
-        entity: "Order",
-        entityId: order.id,
-        metadata: JSON.stringify({
-          source,
-          reason: restockReason,
-          itemCount: order.items.length,
-          quantity: order.items.reduce((sum, item) => sum + item.quantity, 0),
-        }),
-      },
-    });
+    if (order.inventoryReservedAt) {
+      await tx.auditLog.create({
+        data: {
+          actorUserId: order.userId,
+          action: "STRIPE_ORDER_RESTOCKED",
+          entity: "Order",
+          entityId: order.id,
+          metadata: JSON.stringify({
+            source,
+            reason: restockReason,
+            itemCount: order.items.length,
+            quantity: order.items.reduce((sum, item) => sum + item.quantity, 0),
+          }),
+        },
+      });
+    }
 
     return { orderId: order.id, transitionedToFailed: true };
   });

@@ -117,6 +117,7 @@ export async function POST(request: Request) {
       deliveryWindowEndAt: input.deliveryWindowEndAt,
       deliveryInstructions: input.deliveryInstructions,
       deliveryPhone: input.deliveryPhone,
+      reserveInventory: input.paymentMethod !== "STRIPE",
     });
 
     const orderForResponse = await prisma.order.findUnique({

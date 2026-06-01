@@ -22,6 +22,8 @@ Créer des variables **production** (jamais dans Git):
 - [ ] `SESSION_SECRET=<secret_32+_chars>`
 - [ ] `DATABASE_URL=<database_prod>`
 - [ ] `BUSINESS_SUPPORT_EMAIL=<email_support>`
+- [ ] `APP_TRUST_PROXY=cloudflare` si tout le trafic passe par Cloudflare, sinon `none`
+- [ ] `WEB_PUSH_ALLOWED_HOSTS=<hosts>` si des hosts Web Push hors allowlist par defaut sont necessaires
 - [ ] `DATABASE_URL` ne pointe plus vers `dev.db`
 - [ ] `NEXT_PUBLIC_SITE_URL` n'utilise pas `localhost`
 - [ ] `NEXT_PUBLIC_SITE_URL` utilise bien `https`
@@ -64,7 +66,9 @@ npm run seed
 ## 4) Qualité technique (gates)
 
 - [ ] Lint passe sans erreur
+- [ ] Typecheck passe (`npx tsc --noEmit`)
 - [ ] Build production passe
+- [ ] Audit securite local passe (`npm run security:audit`)
 - [ ] Gate solide passe (`npm run release:solid`)
 - [ ] Captures mobile/PWA revues dans `test-results/solid-release/<runId>/`
 - [ ] Health check API répond OK (`/api/health`)
@@ -75,7 +79,9 @@ npm run seed
 ```bash
 npm run release:solid
 npm run lint
+npx tsc --noEmit
 npm run build
+npm run security:audit
 npm run start
 ```
 
@@ -84,8 +90,12 @@ npm run start
 ## 5) Sécurité
 
 - [ ] `.env` jamais commité
+- [ ] Aucun secret, keystore, config Cloudflare reelle, helper credentials ou DB locale/prod-like sous la racine projet (`npm run security:audit`)
 - [ ] Secret session robuste et unique
+- [ ] Migration `Session.tokenHash` appliquee et deconnexion globale acceptee
+- [ ] Rotation externe confirmee pour tout secret qui a pu etre expose
 - [ ] Routes admin/API sensibles testées non authentifiées (doivent refuser)
+- [ ] Rate-limit proxy verifie: `APP_TRUST_PROXY=cloudflare` utilise uniquement `CF-Connecting-IP`; `none` ignore les headers spoofables
 - [ ] Compte admin protégé (mot de passe fort)
 - [ ] Journal d’audit actif
 - [ ] Limitation des accès serveur (SSH, firewall, etc.)
@@ -96,9 +106,11 @@ npm run start
 
 ### Stripe
 - [ ] Checkout complet validé (commande -> paiement -> retour)
-- [ ] Webhook reçu en prod et commande marquée `PAID`
+- [ ] Webhook reçu en prod, commande marquee `PAID`, stock/capacite reserves uniquement apres webhook paye
+- [ ] Cas mismatch Stripe teste en preprod: montant/devise/session/order invalides ne confirment pas la commande
+- [ ] Cas stock/capacite indisponible apres paiement cree une alerte admin remboursement, sans confirmation normale
 - [ ] Cas annulation/expiration testé
-- [ ] Si des produits récurrents sont vendus: abonnement Stripe validé end-to-end en live
+- [ ] Si des produits recurrents sont vendus: intent abonnement local + webhook Stripe valides end-to-end
 
 Note:
 - Les commandes Stripe one-time ont déjà été validées en production.
@@ -120,6 +132,9 @@ Note:
 - [ ] Re-commande depuis historique
 - [ ] Admin: vue commandes / clients / taxes / inventaire
 - [ ] QR chiens: scan -> claim -> fiche publique
+- [ ] Web Push refuse endpoints prives/localhost/IP et accepte seulement les hosts approuves
+- [ ] Creneaux publics refusent les plages hors aujourd'hui + 60 jours
+- [ ] Driver: finish/optimize/location/GPS valides avec reponses `409`, `429`, `400` attendues
 - [ ] Export vendeur QR généré uniquement avec le vrai domaine
 
 ---

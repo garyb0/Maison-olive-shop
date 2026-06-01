@@ -184,6 +184,12 @@ describe("POST /api/orders", () => {
         return_url: expect.stringContaining("/checkout?"),
       }),
     );
+    expect(createOrderSafelyMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        paymentMethod: "STRIPE",
+        reserveInventory: false,
+      }),
+    );
     expect(prismaMock.order.update).toHaveBeenCalledWith({
       where: { id: "order_1" },
       data: { stripeSessionId: "cs_test_1" },
