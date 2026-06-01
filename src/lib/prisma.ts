@@ -1,5 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { PrismaLibSql } from "@prisma/adapter-libsql";
+import fs from "node:fs";
+import path from "node:path";
 
 declare global {
   var __prisma: PrismaClient | undefined;
@@ -45,8 +47,11 @@ function hasRequiredModelDelegates(client: PrismaClient) {
 }
 
 const createPrismaClient = () => {
+  const fallbackDbPath = path.resolve(process.cwd(), "..", "maison-olive-data", "db", "dev.db");
+  fs.mkdirSync(path.dirname(fallbackDbPath), { recursive: true });
+
   const adapter = new PrismaLibSql({
-    url: process.env.DATABASE_URL || "file:./dev.db",
+    url: process.env.DATABASE_URL || `file:${fallbackDbPath}`,
   });
 
   return new PrismaClient({

@@ -31,6 +31,9 @@ export async function POST(request: Request, context: RouteContext) {
 
     return jsonOk({ ok: true, subscription });
   } catch (error) {
+    if (error instanceof Error && error.message === "WEB_PUSH_ENDPOINT_NOT_ALLOWED") {
+      return jsonError("Invalid push subscription", 400);
+    }
     const mapped = mapDeliveryRunError(error);
     return jsonError(mapped.message, mapped.status);
   }

@@ -66,4 +66,19 @@ describe("GET /api/delivery/slots", () => {
     expect(payload.error).toBe("Invalid query");
     expect(getCheckoutDeliverySlotsMock).not.toHaveBeenCalled();
   });
+
+  it("retourne 400 si la plage publique depasse 60 jours", async () => {
+    const { GET } = await import("@/app/api/delivery/slots/route");
+    const tooFar = new Date();
+    tooFar.setDate(tooFar.getDate() + 61);
+
+    const res = await GET(
+      new Request(`http://localhost:3101/api/delivery/slots?from=${encodeURIComponent(tooFar.toISOString())}`),
+    );
+    const payload = (await res.json()) as { error?: string };
+
+    expect(res.status).toBe(400);
+    expect(payload.error).toContain("outside the allowed public window");
+    expect(getCheckoutDeliverySlotsMock).not.toHaveBeenCalled();
+  });
 });

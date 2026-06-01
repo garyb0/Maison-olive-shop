@@ -103,8 +103,17 @@ export function sanitizeGoogleOAuthReturnTo(value: string | null | undefined) {
   const raw = value?.trim();
   if (!raw) return "/account";
   if (!raw.startsWith("/") || raw.startsWith("//")) return "/account";
-  if (/[\r\n]/.test(raw)) return "/account";
-  return raw;
+  if (/[\u0000-\u001f\u007f]/.test(raw)) return "/account";
+  if (raw.includes("\\") || /%5c/i.test(raw)) return "/account";
+
+  try {
+    const parsed = new URL(raw, "https://chezolive.local");
+    if (parsed.origin !== "https://chezolive.local") return "/account";
+    const path = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    return path.startsWith("//") ? "/account" : path;
+  } catch {
+    return "/account";
+  }
 }
 
 export function getGoogleOAuthConfig(): GoogleOAuthConfig | null {

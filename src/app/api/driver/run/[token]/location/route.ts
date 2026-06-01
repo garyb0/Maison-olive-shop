@@ -1,5 +1,10 @@
 import { jsonError, jsonOk } from "@/lib/http";
-import { mapDeliveryRunError, recordDriverRunLocation } from "@/lib/delivery-runs";
+import {
+  getDeliveryRunTokenRateLimitIdentity,
+  mapDeliveryRunError,
+  recordDriverRunLocation,
+} from "@/lib/delivery-runs";
+import { applyRateLimit } from "@/lib/rate-limit";
 import { driverLocationSampleSchema } from "@/lib/validators";
 
 type RouteContext = {
@@ -7,8 +12,16 @@ type RouteContext = {
 };
 
 export async function POST(request: Request, context: RouteContext) {
+  const { token } = await context.params;
+  const rate = await applyRateLimit(request, {
+    namespace: "driver:location",
+    windowMs: 60_000,
+    max: 120,
+    identity: getDeliveryRunTokenRateLimitIdentity(token),
+  });
+  if (!rate.ok) return jsonError("Too many requests", 429);
+
   try {
-    const { token } = await context.params;
     const body = await request.json().catch(() => null);
     const parsed = driverLocationSampleSchema.safeParse(body);
 

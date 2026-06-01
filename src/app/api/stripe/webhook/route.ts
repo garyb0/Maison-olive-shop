@@ -52,6 +52,19 @@ type StripeInvoiceSnapshot = {
   }
 }
 
+type SubscriptionCheckoutIntentForWebhook = {
+  id: string
+  userId: string
+  productId: string
+  priceId: string
+  interval: string
+  quantity: number
+  amountCents: number
+  currency: string
+  stripeSessionId: string
+  status: string
+}
+
 function getPrismaDuplicateErrorCode(error: unknown) {
   return typeof error === 'object' && error !== null && 'code' in error ? (error as { code?: string }).code : undefined
 }
@@ -91,6 +104,34 @@ async function markWebhookEventProcessed(event: Stripe.Event) {
       stripeEventType: event.type,
     },
   })
+}
+
+function validateSubscriptionCheckoutSession(
+  session: Stripe.Checkout.Session,
+  intent: SubscriptionCheckoutIntentForWebhook,
+) {
+  const metadata = session.metadata ?? {}
+
+  if (session.id !== intent.stripeSessionId) return 'SESSION_MISMATCH'
+  if (session.mode !== 'subscription') return 'MODE_MISMATCH'
+  if (!session.subscription) return 'SUBSCRIPTION_MISSING'
+  if (session.payment_status && !['paid', 'no_payment_required'].includes(session.payment_status)) {
+    return 'PAYMENT_NOT_SETTLED'
+  }
+  if (session.client_reference_id && session.client_reference_id !== intent.productId) {
+    return 'CLIENT_REFERENCE_MISMATCH'
+  }
+  if (session.amount_total !== intent.amountCents) return 'AMOUNT_MISMATCH'
+  if ((session.currency ?? '').toUpperCase() !== intent.currency.toUpperCase()) return 'CURRENCY_MISMATCH'
+  if (metadata.userId !== intent.userId) return 'USER_MISMATCH'
+  if (metadata.productId !== intent.productId) return 'PRODUCT_MISMATCH'
+  if (metadata.priceId !== intent.priceId) return 'PRICE_MISMATCH'
+  if (metadata.interval !== intent.interval) return 'INTERVAL_MISMATCH'
+  if (metadata.quantity !== String(intent.quantity)) return 'QUANTITY_MISMATCH'
+  if (metadata.amountCents !== String(intent.amountCents)) return 'METADATA_AMOUNT_MISMATCH'
+  if ((metadata.currency ?? '').toUpperCase() !== intent.currency.toUpperCase()) return 'METADATA_CURRENCY_MISMATCH'
+
+  return null
 }
 
 export async function POST(request: Request) {
@@ -213,24 +254,42 @@ export async function POST(request: Request) {
             },
           })
         } else if (session.mode === 'subscription' && session.subscription) {
-          const metadata = session.metadata ?? {}
-          const userId = metadata.userId
-          const productId = metadata.productId
-          const quantityRaw = metadata.quantity
+          const intent = await prisma.subscriptionCheckoutIntent.findUnique({
+            where: { stripeSessionId: session.id },
+          })
 
-          const quantity = Number.parseInt(quantityRaw ?? '1', 10)
-
-          if (!userId || !productId || !Number.isFinite(quantity) || quantity < 1) {
+          if (!intent || intent.status !== 'PENDING') {
             logApiEvent({
               level: 'WARN',
               route: '/api/stripe/webhook',
-              event: 'CHECKOUT_SUBSCRIPTION_METADATA_INVALID',
+              event: 'CHECKOUT_SUBSCRIPTION_INTENT_MISSING',
               status: 400,
               details: {
                 eventId: event.id,
-                userId,
-                productId,
-                quantityRaw,
+                sessionId: session.id,
+                intentStatus: intent?.status,
+              },
+            })
+            break
+          }
+
+          const validationError = validateSubscriptionCheckoutSession(session, intent)
+          if (validationError) {
+            await prisma.subscriptionCheckoutIntent.update({
+              where: { id: intent.id },
+              data: { status: 'REJECTED' },
+            })
+
+            logApiEvent({
+              level: 'WARN',
+              route: '/api/stripe/webhook',
+              event: 'CHECKOUT_SUBSCRIPTION_INTENT_REJECTED',
+              status: 400,
+              details: {
+                eventId: event.id,
+                sessionId: session.id,
+                intentId: intent.id,
+                reason: validationError,
               },
             })
             break
@@ -244,9 +303,9 @@ export async function POST(request: Request) {
           })
 
           const data = {
-            userId,
-            productId,
-            quantity,
+            userId: intent.userId,
+            productId: intent.productId,
+            quantity: intent.quantity,
             status: mapStripeSubscriptionStatus(sub.status),
             currentPeriodStart: new Date(sub.current_period_start * 1000),
             currentPeriodEnd: new Date(sub.current_period_end * 1000),
@@ -269,6 +328,11 @@ export async function POST(request: Request) {
             })
           }
 
+          await prisma.subscriptionCheckoutIntent.update({
+            where: { id: intent.id },
+            data: { status: 'COMPLETED' },
+          })
+
           logApiEvent({
             level: 'INFO',
             route: '/api/stripe/webhook',
@@ -277,8 +341,9 @@ export async function POST(request: Request) {
             details: {
               eventId: event.id,
               stripeSubscriptionId: sub.id,
-              userId,
-              productId,
+              userId: intent.userId,
+              productId: intent.productId,
+              intentId: intent.id,
             },
           })
         }

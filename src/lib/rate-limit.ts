@@ -1,10 +1,12 @@
 
+import { env } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 
 type RateLimitOptions = {
   namespace: string;
   windowMs: number;
   max: number;
+  identity?: string;
 };
 
 type RateLimitEntry = {
@@ -32,17 +34,13 @@ const getStore = () => {
   return globalThis.__chezoliveRateLimitStore;
 };
 
-const getClientIp = (request: Request) => {
-  const forwardedFor = request.headers.get("x-forwarded-for");
-  if (forwardedFor) {
-    const first = forwardedFor.split(",")[0]?.trim();
-    if (first) return first;
+export const getRateLimitIdentity = (request: Request) => {
+  if (env.appTrustProxy === "cloudflare") {
+    const cloudflareIp = request.headers.get("cf-connecting-ip")?.trim();
+    return cloudflareIp ? `cf:${cloudflareIp}` : "cf:unknown";
   }
 
-  const realIp = request.headers.get("x-real-ip")?.trim();
-  if (realIp) return realIp;
-
-  return "unknown";
+  return "direct";
 };
 
 const maybeCleanupExpiredEntriesMemory = (store: Map<string, RateLimitEntry>, now: number) => {
@@ -73,8 +71,8 @@ async function applyRateLimitWithDatabase(
   options: RateLimitOptions,
 ): Promise<RateLimitResult> {
   const now = Date.now();
-  const ip = getClientIp(request);
-  const id = `${options.namespace}:${ip}`;
+  const identity = options.identity ?? getRateLimitIdentity(request);
+  const id = `${options.namespace}:${identity}`;
   const resetAt = new Date(now + options.windowMs);
 
   await maybeCleanupExpiredEntriesDb(now);
@@ -136,8 +134,8 @@ function applyRateLimitInMemory(request: Request, options: RateLimitOptions): Ra
   const store = getStore();
   maybeCleanupExpiredEntriesMemory(store, now);
 
-  const ip = getClientIp(request);
-  const key = `${options.namespace}:${ip}`;
+  const identity = options.identity ?? getRateLimitIdentity(request);
+  const key = `${options.namespace}:${identity}`;
 
   const current = store.get(key);
   if (!current || current.resetAt <= now) {

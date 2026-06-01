@@ -11,6 +11,10 @@ const prismaMock = {
     update: vi.fn(),
     updateMany: vi.fn(),
   },
+  subscriptionCheckoutIntent: {
+    findUnique: vi.fn(),
+    update: vi.fn(),
+  },
   stripeWebhookEvent: {
     findUnique: vi.fn(),
     create: vi.fn(),
@@ -61,6 +65,19 @@ describe("POST /api/stripe/webhook", () => {
     prismaMock.subscription.create.mockResolvedValue({ id: "sub_1" });
     prismaMock.subscription.update.mockResolvedValue({ id: "sub_1" });
     prismaMock.subscription.updateMany.mockResolvedValue({ count: 1 });
+    prismaMock.subscriptionCheckoutIntent.findUnique.mockResolvedValue({
+      id: "intent_1",
+      userId: "user_1",
+      productId: "prod_1",
+      priceId: "price_weekly_1",
+      interval: "WEEKLY",
+      quantity: 2,
+      amountCents: 2598,
+      currency: "CAD",
+      stripeSessionId: "cs_sub_1",
+      status: "PENDING",
+    });
+    prismaMock.subscriptionCheckoutIntent.update.mockResolvedValue({ id: "intent_1" });
     prismaMock.stripeWebhookEvent.findUnique.mockResolvedValue(null);
     prismaMock.stripeWebhookEvent.create.mockResolvedValue({
       id: "we_1",
@@ -256,6 +273,107 @@ describe("POST /api/stripe/webhook", () => {
     expect(prismaMock.stripeWebhookEvent.create).not.toHaveBeenCalled();
     expect(prismaMock.stripeWebhookEvent.upsert).not.toHaveBeenCalled();
     expect(markOrderPaidFromStripeSessionMock).not.toHaveBeenCalled();
+  });
+
+  it("cree un abonnement seulement depuis un intent local correspondant", async () => {
+    const session = {
+      id: "cs_sub_1",
+      mode: "subscription",
+      payment_status: "paid",
+      amount_total: 2598,
+      currency: "cad",
+      client_reference_id: "prod_1",
+      subscription: "sub_stripe_1",
+      metadata: {
+        userId: "user_1",
+        productId: "prod_1",
+        priceId: "price_weekly_1",
+        interval: "WEEKLY",
+        quantity: "2",
+        amountCents: "2598",
+        currency: "CAD",
+      },
+    };
+    stripeConstructEventMock.mockReturnValue({
+      id: "evt_sub_1",
+      type: "checkout.session.completed",
+      data: { object: session },
+    });
+
+    const { POST } = await import("@/app/api/stripe/webhook/route");
+    const req = new Request("http://localhost:3101/api/stripe/webhook", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "stripe-signature": "t=1,v1=valid",
+      },
+      body: JSON.stringify({}),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(200);
+    expect(prismaMock.subscriptionCheckoutIntent.findUnique).toHaveBeenCalledWith({
+      where: { stripeSessionId: "cs_sub_1" },
+    });
+    expect(prismaMock.subscription.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        stripeSubscriptionId: "sub_stripe_1",
+        userId: "user_1",
+        productId: "prod_1",
+        quantity: 2,
+      }),
+    });
+    expect(prismaMock.subscriptionCheckoutIntent.update).toHaveBeenCalledWith({
+      where: { id: "intent_1" },
+      data: { status: "COMPLETED" },
+    });
+  });
+
+  it("rejette un abonnement si l'intent local ne correspond pas", async () => {
+    const session = {
+      id: "cs_sub_1",
+      mode: "subscription",
+      payment_status: "paid",
+      amount_total: 1,
+      currency: "cad",
+      client_reference_id: "prod_1",
+      subscription: "sub_stripe_1",
+      metadata: {
+        userId: "user_1",
+        productId: "prod_1",
+        priceId: "price_weekly_1",
+        interval: "WEEKLY",
+        quantity: "2",
+        amountCents: "1",
+        currency: "CAD",
+      },
+    };
+    stripeConstructEventMock.mockReturnValue({
+      id: "evt_sub_bad",
+      type: "checkout.session.completed",
+      data: { object: session },
+    });
+
+    const { POST } = await import("@/app/api/stripe/webhook/route");
+    const req = new Request("http://localhost:3101/api/stripe/webhook", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "stripe-signature": "t=1,v1=valid",
+      },
+      body: JSON.stringify({}),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(200);
+    expect(stripeSubscriptionsRetrieveMock).not.toHaveBeenCalled();
+    expect(prismaMock.subscription.create).not.toHaveBeenCalled();
+    expect(prismaMock.subscriptionCheckoutIntent.update).toHaveBeenCalledWith({
+      where: { id: "intent_1" },
+      data: { status: "REJECTED" },
+    });
   });
 
   it("marque le webhook en échec quand le handler lève une erreur", async () => {

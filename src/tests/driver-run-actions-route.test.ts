@@ -5,8 +5,10 @@ const completeDriverStopMock = vi.fn();
 const arriveDriverStopMock = vi.fn();
 const uploadDriverStopProofMock = vi.fn();
 const getDriverStopProofFileMock = vi.fn();
+const applyRateLimitMock = vi.fn();
 
 vi.mock("@/lib/delivery-runs", () => ({
+  getDeliveryRunTokenRateLimitIdentity: (token: string) => `driver-token:${token}`,
   recordDriverRunLocation: (...args: unknown[]) => recordDriverRunLocationMock(...args),
   completeDriverStop: (...args: unknown[]) => completeDriverStopMock(...args),
   arriveDriverStop: (...args: unknown[]) => arriveDriverStopMock(...args),
@@ -18,10 +20,15 @@ vi.mock("@/lib/delivery-runs", () => ({
   }),
 }));
 
+vi.mock("@/lib/rate-limit", () => ({
+  applyRateLimit: (...args: unknown[]) => applyRateLimitMock(...args),
+}));
+
 describe("driver run action routes", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    applyRateLimitMock.mockResolvedValue({ ok: true, remaining: 119, retryAfterSeconds: 0 });
   });
 
   it("enregistre un echantillon GPS chauffeur", async () => {
@@ -51,6 +58,15 @@ describe("driver run action routes", () => {
     expect(response.status).toBe(200);
     expect(payload.accepted).toBe(true);
     expect(payload.actualKmGps).toBe(4.2);
+    expect(applyRateLimitMock).toHaveBeenCalledWith(
+      expect.any(Request),
+      expect.objectContaining({
+        namespace: "driver:location",
+        windowMs: 60000,
+        max: 120,
+        identity: "driver-token:token_1",
+      }),
+    );
     expect(recordDriverRunLocationMock).toHaveBeenCalledWith("token_1", {
       lat: 48.45,
       lng: -68.52,
@@ -59,6 +75,28 @@ describe("driver run action routes", () => {
       heading: 180,
       recordedAt: "2026-04-23T10:05:00.000Z",
     });
+  });
+
+  it("limite les echantillons GPS par token chauffeur", async () => {
+    applyRateLimitMock.mockResolvedValueOnce({ ok: false, remaining: 0, retryAfterSeconds: 20 });
+    const { POST } = await import("@/app/api/driver/run/[token]/location/route");
+
+    const response = await POST(
+      new Request("http://localhost:3101/api/driver/run/token_1/location", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          lat: 48.45,
+          lng: -68.52,
+          accuracyMeters: 8,
+          recordedAt: "2026-04-23T10:05:00.000Z",
+        }),
+      }),
+      { params: Promise.resolve({ token: "token_1" }) },
+    );
+
+    expect(response.status).toBe(429);
+    expect(recordDriverRunLocationMock).not.toHaveBeenCalled();
   });
 
   it("refuse un payload GPS invalide", async () => {

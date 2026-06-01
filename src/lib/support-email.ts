@@ -60,24 +60,39 @@ interface EmailNotificationData {
 
 type SupportEmailKind = "newConversation" | "newMessage" | "assigned";
 
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function buildEmailHtml(data: EmailNotificationData, kind: SupportEmailKind = "newConversation"): string {
   const isReply = kind === "newMessage";
   const isAssigned = kind === "assigned";
   const currentYear = new Date().getFullYear();
+  const customerName = escapeHtml(data.customerName);
+  const customerEmail = escapeHtml(data.customerEmail);
+  const adminName = data.adminName ? escapeHtml(data.adminName) : "";
+  const adminEmail = data.adminEmail ? escapeHtml(data.adminEmail) : "";
   const replyToken = data.adminEmail ? createReplyToken(data.conversationId, data.adminEmail) : '';
   const replyToUrl = data.adminEmail 
     ? `${env.siteUrl}/api/support/email-reply?token=${encodeURIComponent(replyToken)}`
     : '';
 
-  const subject = isReply
+  const subjectText = isReply
     ? `💬 Nouveau message de ${data.customerName} - Chez Olive`
     : isAssigned
       ? `📋 Conversation assignée - ${data.customerName} - Chez Olive`
     : `🔔 Nouvelle conversation de ${data.customerName} - Chez Olive`;
+  const subject = escapeHtml(subjectText);
 
-  const previewText = data.messageContent.length > 100 
+  const previewTextRaw = data.messageContent.length > 100
     ? data.messageContent.substring(0, 100) + '...' 
     : data.messageContent;
+  const previewText = escapeHtml(previewTextRaw);
 
   return `
 <!DOCTYPE html>
@@ -238,9 +253,9 @@ function buildEmailHtml(data: EmailNotificationData, kind: SupportEmailKind = "n
       </h2>
       
       <div class="customer-info">
-        <p><strong>👤 Client :</strong> ${data.customerName}</p>
-        <p><strong>📧 Email :</strong> ${data.customerEmail}</p>
-        ${data.adminName ? `<p><strong>📋 Assigné à :</strong> ${data.adminName}</p>` : ''}
+        <p><strong>👤 Client :</strong> ${customerName}</p>
+        <p><strong>📧 Email :</strong> ${customerEmail}</p>
+        ${adminName ? `<p><strong>📋 Assigné à :</strong> ${adminName}</p>` : ''}
       </div>
       
       <p style="margin: 16px 0; font-size: 15px;">
@@ -273,7 +288,7 @@ function buildEmailHtml(data: EmailNotificationData, kind: SupportEmailKind = "n
     
     <div class="footer">
       <p>© ${currentYear} Chez Olive — Rimouski, QC</p>
-      <p>Cet email a été envoyé à ${data.adminEmail || 'votre adresse'}</p>
+      <p>Cet email a été envoyé à ${adminEmail || 'votre adresse'}</p>
       <p style="margin-top: 8px;">
         <a href="${env.siteUrl}/admin/support/settings" style="color: #6b7280;">Gérer les notifications</a>
       </p>
@@ -402,6 +417,7 @@ export async function sendConversationClosedEmail(data: {
     return;
   }
   const currentYear = new Date().getFullYear();
+  const customerName = escapeHtml(data.customerName);
 
   const html = `
 <!DOCTYPE html>
@@ -469,7 +485,7 @@ export async function sendConversationClosedEmail(data: {
     </div>
     <div class="body">
       <h2 style="margin: 0 0 16px; font-size: 22px;">Conversation terminée</h2>
-      <p>Bonjour ${data.customerName},</p>
+      <p>Bonjour ${customerName},</p>
       <p>Votre conversation de support a été clôturée par notre équipe.</p>
       <p>Si vous avez d'autres questions, n'hésitez pas à nous recontacter en ouvrant une nouvelle conversation.</p>
       <div style="text-align: center;">

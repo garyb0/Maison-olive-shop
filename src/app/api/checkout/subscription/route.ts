@@ -4,6 +4,7 @@ import { logApiEvent } from '@/lib/observability'
 import { resolvePublicSiteUrl } from '@/lib/site-url'
 import { subscriptionCheckoutSchema } from '@/lib/validators'
 import { stripe, stripeEnabled } from '@/lib/stripe'
+import { prisma } from '@/lib/prisma'
 
 type SubscriptionInterval = 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY' | 'QUARTERLY'
 
@@ -207,8 +208,6 @@ export async function POST(request: Request) {
 
     const { productId, interval, quantity } = parsed.data
 
-    const { prisma } = await import('@/lib/prisma')
-
     const product = await prisma.product.findFirst({
       where: { id: productId, isSubscription: true, isActive: true },
     })
@@ -221,6 +220,11 @@ export async function POST(request: Request) {
     const resolvedPrice = await resolveSubscriptionPriceId(product, interval)
 
     if (!resolvedPrice.priceId) {
+      return NextResponse.json({ error: 'Missing subscription price for selected interval' }, { status: 400 })
+    }
+
+    const unitAmount = product[unitAmountFieldMap[interval]]
+    if (!unitAmount || unitAmount <= 0) {
       return NextResponse.json({ error: 'Missing subscription price for selected interval' }, { status: 400 })
     }
 
@@ -246,6 +250,7 @@ export async function POST(request: Request) {
       ui_mode: 'custom',
       return_url: returnUrl,
       customer_email: user.email,
+      client_reference_id: product.id,
       line_items: [
         {
           price: resolvedPrice.priceId,
@@ -255,12 +260,18 @@ export async function POST(request: Request) {
       metadata: {
         userId: user.id,
         productId: product.id,
+        priceId: resolvedPrice.priceId,
+        interval,
         quantity: quantity.toString(),
+        amountCents: String(unitAmount * quantity),
+        currency: product.currency.toUpperCase(),
       },
       subscription_data: {
         metadata: {
           userId: user.id,
           productId: product.id,
+          priceId: resolvedPrice.priceId,
+          interval,
         },
       },
     })
@@ -275,6 +286,19 @@ export async function POST(request: Request) {
       })
       return NextResponse.json({ error: 'Unable to create checkout session' }, { status: 500 })
     }
+
+    await prisma.subscriptionCheckoutIntent.create({
+      data: {
+        userId: user.id,
+        productId: product.id,
+        priceId: resolvedPrice.priceId,
+        interval,
+        quantity,
+        amountCents: unitAmount * quantity,
+        currency: product.currency.toUpperCase(),
+        stripeSessionId: session.id,
+      },
+    })
 
     logApiEvent({
       level: 'INFO',

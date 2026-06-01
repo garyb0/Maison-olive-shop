@@ -134,118 +134,229 @@ function stripHtml(html: string): string {
     .trim();
 }
 
+function assertSafeSmtpHeader(name: string, value: string) {
+  if (/[\r\n]/.test(value)) {
+    throw new Error(`SMTP_HEADER_INJECTION:${name}`);
+  }
+}
+
+function encodeSmtpHeader(name: string, value: string) {
+  assertSafeSmtpHeader(name, value);
+  if (/^[\x20-\x7E]*$/.test(value)) return value;
+  return `=?UTF-8?B?${Buffer.from(value, "utf8").toString("base64")}?=`;
+}
+
+export function normalizeSmtpDataBody(text: string) {
+  return text
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .split("\n")
+    .map((line) => (line.startsWith(".") ? `.${line}` : line))
+    .join("\r\n");
+}
+
+function smtpEhloHost() {
+  try {
+    return new URL(env.siteUrl).hostname || "chezolive.local";
+  } catch {
+    return "chezolive.local";
+  }
+}
+
+export function buildSmtpMessage(input: { to: string; subject: string; text: string }) {
+  const from = env.smtpFromEmail || env.businessSupportEmail;
+  assertSafeSmtpHeader("from", from);
+  assertSafeSmtpHeader("to", input.to);
+
+  return [
+    `From: ${encodeSmtpHeader("from", from)}`,
+    `To: ${encodeSmtpHeader("to", input.to)}`,
+    `Subject: ${encodeSmtpHeader("subject", input.subject)}`,
+    "MIME-Version: 1.0",
+    "Content-Type: text/plain; charset=utf-8",
+    "Content-Transfer-Encoding: 8bit",
+    "",
+    normalizeSmtpDataBody(input.text),
+  ].join("\r\n");
+}
+
+type SmtpResponse = {
+  code: number;
+  text: string;
+};
+
 async function sendSmtpEmail(input: { to: string; subject: string; text: string }): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const host = env.smtpHost;
-    const port = env.smtpPort || (env.smtpSecure ? 465 : 587);
-    const secure = env.smtpSecure;
-    
-    logEmailDebug("SMTP_CONNECTING", { host, port, secure, to: input.to });
-    
-    const socket = secure 
-      ? tls.connect({ host, port, rejectUnauthorized: false })
-      : net.createConnection({ host, port });
-    
-    let response = "";
-    
-    const sendCommand = (cmd: string) => {
-      socket.write(cmd + "\r\n");
-    };
-    
-    socket.on("data", (data: Buffer) => {
-      response += data.toString();
-      logEmailDebug("SMTP_RESPONSE_RECEIVED", { chunk: response.trim() });
-      
-      // Wait for server ready
-      if (response.includes("220")) {
-        response = "";
-        sendCommand("EHLO " + env.siteUrl);
+  const host = env.smtpHost;
+  const port = env.smtpPort || (env.smtpSecure ? 465 : 587);
+  const rejectUnauthorized = env.nodeEnv === "production";
+  const from = env.smtpFromEmail || env.businessSupportEmail;
+  assertSafeSmtpHeader("from", from);
+  assertSafeSmtpHeader("to", input.to);
+  assertSafeSmtpHeader("subject", input.subject);
+
+  logEmailDebug("SMTP_CONNECTING", { host, port, secure: env.smtpSecure, to: input.to });
+
+  let socket: net.Socket | tls.TLSSocket | null = null;
+  let buffer = "";
+  let currentLines: string[] = [];
+  const queuedResponses: SmtpResponse[] = [];
+  let pending:
+    | {
+        resolve: (response: SmtpResponse) => void;
+        reject: (error: Error) => void;
       }
-      // After EHLO, start TLS if not secure and server supports it
-      else if (response.includes("250") && !secure && !response.includes("AUTH")) {
-        response = "";
-        sendCommand("STARTTLS");
+    | null = null;
+
+  const parseResponse = (data: Buffer) => {
+    buffer += data.toString("utf8");
+    let newlineIndex = buffer.indexOf("\n");
+    while (newlineIndex >= 0) {
+      const line = buffer.slice(0, newlineIndex).replace(/\r$/, "");
+      buffer = buffer.slice(newlineIndex + 1);
+      currentLines.push(line);
+
+      const finalLine = /^\d{3} /.test(line);
+      if (finalLine) {
+        const responseText = currentLines.join("\n");
+        const code = Number.parseInt(line.slice(0, 3), 10);
+        const response = { code, text: responseText };
+        currentLines = [];
+        logEmailDebug("SMTP_RESPONSE_RECEIVED", { code, text: responseText });
+
+        if (pending) {
+          pending.resolve(response);
+          pending = null;
+        } else {
+          queuedResponses.push(response);
+        }
       }
-      // After STARTTLS response, upgrade connection
-      else if (response.includes("220") && response.includes("ready")) {
-        // TLS upgrade would happen here, but for simplicity we'll skip
-        response = "";
-        sendCommand("AUTH LOGIN");
+      newlineIndex = buffer.indexOf("\n");
+    }
+  };
+
+  const onSocketError = (error: Error) => {
+    if (pending) {
+      pending.reject(error);
+      pending = null;
+    }
+  };
+
+  const attachSocket = (nextSocket: net.Socket | tls.TLSSocket) => {
+    socket = nextSocket;
+    nextSocket.setTimeout(30_000, () => nextSocket.destroy(new Error("SMTP_TIMEOUT")));
+    nextSocket.on("data", parseResponse);
+    nextSocket.on("error", onSocketError);
+  };
+
+  const readResponse = () =>
+    new Promise<SmtpResponse>((resolve, reject) => {
+      const queued = queuedResponses.shift();
+      if (queued) {
+        resolve(queued);
+        return;
       }
-      // After AUTH LOGIN
-      else if (response.includes("334") && !response.includes("VX")) {
-        response = "";
-        // Send username (base64 encoded)
-        const user = Buffer.from(env.smtpUser || "").toString("base64");
-        sendCommand(user);
-      }
-      // After username, send password
-      else if (response.includes("334") && response.includes("VX")) {
-        response = "";
-        // Send password (base64 encoded)
-        const pass = Buffer.from(env.smtpPass || "").toString("base64");
-        sendCommand(pass);
-      }
-      // After AUTH success
-      else if (response.includes("235") || response.includes("2.7.0")) {
-        response = "";
-        sendCommand("MAIL FROM:<" + (env.smtpFromEmail || env.businessSupportEmail) + ">");
-      }
-      // After MAIL FROM
-      else if (response.includes("250") && !response.includes("RCPT")) {
-        response = "";
-        sendCommand("RCPT TO:<" + input.to + ">");
-      }
-      // After RCPT TO
-      else if (response.includes("250") && !response.includes("DATA")) {
-        response = "";
-        sendCommand("DATA");
-      }
-      // After DATA command (354 response)
-      else if (response.includes("354")) {
-        response = "";
-        // Send email content
-        const emailContent = 
-          "From: " + (env.smtpFromEmail || env.businessSupportEmail) + "\r\n" +
-          "To: " + input.to + "\r\n" +
-          "Subject: " + input.subject + "\r\n" +
-          "Content-Type: text/plain; charset=utf-8\r\n\r\n" +
-          input.text + "\r\n.\r\n";
-        sendCommand(emailContent);
-      }
-      // After email sent (250 response)
-      else if (response.includes("250") && response.includes("OK")) {
-        logApiEvent({
-          level: "INFO",
-          route: "lib/email",
-          event: "SMTP_EMAIL_SENT",
-          details: { to: input.to },
-        });
-        sendCommand("QUIT");
-        socket.end();
-        resolve();
-      }
-      // After QUIT
-      else if (response.includes("221")) {
-        socket.end();
-        resolve();
-      }
+      pending = { resolve, reject };
     });
-    
-    socket.on("error", (err: Error) => {
-      logApiEvent({
-        level: "WARN",
-        route: "lib/email",
-        event: "SMTP_ERROR",
-        details: { to: input.to, error: err },
+
+  const expectCode = (response: SmtpResponse, expected: number | number[], command: string) => {
+    const expectedCodes = Array.isArray(expected) ? expected : [expected];
+    if (!expectedCodes.includes(response.code)) {
+      throw new Error(`SMTP_COMMAND_FAILED:${command}:${response.code}`);
+    }
+    return response;
+  };
+
+  const writeLine = (line: string) => {
+    if (!socket) throw new Error("SMTP_SOCKET_NOT_CONNECTED");
+    socket.write(`${line}\r\n`);
+  };
+
+  const command = async (line: string, expected: number | number[]) => {
+    writeLine(line);
+    return expectCode(await readResponse(), expected, line.split(" ")[0] ?? line);
+  };
+
+  const connectPlain = () =>
+    new Promise<net.Socket>((resolve, reject) => {
+      const plain = net.createConnection({ host, port });
+      plain.once("connect", () => resolve(plain));
+      plain.once("error", reject);
+      attachSocket(plain);
+    });
+
+  const connectTls = (baseSocket?: net.Socket) =>
+    new Promise<tls.TLSSocket>((resolve, reject) => {
+      const secureSocket = tls.connect({
+        host: baseSocket ? undefined : host,
+        port: baseSocket ? undefined : port,
+        socket: baseSocket,
+        servername: host,
+        rejectUnauthorized,
       });
-      reject(err);
+      secureSocket.once("secureConnect", () => resolve(secureSocket));
+      secureSocket.once("error", reject);
+      attachSocket(secureSocket);
     });
-    
-    socket.on("end", () => {
-      logEmailDebug("SMTP_CONNECTION_CLOSED", { to: input.to });
+
+  try {
+    await (env.smtpSecure ? connectTls() : connectPlain());
+    expectCode(await readResponse(), 220, "CONNECT");
+
+    let ehlo = await command(`EHLO ${smtpEhloHost()}`, 250);
+
+    if (!env.smtpSecure) {
+      const supportsStartTls = /^250[ -]STARTTLS\b/im.test(ehlo.text);
+      if (!supportsStartTls) {
+        throw new Error("SMTP_STARTTLS_REQUIRED");
+      }
+
+      await command("STARTTLS", 220);
+      if (!socket) throw new Error("SMTP_SOCKET_NOT_CONNECTED");
+      const oldSocket = socket as net.Socket;
+      oldSocket.removeListener("data", parseResponse);
+      oldSocket.removeListener("error", onSocketError);
+      buffer = "";
+      currentLines = [];
+      queuedResponses.length = 0;
+      await connectTls(oldSocket);
+      ehlo = await command(`EHLO ${smtpEhloHost()}`, 250);
+    }
+
+    if (!/^250[ -]AUTH\b/im.test(ehlo.text)) {
+      throw new Error("SMTP_AUTH_UNAVAILABLE");
+    }
+
+    await command("AUTH LOGIN", 334);
+    await command(Buffer.from(env.smtpUser || "", "utf8").toString("base64"), 334);
+    await command(Buffer.from(env.smtpPass || "", "utf8").toString("base64"), 235);
+    await command(`MAIL FROM:<${from}>`, 250);
+    await command(`RCPT TO:<${input.to}>`, [250, 251]);
+    await command("DATA", 354);
+
+    if (!socket) throw new Error("SMTP_SOCKET_NOT_CONNECTED");
+    (socket as net.Socket | tls.TLSSocket).write(`${buildSmtpMessage(input)}\r\n.\r\n`);
+    expectCode(await readResponse(), 250, "DATA_BODY");
+
+    logApiEvent({
+      level: "INFO",
+      route: "lib/email",
+      event: "SMTP_EMAIL_SENT",
+      details: { to: input.to },
     });
-  });
+
+    writeLine("QUIT");
+    await readResponse().catch(() => undefined);
+  } catch (error) {
+    logApiEvent({
+      level: "WARN",
+      route: "lib/email",
+      event: "SMTP_ERROR",
+      details: { to: input.to, error },
+    });
+    throw error;
+  } finally {
+    (socket as net.Socket | tls.TLSSocket | null)?.end();
+  }
 }
 
 /**

@@ -29,6 +29,7 @@ const nodeEnv = process.env.NODE_ENV ?? "development";
 const smtpPortRaw = process.env.SMTP_PORT;
 const smtpPortIsConfigured = typeof smtpPortRaw === "string" && smtpPortRaw.trim().length > 0;
 const parsedSmtpPort = parseInteger(smtpPortRaw, 587, { min: 1, max: 65535 });
+const appTrustProxyRaw = process.env.APP_TRUST_PROXY ?? "none";
 
 export const env = {
   nodeEnv,
@@ -59,6 +60,7 @@ export const env = {
     process.env.SMS_DRY_RUN === undefined
       ? nodeEnv !== "production"
       : process.env.SMS_DRY_RUN === "true",
+  appTrustProxy: appTrustProxyRaw === "cloudflare" ? "cloudflare" : "none",
   twilioAccountSid: process.env.TWILIO_ACCOUNT_SID ?? "",
   twilioAuthToken: process.env.TWILIO_AUTH_TOKEN ?? "",
   twilioMessagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID ?? "",
@@ -84,6 +86,7 @@ export const env = {
   webPushPublicKey: process.env.WEB_PUSH_PUBLIC_KEY ?? process.env.NEXT_PUBLIC_WEB_PUSH_PUBLIC_KEY ?? "",
   webPushPrivateKey: process.env.WEB_PUSH_PRIVATE_KEY ?? "",
   webPushSubject: process.env.WEB_PUSH_SUBJECT ?? `mailto:${process.env.BUSINESS_SUPPORT_EMAIL ?? "support@chezolive.ca"}`,
+  webPushAllowedHosts: process.env.WEB_PUSH_ALLOWED_HOSTS ?? "",
   firebaseProjectId: process.env.FIREBASE_PROJECT_ID ?? "",
   firebaseClientEmail: process.env.FIREBASE_CLIENT_EMAIL ?? "",
   firebasePrivateKey: process.env.FIREBASE_PRIVATE_KEY ?? "",
@@ -111,6 +114,10 @@ export function validateEnv(target: "development" | "production" = "development"
     warnings.push(
       "SHIPPING_FLAT_CENTS is 0 while SHIPPING_FREE_THRESHOLD_CENTS is above 0; local delivery is free before the configured free-delivery threshold."
     );
+  }
+
+  if (appTrustProxyRaw !== "none" && appTrustProxyRaw !== "cloudflare") {
+    errors.push("APP_TRUST_PROXY must be either none or cloudflare.");
   }
 
   if (target === "production") {

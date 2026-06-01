@@ -4,8 +4,10 @@ const getDriverRunSnapshotMock = vi.fn();
 const startDriverRunMock = vi.fn();
 const finishDriverRunMock = vi.fn();
 const optimizeDriverRunFromCurrentPositionMock = vi.fn();
+const applyRateLimitMock = vi.fn();
 
 vi.mock("@/lib/delivery-runs", () => ({
+  getDeliveryRunTokenRateLimitIdentity: (token: string) => `driver-token:${token}`,
   getDriverRunSnapshot: (...args: unknown[]) => getDriverRunSnapshotMock(...args),
   startDriverRun: (...args: unknown[]) => startDriverRunMock(...args),
   finishDriverRun: (...args: unknown[]) => finishDriverRunMock(...args),
@@ -23,10 +25,15 @@ vi.mock("@/lib/delivery-runs", () => ({
   }),
 }));
 
+vi.mock("@/lib/rate-limit", () => ({
+  applyRateLimit: (...args: unknown[]) => applyRateLimitMock(...args),
+}));
+
 describe("driver run routes", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    applyRateLimitMock.mockResolvedValue({ ok: true, remaining: 5, retryAfterSeconds: 0 });
   });
 
   it("retourne le snapshot du chauffeur", async () => {
@@ -128,6 +135,15 @@ describe("driver run routes", () => {
 
     expect(response.status).toBe(200);
     expect(payload.navigationHref).toContain("waze.com");
+    expect(applyRateLimitMock).toHaveBeenCalledWith(
+      expect.any(Request),
+      expect.objectContaining({
+        namespace: "driver:optimize",
+        windowMs: 600000,
+        max: 6,
+        identity: "driver-token:token_1",
+      }),
+    );
     expect(optimizeDriverRunFromCurrentPositionMock).toHaveBeenCalledWith("token_1", {
       lat: 48.45,
       lng: -68.52,
@@ -135,6 +151,26 @@ describe("driver run routes", () => {
       recordedAt: "2026-04-24T20:00:00.000Z",
       navigationProvider: "WAZE",
     });
+  });
+
+  it("limite la reoptimisation par token chauffeur", async () => {
+    applyRateLimitMock.mockResolvedValueOnce({ ok: false, remaining: 0, retryAfterSeconds: 300 });
+    const { POST } = await import("@/app/api/driver/run/[token]/optimize/route");
+    const response = await POST(new Request("http://localhost:3101/api/driver/run/token_1/optimize", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        lat: 48.45,
+        lng: -68.52,
+        accuracyMeters: 8,
+        recordedAt: "2026-04-24T20:00:00.000Z",
+      }),
+    }), {
+      params: Promise.resolve({ token: "token_1" }),
+    });
+
+    expect(response.status).toBe(429);
+    expect(optimizeDriverRunFromCurrentPositionMock).not.toHaveBeenCalled();
   });
 
   it("refuse un payload de reoptimisation invalide", async () => {

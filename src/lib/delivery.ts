@@ -221,6 +221,7 @@ async function getReservedCountMap(prismaLike: PrismaLike, slotIds: string[]) {
       deliverySlotId: { in: slotIds },
       status: { not: "CANCELLED" },
       paymentStatus: { not: "FAILED" },
+      deliveryCapacityReservedAt: { not: null },
     },
     select: {
       deliverySlotId: true,
@@ -276,7 +277,8 @@ export async function getDynamicDeliveryWindows(input: AvailabilityInput): Promi
         { deliveryWindowStartAt: { lt: latest } },
         { deliveryWindowEndAt: { gt: earliest } },
         { status: { not: "CANCELLED" } },
-        { paymentStatus: { not: "FAILED" } }
+        { paymentStatus: { not: "FAILED" } },
+        { deliveryCapacityReservedAt: { not: null } }
       ]
     },
     select: {
@@ -770,6 +772,7 @@ async function getAdminDynamicDeliveryWindowSlots(
       deliveryStatus: { in: ["SCHEDULED", "OUT_FOR_DELIVERY"] },
       status: { not: "CANCELLED" },
       paymentStatus: { not: "FAILED" },
+      deliveryCapacityReservedAt: { not: null },
     },
     select: {
       deliveryWindowStartAt: true,
@@ -1054,6 +1057,7 @@ export async function resolveDeliverySelectionForOrder(
           { deliveryWindowEndAt: { gt: windowStart } },
           { status: { not: "CANCELLED" } },
           { paymentStatus: { not: "FAILED" } },
+          { deliveryCapacityReservedAt: { not: null } },
           ...(input.excludeOrderId ? [{ id: { not: input.excludeOrderId } }] : []),
         ]
       }
@@ -1106,6 +1110,7 @@ export async function resolveDeliverySelectionForOrder(
       deliverySlotId: slot.id,
       status: { not: "CANCELLED" },
       paymentStatus: { not: "FAILED" },
+      deliveryCapacityReservedAt: { not: null },
       ...(input.excludeOrderId ? { id: { not: input.excludeOrderId } } : {}),
     },
   });

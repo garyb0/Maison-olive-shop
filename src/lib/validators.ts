@@ -377,8 +377,8 @@ export const adminCompleteDeliveryRunSchema = z.object({
 export const driverLocationSampleSchema = z.object({
   lat: z.number().min(-90).max(90),
   lng: z.number().min(-180).max(180),
-  accuracyMeters: z.number().min(0).max(5000),
-  speedMps: z.preprocess(emptyToUndefined, z.number().min(0).max(120).optional()),
+  accuracyMeters: z.number().min(0).max(100),
+  speedMps: z.preprocess(emptyToUndefined, z.number().min(0).max(41.67).optional()),
   heading: z.preprocess(emptyToUndefined, z.number().min(0).max(360).optional()),
   recordedAt: z.string().datetime(),
 });
@@ -386,7 +386,7 @@ export const driverLocationSampleSchema = z.object({
 export const driverRunOptimizeSchema = z.object({
   lat: z.number().min(-90).max(90),
   lng: z.number().min(-180).max(180),
-  accuracyMeters: z.number().min(0).max(5000),
+  accuracyMeters: z.number().min(0).max(100),
   recordedAt: z.string().datetime(),
   navigationProvider: z.enum(["WAZE", "GOOGLE_MAPS"]).optional().default("WAZE"),
 });
@@ -394,7 +394,7 @@ export const driverRunOptimizeSchema = z.object({
 export const driverStopArriveSchema = z.object({
   lat: z.number().min(-90).max(90),
   lng: z.number().min(-180).max(180),
-  accuracyMeters: z.number().min(0).max(5000),
+  accuracyMeters: z.number().min(0).max(100),
   recordedAt: z.string().datetime(),
 });
 
@@ -407,8 +407,8 @@ export const driverRunStartSchema = z
   .object({
     lat: z.preprocess(emptyToUndefined, z.number().min(-90).max(90).optional()),
     lng: z.preprocess(emptyToUndefined, z.number().min(-180).max(180).optional()),
-    accuracyMeters: z.preprocess(emptyToUndefined, z.number().min(0).max(5000).optional()),
-    speedMps: z.preprocess(emptyToUndefined, z.number().min(0).max(120).optional()),
+    accuracyMeters: z.preprocess(emptyToUndefined, z.number().min(0).max(100).optional()),
+    speedMps: z.preprocess(emptyToUndefined, z.number().min(0).max(41.67).optional()),
     heading: z.preprocess(emptyToUndefined, z.number().min(0).max(360).optional()),
     recordedAt: z.preprocess(emptyToUndefined, z.string().datetime().optional()),
   })

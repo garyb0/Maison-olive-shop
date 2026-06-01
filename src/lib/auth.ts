@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { randomBytes, createHash } from "crypto";
+import { randomBytes, createHash, createHmac } from "crypto";
 import bcrypt from "bcryptjs";
 import { ADMIN_ACCESS_COOKIE_NAME, createAdminAccessCookieValue } from "@/lib/admin-access-cookie";
 import { DEV_SESSION_SECRET, env } from "@/lib/env";
@@ -76,13 +76,18 @@ const toCurrentUser = (user: SessionUser) => ({
   twoFactorEnabled: Boolean(user.twoFactorEnabled),
 });
 
+export function hashSessionToken(token: string) {
+  return createHmac("sha256", env.sessionSecret).update(token).digest("hex");
+}
+
 async function createSessionForUser(user: Pick<SessionUser, "id" | "role">) {
   const token = randomBytes(32).toString("hex");
+  const tokenHash = hashSessionToken(token);
   const expiresAt = new Date(Date.now() + env.sessionDurationDays * 24 * 60 * 60 * 1000);
 
   await prisma.session.create({
     data: {
-      token,
+      tokenHash,
       userId: user.id,
       expiresAt,
     },
@@ -138,9 +143,10 @@ async function getCurrentSessionWithUser() {
   const cookieStore = await cookies();
   const token = cookieStore.get(env.sessionCookieName)?.value;
   if (!token) return null;
+  const tokenHash = hashSessionToken(token);
 
   const session = await prisma.session.findUnique({
-    where: { token },
+    where: { tokenHash },
     include: { user: true },
   });
 
@@ -445,6 +451,7 @@ export async function changePasswordForCurrentUser(currentPassword: string, newP
   const cookieStore = await cookies();
   const token = cookieStore.get(env.sessionCookieName)?.value;
   if (!token) throw new Error("UNAUTHORIZED");
+  const tokenHash = hashSessionToken(token);
 
   const currentPasswordOk = await verifyPassword(currentPassword, session.user.passwordHash);
   if (!currentPasswordOk) {
@@ -466,7 +473,7 @@ export async function changePasswordForCurrentUser(currentPassword: string, newP
     prisma.session.deleteMany({
       where: {
         userId: session.userId,
-        token: { not: token },
+        tokenHash: { not: tokenHash },
       },
     }),
     prisma.auditLog.create({
@@ -487,12 +494,13 @@ export async function revokeOtherSessionsForCurrentUser() {
   const cookieStore = await cookies();
   const token = cookieStore.get(env.sessionCookieName)?.value;
   if (!token) throw new Error("UNAUTHORIZED");
+  const tokenHash = hashSessionToken(token);
 
   const result = await prisma.$transaction(async (tx) => {
     const deleted = await tx.session.deleteMany({
       where: {
         userId: session.userId,
-        token: { not: token },
+        tokenHash: { not: tokenHash },
       },
     });
 
@@ -517,7 +525,7 @@ export async function logoutUser() {
   const token = cookieStore.get(env.sessionCookieName)?.value;
 
   if (token) {
-    await prisma.session.deleteMany({ where: { token } });
+    await prisma.session.deleteMany({ where: { tokenHash: hashSessionToken(token) } });
   }
 
   cookieStore.delete(env.sessionCookieName);

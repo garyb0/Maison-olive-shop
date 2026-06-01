@@ -95,12 +95,73 @@ function hashDeliveryRunToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
 }
 
+export function getDeliveryRunTokenRateLimitIdentity(token: string) {
+  return `driver-token:${hashDeliveryRunToken(token)}`;
+}
+
 function buildDriverRunUrl(token: string) {
   return `${env.siteUrl}/driver/run/${token}`;
 }
 
 function isDeliveryRunsDisabledError(error: unknown) {
   return error instanceof Error && error.message === "DELIVERY_RUNS_DISABLED";
+}
+
+const MAX_DRIVER_GPS_AGE_MS = 5 * 60 * 1000;
+const MAX_DRIVER_GPS_FUTURE_MS = 60 * 1000;
+const MAX_DRIVER_GPS_ACCURACY_METERS = 100;
+const MAX_DRIVER_GPS_SPEED_KMH = 150;
+
+function distanceMeters(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
+  const toRad = (value: number) => (value * Math.PI) / 180;
+  const earthRadiusMeters = 6_371_000;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 2 * earthRadiusMeters * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+export function assertDriverGpsSample(input: {
+  lat: number;
+  lng: number;
+  accuracyMeters: number;
+  speedMps?: number;
+  recordedAt: Date;
+}, lastSample?: { recordedAt: Date; lat: number; lng: number } | null) {
+  const recordedTime = input.recordedAt.getTime();
+  if (Number.isNaN(recordedTime)) {
+    throw new Error("DELIVERY_GPS_SAMPLE_INVALID");
+  }
+
+  const now = Date.now();
+  if (recordedTime < now - MAX_DRIVER_GPS_AGE_MS) {
+    throw new Error("DELIVERY_GPS_SAMPLE_STALE");
+  }
+  if (recordedTime > now + MAX_DRIVER_GPS_FUTURE_MS) {
+    throw new Error("DELIVERY_GPS_SAMPLE_FUTURE");
+  }
+  if (input.accuracyMeters > MAX_DRIVER_GPS_ACCURACY_METERS) {
+    throw new Error("DELIVERY_GPS_SAMPLE_INACCURATE");
+  }
+  if (input.speedMps !== undefined && input.speedMps * 3.6 > MAX_DRIVER_GPS_SPEED_KMH) {
+    throw new Error("DELIVERY_GPS_SAMPLE_TOO_FAST");
+  }
+
+  if (!lastSample) return;
+
+  const deltaSeconds = (recordedTime - lastSample.recordedAt.getTime()) / 1000;
+  if (deltaSeconds <= 0) {
+    throw new Error("DELIVERY_GPS_SAMPLE_NON_MONOTONIC");
+  }
+
+  const kmh = (distanceMeters(lastSample, input) / deltaSeconds) * 3.6;
+  if (kmh > MAX_DRIVER_GPS_SPEED_KMH) {
+    throw new Error("DELIVERY_GPS_SAMPLE_TOO_FAST");
+  }
 }
 
 export function isDeliveryRunsEnabled() {
@@ -1329,6 +1390,16 @@ export async function startDriverRun(token: string, input?: DeliveryRunStartLoca
       ? new Date(input.recordedAt)
       : new Date();
 
+  if (hasOriginOverride) {
+    assertDriverGpsSample({
+      lat: input!.lat!,
+      lng: input!.lng!,
+      accuracyMeters: input?.accuracyMeters ?? 25,
+      speedMps: input?.speedMps,
+      recordedAt,
+    });
+  }
+
   const updated = await prisma.$transaction(async (tx) => {
     await tx.order.updateMany({
       where: {
@@ -1433,6 +1504,18 @@ export async function optimizeDriverRunFromCurrentPosition(token: string, input:
   if (Number.isNaN(recordedAt.getTime())) {
     throw new Error("DELIVERY_GPS_SAMPLE_INVALID");
   }
+
+  const lastSample = await prisma.deliveryGpsSample.findFirst({
+    where: { runId: access.run.id },
+    orderBy: [{ recordedAt: "desc" }],
+    select: { recordedAt: true, lat: true, lng: true },
+  });
+  assertDriverGpsSample({
+    lat: input.lat,
+    lng: input.lng,
+    accuracyMeters: input.accuracyMeters,
+    recordedAt,
+  }, lastSample);
 
   let warning: string | null = null;
   let plannedRoute: Awaited<ReturnType<typeof planOrderedStops>> | null = null;
@@ -1545,6 +1628,18 @@ export async function arriveDriverStop(token: string, input: DriverStopArriveInp
     throw new Error("DELIVERY_GPS_SAMPLE_INVALID");
   }
 
+  const lastSample = await prisma.deliveryGpsSample.findFirst({
+    where: { runId: access.run.id },
+    orderBy: [{ recordedAt: "desc" }],
+    select: { recordedAt: true, lat: true, lng: true },
+  });
+  assertDriverGpsSample({
+    lat: input.lat,
+    lng: input.lng,
+    accuracyMeters: input.accuracyMeters,
+    recordedAt,
+  }, lastSample);
+
   const stopPoint = await resolveStopPoint(stop);
   const arrivedDistanceMeters = stopPoint
     ? distanceMetersBetween({ lat: input.lat, lng: input.lng }, stopPoint)
@@ -1619,6 +1714,14 @@ export async function uploadDriverStopProof(token: string, input: DriverStopProo
     input.recordedAt && !Number.isNaN(new Date(input.recordedAt).getTime())
       ? new Date(input.recordedAt)
       : new Date();
+  if (input.lat !== undefined && input.lng !== undefined && input.accuracyMeters !== undefined) {
+    assertDriverGpsSample({
+      lat: input.lat,
+      lng: input.lng,
+      accuracyMeters: input.accuracyMeters,
+      recordedAt: uploadedAt,
+    });
+  }
   const fileName = buildDeliveryProofFileName({
     runId: access.run.id,
     stopId: input.stopId,
@@ -1744,6 +1847,13 @@ export async function recordDriverRunLocation(
     where: { runId: access.run.id },
     orderBy: [{ recordedAt: "desc" }],
   });
+  assertDriverGpsSample({
+    lat: input.lat,
+    lng: input.lng,
+    accuracyMeters: input.accuracyMeters,
+    speedMps: input.speedMps,
+    recordedAt,
+  }, lastSample);
 
   const resolution = resolveDeliveryRunKm({
     samples: [
@@ -1908,6 +2018,13 @@ export async function finishDriverRun(
   await ensureDeliveryRunsEnabledForMutation();
   const access = await getRunByToken(token);
 
+  if (access.run.status !== "IN_PROGRESS") {
+    throw new Error("DELIVERY_RUN_NOT_IN_PROGRESS");
+  }
+  if (access.run.stops.some((stop) => stop.status === "PENDING")) {
+    throw new Error("DELIVERY_RUN_HAS_PENDING_STOPS");
+  }
+
   const samples = await loadRunSamples(access.run.id);
   const km = resolveDeliveryRunKm({
     samples,
@@ -2060,8 +2177,17 @@ export function mapDeliveryRunError(error: unknown) {
         return { message: "The delivery run has not started yet.", status: 409 };
       case "DELIVERY_RUN_NO_PENDING_STOPS":
         return { message: "There are no pending stops to optimize.", status: 409 };
+      case "DELIVERY_RUN_HAS_PENDING_STOPS":
+        return { message: "All stops must be completed before finishing this run.", status: 409 };
       case "DELIVERY_GPS_TRACKING_DISABLED":
         return { message: "GPS tracking is disabled for this environment.", status: 409 };
+      case "DELIVERY_GPS_SAMPLE_INVALID":
+      case "DELIVERY_GPS_SAMPLE_STALE":
+      case "DELIVERY_GPS_SAMPLE_FUTURE":
+      case "DELIVERY_GPS_SAMPLE_INACCURATE":
+      case "DELIVERY_GPS_SAMPLE_NON_MONOTONIC":
+      case "DELIVERY_GPS_SAMPLE_TOO_FAST":
+        return { message: "Invalid driver GPS sample.", status: 400 };
       case "DELIVERY_RUN_ALREADY_FINISHED":
         return { message: "This delivery run is already completed or cancelled.", status: 409 };
       case "DELIVERY_STOP_ALREADY_COMPLETED":

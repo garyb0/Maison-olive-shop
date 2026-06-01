@@ -198,6 +198,7 @@ async function main() {
 
   const steps: Array<{ name: string; command: string; args: string[]; env?: Record<string, string> }> = [
     { name: "release audit", command: commandName("npm"), args: ["run", "release:audit"] },
+    { name: "security audit", command: commandName("npm"), args: ["run", "security:audit"] },
     { name: "typescript", command: commandName("npx"), args: ["tsc", "--noEmit"] },
     { name: "auth module", command: commandName("npm"), args: ["run", "test:module:auth"] },
     { name: "dogs module", command: commandName("npm"), args: ["run", "test:module:dogs"] },
