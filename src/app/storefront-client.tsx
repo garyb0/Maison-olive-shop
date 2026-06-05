@@ -9,7 +9,7 @@ import { GoogleAuthButton } from "@/components/GoogleAuthButton";
 import { Navigation } from "@/components/Navigation";
 import { ProductFavoriteButton } from "@/components/ProductFavoriteButton";
 import { ProductShareButton } from "@/components/ProductShareButton";
-import type { PublicProductVariant } from "@/lib/product-variants";
+import { sumActiveVariantStock, type PublicProductVariant } from "@/lib/product-variants";
 
 type ProductCard = {
   id: string;
@@ -119,6 +119,32 @@ const FALLBACK_CATEGORY_SHORTCUTS = [
 function getLocalizedCategoryLabel(category: string, language: Language): string {
   const normalized = category.trim().toLowerCase();
   return CATEGORY_LABELS[normalized]?.[language] ?? category;
+}
+
+function getCatalogProductBenefitLabels(product: ProductCard, language: Language) {
+  const variantCount = product.variants?.length ?? 0;
+  const displayStock = getCatalogDisplayStock(product);
+  const selectionLabel = variantCount > 0
+    ? language === "fr"
+      ? `${variantCount} couleur${variantCount > 1 ? "s" : ""}`
+      : `${variantCount} color${variantCount > 1 ? "s" : ""}`
+    : displayStock > 0
+      ? language === "fr"
+        ? "Stock disponible"
+        : "Available stock"
+      : language === "fr"
+        ? "Stock à venir"
+        : "Stock returning";
+
+  return [
+    selectionLabel,
+    language === "fr" ? "Livraison Rimouski" : "Rimouski delivery",
+    language === "fr" ? "Paiement sécurisé" : "Secure payment",
+  ];
+}
+
+function getCatalogDisplayStock(product: ProductCard) {
+  return (product.variants?.length ?? 0) > 0 ? sumActiveVariantStock(product.variants) : product.stock;
 }
 
 export function StorefrontClient({
@@ -265,7 +291,7 @@ export function StorefrontClient({
   ], [language]);
 
   const featuredProducts = useMemo(
-    () => products.filter((product) => product.stock > 0).slice(0, 4),
+    () => products.filter((product) => getCatalogDisplayStock(product) > 0).slice(0, 4),
     [products],
   );
 
@@ -355,7 +381,7 @@ export function StorefrontClient({
       result = result.filter((p) => p.subcategorySlug === subcategoryFilter);
     }
 
-    const stockRank = (product: ProductCard) => (product.stock > 0 ? 0 : 1);
+    const stockRank = (product: ProductCard) => (getCatalogDisplayStock(product) > 0 ? 0 : 1);
     const stockFirst = (left: ProductCard, right: ProductCard) => stockRank(left) - stockRank(right);
 
     if (sortBy === "price-asc") result.sort((a, b) => stockFirst(a, b) || a.priceCents - b.priceCents);
@@ -365,6 +391,8 @@ export function StorefrontClient({
 
     return result;
   }, [products, search, categoryFilter, subcategoryFilter, sortBy, language]);
+  const smallCatalogMode = isShopSurface && products.length > 0 && products.length <= 2;
+  const singleProductMode = isShopSurface && products.length === 1;
 
   const addToCart = (product: ProductCard, x: number, y: number) => {
     if ((product.variants?.length ?? 0) > 0) return;
@@ -954,7 +982,10 @@ export function StorefrontClient({
 
         {/* ── Catalogue ── */}
         {isShopSurface ? (
-        <section className="section catalog-section" id="catalogue">
+        <section
+          className={`section catalog-section${smallCatalogMode ? " catalog-section--spotlight" : ""}${singleProductMode ? " catalog-section--single" : ""}`}
+          id="catalogue"
+        >
           {/* Titre + toolbar */}
           <div className="catalog-header">
             <div>
@@ -1006,8 +1037,22 @@ export function StorefrontClient({
             </select>
           </div>
 
-          <div className="catalog-market-layout">
-            {categories.length > 0 && (
+          {smallCatalogMode ? (
+            <div className="catalog-spotlight-intro">
+              <p className="home-eyebrow">
+                {language === "fr" ? "Sélection disponible" : "Available selection"}
+              </p>
+              <h2>{language === "fr" ? "Disponible maintenant" : "Available now"}</h2>
+              <p>
+                {language === "fr"
+                  ? "Confort choisi pour les routines locales, avec stock clair et livraison à Rimouski."
+                  : "Comfort selected for local routines, with clear stock and Rimouski delivery."}
+              </p>
+            </div>
+          ) : null}
+
+          <div className={`catalog-market-layout${smallCatalogMode ? " catalog-market-layout--spotlight" : ""}`}>
+            {categories.length > 0 && !smallCatalogMode && (
               <aside className="catalog-side-panel" aria-label={language === "fr" ? "Catégories du catalogue" : "Catalog categories"}>
                 <h3>{language === "fr" ? "Toutes les catégories" : "All categories"}</h3>
                 <button
@@ -1057,7 +1102,7 @@ export function StorefrontClient({
               </aside>
             )}
 
-            <div className="catalog-products-panel">
+            <div className={`catalog-products-panel${smallCatalogMode ? " catalog-products-panel--spotlight" : ""}`}>
           {/* Filtres par catégorie */}
           {categories.length > 0 && (
             <div className="catalog-categories" role="group" aria-label={language === "fr" ? "Filtrer par catégorie" : "Filter by category"}>
@@ -1123,10 +1168,10 @@ export function StorefrontClient({
 
           {/* Grille produits */}
           {filteredProducts.length > 0 ? (
-            <div className="grid-products">
+            <div className={`grid-products${smallCatalogMode ? " grid-products--spotlight" : ""}`}>
               {filteredProducts.map((product) => (
                 <article
-                  className={`catalog-product-card${addingId === product.id ? " catalog-product-card--adding" : ""}${product.stock === 0 ? " catalog-product-card--out" : ""}`}
+                  className={`catalog-product-card${smallCatalogMode ? " catalog-product-card--spotlight" : ""}${addingId === product.id ? " catalog-product-card--adding" : ""}${getCatalogDisplayStock(product) === 0 ? " catalog-product-card--out" : ""}`}
                   key={product.id}
                 >
                   {/* Visuel — image ou emoji de catégorie */}
@@ -1159,15 +1204,15 @@ export function StorefrontClient({
 
                   {/* Badges : catégorie + stock */}
                   <div className="catalog-product-meta">
-                    {product.stock === 0 ? (
+                    {getCatalogDisplayStock(product) === 0 ? (
                       <span className="catalog-stock-pill catalog-stock-pill--out">
                         {language === "fr" ? "Rupture" : "Out of stock"}
                       </span>
-                    ) : product.stock <= 3 ? (
+                    ) : getCatalogDisplayStock(product) <= 3 ? (
                       <span className="catalog-stock-pill catalog-stock-pill--low">
                         {language === "fr"
-                          ? `${product.stock} restant${product.stock > 1 ? "s" : ""}`
-                          : `${product.stock} left`}
+                          ? `${getCatalogDisplayStock(product)} restant${getCatalogDisplayStock(product) > 1 ? "s" : ""}`
+                          : `${getCatalogDisplayStock(product)} left`}
                       </span>
                     ) : (
                       <span className="catalog-stock-pill catalog-stock-pill--in">
@@ -1181,9 +1226,9 @@ export function StorefrontClient({
                       {product.name}
                     </Link>
                     <p className="catalog-product-seller">Chez Olive &middot; Rimouski</p>
-                    <p className="catalog-product-rating" aria-label={language === "fr" ? "Note cinq etoiles" : "Five star rating"}>
-                      <span aria-hidden="true">★★★★★</span>
-                    </p>
+                    {smallCatalogMode ? (
+                      <p className="catalog-product-description">{product.description}</p>
+                    ) : null}
                     {(product.variants?.length ?? 0) > 0 ? (
                       <div className="catalog-variant-swatches" aria-label={language === "fr" ? "Couleurs disponibles" : "Available colors"}>
                         {product.variants?.slice(0, 8).map((variant) => (
@@ -1199,15 +1244,16 @@ export function StorefrontClient({
                         ) : null}
                       </div>
                     ) : null}
-                    <p className="catalog-product-fast-note">
-                      {product.stock > 0
-                        ? language === "fr"
-                          ? "Livraison locale et suivi humain."
-                          : "Local delivery and human follow-up."
-                        : language === "fr"
-                          ? "Visible pour consultation; achat bloqué tant que le stock revient."
-                          : "Visible for reference; purchase is blocked until stock returns."}
-                    </p>
+                    {smallCatalogMode ? (
+                      <div
+                        className="catalog-product-benefits"
+                        aria-label={language === "fr" ? "Points forts du produit" : "Product highlights"}
+                      >
+                        {getCatalogProductBenefitLabels(product, language).map((label) => (
+                          <span key={label}>{label}</span>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
 
                   {/* Ajout au panier */}
@@ -1216,7 +1262,13 @@ export function StorefrontClient({
                     <div className="catalog-product-actions">
                       {(product.variants?.length ?? 0) > 0 ? (
                         <Link className="catalog-product-add" href={`/products/${product.slug}`}>
-                          {language === "fr" ? "Voir les couleurs" : "View colors"}
+                          {smallCatalogMode
+                            ? language === "fr"
+                              ? "Choisir la couleur"
+                              : "Choose color"
+                            : language === "fr"
+                              ? "Voir les couleurs"
+                              : "View colors"}
                         </Link>
                       ) : (
                       <>

@@ -81,7 +81,7 @@ test.describe("solid mobile release recipe", () => {
   test("public, app, account and admin surfaces are mobile-stable", async ({ page }, testInfo) => {
     const routes = [
       { path: "/?home=1", name: "01-home", heading: /Boutique locale, achat direct/i, tapTarget: ".home-hero-primary" },
-      { path: "/boutique", name: "02-boutique", heading: /Catalogue|Catalog/i, tapTarget: ".catalog-side-link" },
+      { path: "/boutique", name: "02-boutique", heading: /Catalogue|Catalog/i, tapTarget: ".catalog-side-link, .catalog-cat-pill" },
       { path: "/faq", name: "03-faq", heading: /Comment peut-on|How can we help/i, tapTarget: ".help-anchor-nav a" },
       {
         path: "/cart",
@@ -176,18 +176,24 @@ test.describe("solid mobile release recipe", () => {
 
     const cards = page.locator(".catalog-product-card");
     const cardCount = await cards.count();
-    test.skip(cardCount < 2, "Native boutique density needs at least two products in the catalog.");
+    expect(cardCount, "native boutique should render at least one product card").toBeGreaterThan(0);
 
     const firstCard = cards.nth(0);
-    const secondCard = cards.nth(1);
     await expect(firstCard).toBeVisible();
-    await expect(secondCard).toBeVisible();
 
-    const [firstBox, secondBox] = await Promise.all([firstCard.boundingBox(), secondCard.boundingBox()]);
-    expect(firstBox, "first product card box").not.toBeNull();
-    expect(secondBox, "second product card box").not.toBeNull();
-    expect(Math.abs(firstBox!.y - secondBox!.y), "first two products should share the same row").toBeLessThanOrEqual(4);
-    expect(secondBox!.x, "second product should sit in the second column").toBeGreaterThan(firstBox!.x + firstBox!.width * 0.75);
+    if (cardCount === 1) {
+      await expect(page.locator(".catalog-section--single")).toBeVisible();
+      await expect(firstCard.locator(".catalog-product-description")).toBeVisible();
+    } else {
+      const secondCard = cards.nth(1);
+      await expect(secondCard).toBeVisible();
+
+      const [firstBox, secondBox] = await Promise.all([firstCard.boundingBox(), secondCard.boundingBox()]);
+      expect(firstBox, "first product card box").not.toBeNull();
+      expect(secondBox, "second product card box").not.toBeNull();
+      expect(Math.abs(firstBox!.y - secondBox!.y), "first two products should share the same row").toBeLessThanOrEqual(4);
+      expect(secondBox!.x, "second product should sit in the second column").toBeGreaterThan(firstBox!.x + firstBox!.width * 0.75);
+    }
 
     await expect(firstCard.locator(".catalog-stock-pill")).toBeVisible();
     await expect(firstCard.locator(".catalog-product-price")).toBeVisible();

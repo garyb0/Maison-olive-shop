@@ -6,6 +6,7 @@ import { getAdminOrders, getAdminCustomers, getAdminProductInventoryMetrics, get
 import { formatCurrency } from "@/lib/format";
 import { getMaintenanceState } from "@/lib/maintenance";
 import { getOwnerTodaySnapshot } from "@/lib/owner-dashboard";
+import { isSmokeProductSku } from "@/lib/product-sku";
 import { AdminDashboardClient } from "./admin-dashboard-client";
 
 const orderStatusLabel = (status: string, language: "fr" | "en") => {
@@ -97,7 +98,8 @@ export default async function AdminDashboardPage() {
     getOwnerTodaySnapshot(),
   ]);
 
-  const activeProducts = products.filter((product) => product.isActive).length;
+  const dashboardProducts = products.filter((product) => !isSmokeProductSku(product.sku));
+  const activeProducts = dashboardProducts.filter((product) => product.isActive).length;
   const pendingOrders = orders.filter((order) => order.status === "PENDING").length;
   const locale = language === "fr" ? "fr-CA" : "en-CA";
   const formatShortDateTime = (date: Date) =>
@@ -138,7 +140,7 @@ export default async function AdminDashboardPage() {
       initialMaintenanceEnabled={maintenanceState.enabled}
       initialMaintenanceOpenAt={maintenanceState.openAt ? maintenanceState.openAt.toISOString() : null}
       stats={{
-        totalProducts: products.length,
+        totalProducts: dashboardProducts.length,
         activeProducts,
         totalOrders: orders.length,
         pendingOrders,

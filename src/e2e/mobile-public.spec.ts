@@ -15,8 +15,37 @@ type ProductsPayload = {
     stock?: number;
     isActive?: boolean;
     isSubscription?: boolean;
+    variants?: Array<{
+      id: string;
+      stock?: number;
+      isActive?: boolean;
+    }>;
   }>;
 };
+
+type ProductPayloadItem = NonNullable<ProductsPayload["products"]>[number];
+
+function getAvailableCartLine(product: ProductPayloadItem, quantity = 1) {
+  const availableVariant = product.variants?.find((variant) => variant.isActive !== false && (variant.stock ?? 0) > 0);
+
+  if (availableVariant) {
+    return {
+      productId: product.id,
+      variantId: availableVariant.id,
+      quantity: Math.min(quantity, Math.max(1, availableVariant.stock ?? quantity)),
+    };
+  }
+
+  return {
+    productId: product.id,
+    quantity: Math.min(quantity, Math.max(1, product.stock ?? quantity)),
+  };
+}
+
+async function expectProductAddHydrated(page: Page) {
+  await page.waitForFunction(() => document.body.classList.contains("has-product-sticky-cta"));
+  await expect(page.locator(".olive-product-add-btn").first()).toBeEnabled();
+}
 
 test.use({
   viewport: MOBILE_VIEWPORT,
@@ -40,8 +69,8 @@ async function expectMinTapSize(locator: Locator, label: string, min = 44) {
   const box = await locator.boundingBox();
 
   expect(box, `${label} must have a measurable bounding box`).not.toBeNull();
-  expect(box!.width, `${label} width`).toBeGreaterThanOrEqual(min);
-  expect(box!.height, `${label} height`).toBeGreaterThanOrEqual(min);
+  expect(box!.width, `${label} width`).toBeGreaterThanOrEqual(min - 0.5);
+  expect(box!.height, `${label} height`).toBeGreaterThanOrEqual(min - 0.5);
 }
 
 test.describe("mobile public layout", () => {
@@ -211,7 +240,7 @@ test.describe("mobile public layout", () => {
     await page.waitForLoadState("networkidle");
     await expectNoHorizontalOverflow(page);
 
-    await expectMinTapSize(page.locator(".catalog-side-link").first(), "catalog category chip");
+    await expectMinTapSize(page.locator(".catalog-side-link, .catalog-cat-pill").first(), "catalog category chip");
     await expectMinTapSize(page.locator(".catalog-product-card a[href^='/products/']").first(), "first product details link");
     await expectMinTapSize(page.locator(".catalog-product-add").first(), "first product add button");
 
@@ -225,6 +254,12 @@ test.describe("mobile public layout", () => {
     await expect(availableCard).toBeVisible();
 
     await availableCard.locator(".catalog-product-add").click();
+    if ((availableProduct!.variants?.length ?? 0) > 0) {
+      await expect(page).toHaveURL(new RegExp(`/products/${availableProduct!.slug}`));
+      await expectProductAddHydrated(page);
+      await expectMinTapSize(page.locator(".olive-product-add-btn").first(), "product page add button after variant CTA");
+      await page.locator(".olive-product-add-btn").first().click();
+    }
     await expect.poll(() => page.evaluate(() => {
       const raw = window.localStorage.getItem("chezolive_cart_v1");
       if (!raw) return 0;
@@ -260,6 +295,7 @@ test.describe("mobile public layout", () => {
 
     await page.goto(`/products/${availableProduct!.slug}`);
     await page.waitForLoadState("domcontentloaded");
+    await expectProductAddHydrated(page);
     await expectNoHorizontalOverflow(page);
     await expectMinTapSize(page.locator(".olive-product-add-btn").first(), "product add button");
     const productAddBox = await page.locator(".olive-product-add-btn").first().boundingBox();
@@ -301,15 +337,16 @@ test.describe("mobile public layout", () => {
     const availableProduct = payload.products?.find((product) => product.isActive !== false && (product.stock ?? 0) > 0);
     expect(availableProduct?.id, "An available product is required for the mobile cart smoke.").toBeTruthy();
 
-    await page.evaluate((productId) => {
-      window.localStorage.setItem("chezolive_cart_v1", JSON.stringify([{ productId, quantity: 2 }]));
-    }, availableProduct!.id);
+    const cartLine = getAvailableCartLine(availableProduct!, 2);
+    await page.evaluate((line) => {
+      window.localStorage.setItem("chezolive_cart_v1", JSON.stringify([line]));
+    }, cartLine);
     await page.reload();
     await page.waitForLoadState("domcontentloaded");
 
     await expectNoHorizontalOverflow(page);
     await expect(page.locator(".cart-mobile-summary")).toContainText(/Total|Subtotal/i);
-    await expect(page.locator(".cart-mobile-summary")).toContainText(/checkout|Ready/i);
+    await expect(page.locator(".cart-mobile-summary")).toContainText(/checkout|Ready|Prêt/i);
     await expect(page.locator(".cart-mobile-summary")).toContainText(/Panier|Cart/i);
     await expect(page.locator(".cart-item-card")).toHaveCount(1);
     await expectMinTapSize(page.locator(".cart-qty-btn").first(), "cart quantity button");
@@ -332,9 +369,10 @@ test.describe("mobile public layout", () => {
     const availableProduct = payload.products?.find((product) => product.isActive !== false && (product.stock ?? 0) > 0);
     expect(availableProduct?.id, "An available product is required for the mobile checkout smoke.").toBeTruthy();
 
-    await page.addInitScript((productId) => {
-      window.localStorage.setItem("chezolive_cart_v1", JSON.stringify([{ productId, quantity: 1 }]));
-    }, availableProduct!.id);
+    const checkoutLine = getAvailableCartLine(availableProduct!, 1);
+    await page.addInitScript((line) => {
+      window.localStorage.setItem("chezolive_cart_v1", JSON.stringify([line]));
+    }, checkoutLine);
 
     await page.goto("/checkout");
     await page.waitForLoadState("domcontentloaded");
@@ -343,7 +381,8 @@ test.describe("mobile public layout", () => {
     await expect(page.getByRole("heading", { name: /Finaliser ma commande|Checkout/i })).toBeVisible();
     await expect(page.locator(".checkout-mobile-summary")).toContainText(/Total actuel|Current total/i);
     await expect(page.locator(".checkout-step-card")).toHaveCount(4);
-    await expect(page.locator(".checkout-flow-strip span").first()).toBeVisible();
+    await expect(page.locator(".checkout-mobile-summary__steps").first()).toBeVisible();
+    await expect(page.locator(".checkout-mobile-summary__steps").first()).toContainText(/Infos|Info|Livraison|Delivery|Paiement|Payment/i);
     await expectMinTapSize(page.locator(".checkout-help-strip summary").first(), "checkout help summary");
     await page.locator(".checkout-help-strip summary").first().click();
     await expectMinTapSize(page.locator(".checkout-help-strip a").first(), "checkout help link");

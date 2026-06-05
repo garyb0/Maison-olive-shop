@@ -188,8 +188,9 @@ describe("public cart and checkout flow", () => {
 
     expect(screen.getByRole("heading", { level: 1, name: "Catalogue" })).toBeInTheDocument();
     await waitFor(() => expect(trackConversionEventMock).toHaveBeenCalledWith("SHOP_VIEW", { language: "fr" }));
-    expect(screen.getByText("Livraison locale et suivi humain.")).toBeInTheDocument();
-    expect(screen.getByText("Visible pour consultation; achat bloqué tant que le stock revient.")).toBeInTheDocument();
+    expect(document.querySelector(".catalog-section--spotlight")).toBeInTheDocument();
+    expect(screen.getAllByText("Livraison Rimouski").length).toBeGreaterThan(0);
+    expect(screen.queryByLabelText("Note cinq etoiles")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Indisponible" })).toBeDisabled();
     expect(screen.getAllByRole("button", { name: "Partager" })).toHaveLength(2);
     expect(screen.getAllByText("Abonnement")).toHaveLength(1);
@@ -210,6 +211,112 @@ describe("public cart and checkout flow", () => {
         language: "fr",
       }),
     );
+  });
+
+  it("affiche une vitrine compacte quand la boutique contient un seul produit", () => {
+    render(
+      <StorefrontClient
+        surface="shop"
+        language="fr"
+        t={getDictionary("fr")}
+        user={null}
+        products={[
+          {
+            id: "prod_featured",
+            slug: "lit-chien-tres-grand-37x30",
+            name: "Lit pour chien douillet",
+            description: "Lit confortable avec plusieurs couleurs disponibles.",
+            category: "Literie",
+            subcategorySlug: "lits",
+            subcategoryLabel: "Lits",
+            priceLabel: "50,00 $",
+            priceCents: 5000,
+            stock: 36,
+            imageUrl: null,
+            variants: [
+              {
+                id: "variant_cyan",
+                slug: "cyan",
+                colorNameFr: "Cyan",
+                colorNameEn: "Cyan",
+                colorHex: "#10aabd",
+                sizeNameFr: "Très grand",
+                sizeNameEn: "Very large",
+                sizeCode: "37x30",
+                sizeSortOrder: 1,
+                imageUrl: null,
+                stock: 10,
+                priceCents: null,
+                isActive: true,
+                sortOrder: 1,
+              },
+            ],
+          },
+        ]}
+      />,
+    );
+
+    expect(document.querySelector(".catalog-section--single")).toBeInTheDocument();
+    expect(document.querySelector(".catalog-side-panel")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "Disponible maintenant" })).toBeInTheDocument();
+    expect(screen.getByText("Lit pour chien douillet")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Choisir la couleur" })).toHaveAttribute("href", "/products/lit-chien-tres-grand-37x30");
+  });
+
+  it("garde le layout catalogue complet quand plusieurs produits sont visibles", () => {
+    render(
+      <StorefrontClient
+        surface="shop"
+        language="fr"
+        t={getDictionary("fr")}
+        user={null}
+        products={[
+          {
+            id: "prod_harness",
+            slug: "harnais-confort-olive",
+            name: "Harnais Confort Olive",
+            description: "Harnais confortable.",
+            category: "Accessoires",
+            subcategorySlug: "harnais",
+            subcategoryLabel: "Harnais",
+            priceLabel: "32,99 $",
+            priceCents: 3299,
+            stock: 6,
+            imageUrl: null,
+          },
+          {
+            id: "prod_bowl",
+            slug: "gamelle-olive",
+            name: "Gamelle Olive",
+            description: "Bol pratique.",
+            category: "Accessoires",
+            subcategorySlug: "gamelles",
+            subcategoryLabel: "Gamelles",
+            priceLabel: "18,99 $",
+            priceCents: 1899,
+            stock: 4,
+            imageUrl: null,
+          },
+          {
+            id: "prod_shampoo",
+            slug: "shampoing-peau-sensible",
+            name: "Shampoing Peau Sensible",
+            description: "Soin doux.",
+            category: "Hygiène",
+            subcategorySlug: "shampoings",
+            subcategoryLabel: "Shampoings",
+            priceLabel: "18,99 $",
+            priceCents: 1899,
+            stock: 10,
+            imageUrl: null,
+          },
+        ]}
+      />,
+    );
+
+    expect(document.querySelector(".catalog-section--spotlight")).not.toBeInTheDocument();
+    expect(document.querySelector(".catalog-side-panel")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Tout le catalogue" })).toBeInTheDocument();
   });
 
   it("filtre la boutique par sous-categorie guidee", () => {

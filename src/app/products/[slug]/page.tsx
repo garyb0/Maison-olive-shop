@@ -256,7 +256,7 @@ export default async function ProductDetailsPage({ params, searchParams }: Produ
             <div className="olive-product-purchase-head">
               <p className="home-eyebrow">{language === "fr" ? "Achat rapide" : "Quick purchase"}</p>
               <strong>{priceLabel}</strong>
-              <span className={product.stock > 0 ? "olive-stock-pill olive-stock-pill--ok" : "olive-stock-pill olive-stock-pill--out"}>
+              <span className={displayStock > 0 ? "olive-stock-pill olive-stock-pill--ok" : "olive-stock-pill olive-stock-pill--out"}>
                 {availabilityLabel}
               </span>
             </div>

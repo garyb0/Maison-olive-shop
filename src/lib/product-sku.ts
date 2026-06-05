@@ -8,3 +8,7 @@ export function toProductSku(value: string) {
     .replace(/-{2,}/g, "-")
     .slice(0, 64);
 }
+
+export function isSmokeProductSku(value: string | null | undefined) {
+  return value?.trim().toUpperCase().startsWith("SMOKE-") ?? false;
+}
