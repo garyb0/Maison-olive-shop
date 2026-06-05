@@ -22415,7 +22415,15 @@ body:has(.account-access-card) .support-lite-window {
 @media (min-width: 900px) {
   body:has(.app-shell--home) > .app-shell--home,
   body:has(.app-shell--shop) > .app-shell--shop,
-  body:has(.olive-product-page) > .app-shell {
+  body:has(.olive-product-page) > .app-shell,
+  body:has(.account-app-shell) > .account-app-shell,
+  body:has(.cart-app-shell) > .cart-app-shell,
+  body:has(.checkout-app-shell) > .checkout-app-shell,
+  body:has(.login-page) > .login-page,
+  body:has(.auth-shell) > .app-shell:not(.pwa-app-shell),
+  body:has(.help-hero) > .app-shell:not(.pwa-app-shell),
+  body:has(.legal-page) > .app-shell:not(.pwa-app-shell),
+  body:has(.checkout-success-shell) > .app-shell:not(.pwa-app-shell) {
     max-width: 1180px;
     padding-top: 0.95rem;
     padding-right: clamp(0.85rem, 2.2vw, 1.6rem);
@@ -22425,9 +22433,59 @@ body:has(.account-access-card) .support-lite-window {
 
   body:has(.app-shell--home) .topbar,
   body:has(.app-shell--shop) .topbar,
-  body:has(.olive-product-page) .topbar {
+  body:has(.olive-product-page) .topbar,
+  body:has(.account-app-shell) .topbar,
+  body:has(.cart-app-shell) .topbar,
+  body:has(.checkout-app-shell) .topbar,
+  body:has(.login-page) .topbar,
+  body:has(.auth-shell) .topbar,
+  body:has(.help-hero) .topbar,
+  body:has(.legal-page) .topbar,
+  body:has(.checkout-success-shell) .topbar {
     margin-bottom: 0.75rem;
     background: var(--background);
+  }
+
+  body:has(.login-page) .nav-marketplace-main,
+  body:has(.auth-shell) .nav-marketplace-main,
+  body:has(.help-hero) .nav-marketplace-main,
+  body:has(.legal-page) .nav-marketplace-main,
+  body:has(.checkout-success-shell) .nav-marketplace-main {
+    border-color: var(--client-border);
+    border-radius: var(--client-radius);
+    background: rgba(255, 255, 255, 0.94);
+    box-shadow: var(--client-shadow-soft);
+  }
+
+  body:has(.account-app-shell) .nav-marketplace-search,
+  body:has(.cart-app-shell) .nav-marketplace-search,
+  body:has(.checkout-app-shell) .nav-marketplace-search,
+  body:has(.login-page) .nav-marketplace-search,
+  body:has(.auth-shell) .nav-marketplace-search,
+  body:has(.help-hero) .nav-marketplace-search,
+  body:has(.legal-page) .nav-marketplace-search,
+  body:has(.checkout-success-shell) .nav-marketplace-search {
+    border-color: var(--client-border);
+    background: #fff;
+  }
+
+  body:has(.account-app-shell) .nav-marketplace-link,
+  body:has(.cart-app-shell) .nav-marketplace-link,
+  body:has(.checkout-app-shell) .nav-marketplace-link,
+  body:has(.login-page) .nav-marketplace-link,
+  body:has(.auth-shell) .nav-marketplace-link,
+  body:has(.help-hero) .nav-marketplace-link,
+  body:has(.legal-page) .nav-marketplace-link,
+  body:has(.checkout-success-shell) .nav-marketplace-link,
+  body:has(.account-app-shell) .nav-marketplace-action,
+  body:has(.cart-app-shell) .nav-marketplace-action,
+  body:has(.checkout-app-shell) .nav-marketplace-action,
+  body:has(.login-page) .nav-marketplace-action,
+  body:has(.auth-shell) .nav-marketplace-action,
+  body:has(.help-hero) .nav-marketplace-action,
+  body:has(.legal-page) .nav-marketplace-action,
+  body:has(.checkout-success-shell) .nav-marketplace-action {
+    border-radius: var(--client-radius-sm);
   }
 
   body:has(.app-shell--shop) .catalog-section,
@@ -22452,21 +22510,45 @@ body:has(.account-access-card) .support-lite-window {
 
   body:has(.app-shell--home) .site-footer-wrap,
   body:has(.app-shell--shop) .site-footer-wrap,
-  body:has(.olive-product-page) .site-footer-wrap {
+  body:has(.olive-product-page) .site-footer-wrap,
+  body:has(.account-app-shell) .site-footer-wrap,
+  body:has(.cart-app-shell) .site-footer-wrap,
+  body:has(.checkout-app-shell) .site-footer-wrap,
+  body:has(.login-page) .site-footer-wrap,
+  body:has(.auth-shell) .site-footer-wrap,
+  body:has(.help-hero) .site-footer-wrap,
+  body:has(.legal-page) .site-footer-wrap,
+  body:has(.checkout-success-shell) .site-footer-wrap {
     margin-top: 0.9rem;
     padding: 0 clamp(0.85rem, 2.2vw, 1.6rem) 1.1rem;
   }
 
   body:has(.app-shell--home) .site-footer-wrap > .app-shell,
   body:has(.app-shell--shop) .site-footer-wrap > .app-shell,
-  body:has(.olive-product-page) .site-footer-wrap > .app-shell {
+  body:has(.olive-product-page) .site-footer-wrap > .app-shell,
+  body:has(.account-app-shell) .site-footer-wrap > .app-shell,
+  body:has(.cart-app-shell) .site-footer-wrap > .app-shell,
+  body:has(.checkout-app-shell) .site-footer-wrap > .app-shell,
+  body:has(.login-page) .site-footer-wrap > .app-shell,
+  body:has(.auth-shell) .site-footer-wrap > .app-shell,
+  body:has(.help-hero) .site-footer-wrap > .app-shell,
+  body:has(.legal-page) .site-footer-wrap > .app-shell,
+  body:has(.checkout-success-shell) .site-footer-wrap > .app-shell {
     max-width: 1180px;
     padding: 0;
   }
 
   body:has(.app-shell--home) .site-footer,
   body:has(.app-shell--shop) .site-footer,
-  body:has(.olive-product-page) .site-footer {
+  body:has(.olive-product-page) .site-footer,
+  body:has(.account-app-shell) .site-footer,
+  body:has(.cart-app-shell) .site-footer,
+  body:has(.checkout-app-shell) .site-footer,
+  body:has(.login-page) .site-footer,
+  body:has(.auth-shell) .site-footer,
+  body:has(.help-hero) .site-footer,
+  body:has(.legal-page) .site-footer,
+  body:has(.checkout-success-shell) .site-footer {
     width: 100%;
     max-width: 1180px;
     margin: 0 auto;

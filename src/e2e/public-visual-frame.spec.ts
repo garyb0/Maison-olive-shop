@@ -26,9 +26,15 @@ type FrameMetrics = {
   viewportWidth: number;
   documentWidth: number;
   bodyWidth: number;
+  shell: FrameBox;
   header: FrameBox;
-  main: FrameBox;
   footer: FrameBox;
+};
+
+type PublicFrameRoute = {
+  label: string;
+  path: string;
+  visibleSelector: string;
 };
 
 function hasAvailableStock(product: NonNullable<ProductsPayload["products"]>[number]) {
@@ -51,13 +57,32 @@ async function getActiveProductSlug(request: APIRequestContext) {
   return product!.slug;
 }
 
-async function readFrameMetrics(page: Page, mainSelector: string) {
+function getPublicFrameRoutes(productSlug: string): PublicFrameRoute[] {
+  return [
+    { label: "home", path: "/?home=1", visibleSelector: ".home-hero" },
+    { label: "shop", path: "/boutique", visibleSelector: ".catalog-section" },
+    { label: "product", path: `/products/${productSlug}`, visibleSelector: ".olive-product-page" },
+    { label: "account", path: "/account", visibleSelector: ".account-access-card, .account-layout-shell" },
+    { label: "cart", path: "/cart", visibleSelector: ".cart-page-header, .cart-empty-state" },
+    { label: "checkout", path: "/checkout", visibleSelector: ".checkout-page-header, .checkout-section-card, .cart-empty-state" },
+    { label: "login", path: "/login", visibleSelector: ".login-auth-frame" },
+    { label: "forgot-password", path: "/forgot-password", visibleSelector: ".auth-shell" },
+    { label: "reset-password", path: "/reset-password", visibleSelector: ".auth-shell" },
+    { label: "faq", path: "/faq", visibleSelector: ".help-hero" },
+    { label: "terms", path: "/terms", visibleSelector: ".legal-page" },
+    { label: "privacy", path: "/privacy", visibleSelector: ".legal-page" },
+    { label: "data-deletion", path: "/data-deletion", visibleSelector: ".legal-page" },
+    { label: "checkout-success", path: "/checkout/success", visibleSelector: ".checkout-success-shell" },
+  ];
+}
+
+async function readDesktopFrameMetrics(page: Page, visibleSelector: string) {
   await expect(page.locator(".nav-marketplace-main").first()).toBeVisible();
-  await expect(page.locator(mainSelector).first()).toBeVisible();
+  await expect(page.locator(visibleSelector).first()).toBeVisible();
   await expect(page.locator(".site-footer").first()).toBeAttached();
   await page.evaluate(() => (document.fonts ? document.fonts.ready.then(() => true) : true));
 
-  return page.evaluate((selector): FrameMetrics => {
+  return page.evaluate((): FrameMetrics => {
     const readBox = (targetSelector: string) => {
       const element = document.querySelector(targetSelector);
       if (!element) {
@@ -77,11 +102,36 @@ async function readFrameMetrics(page: Page, mainSelector: string) {
       viewportWidth: window.innerWidth,
       documentWidth: document.documentElement.scrollWidth,
       bodyWidth: document.body.scrollWidth,
+      shell: readBox("body > .app-shell"),
       header: readBox(".nav-marketplace-main"),
-      main: readBox(selector),
       footer: readBox(".site-footer"),
     };
-  }, mainSelector);
+  });
+}
+
+async function readMobileFrameMetrics(page: Page, visibleSelector: string) {
+  await expect(page.locator(visibleSelector).first()).toBeVisible();
+  await page.evaluate(() => (document.fonts ? document.fonts.ready.then(() => true) : true));
+
+  return page.evaluate((): Pick<FrameMetrics, "viewportWidth" | "documentWidth" | "bodyWidth" | "shell"> => {
+    const shell = document.querySelector("body > .app-shell");
+    if (!shell) {
+      throw new Error("Missing frame element: body > .app-shell");
+    }
+
+    const rect = shell.getBoundingClientRect();
+
+    return {
+      viewportWidth: window.innerWidth,
+      documentWidth: document.documentElement.scrollWidth,
+      bodyWidth: document.body.scrollWidth,
+      shell: {
+        x: rect.x,
+        width: rect.width,
+        right: rect.right,
+      },
+    };
+  });
 }
 
 function expectClose(actual: number, expected: number, label: string) {
@@ -94,7 +144,10 @@ function expectFrameClose(actual: FrameBox, expected: FrameBox, label: string) {
   expectClose(actual.right, expected.right, `${label} right`);
 }
 
-function expectNoHorizontalOverflow(metrics: FrameMetrics, label: string) {
+function expectNoHorizontalOverflow(
+  metrics: Pick<FrameMetrics, "viewportWidth" | "documentWidth" | "bodyWidth">,
+  label: string,
+) {
   expect(metrics.documentWidth, `${label} document width`).toBeLessThanOrEqual(metrics.viewportWidth + 1);
   expect(metrics.bodyWidth, `${label} body width`).toBeLessThanOrEqual(metrics.viewportWidth + 1);
 }
@@ -103,20 +156,16 @@ test.describe("public visual frame", () => {
   test.describe("desktop", () => {
     test.use({ viewport: DESKTOP_VIEWPORT });
 
-    test("home, shop and product pages keep the same frame", async ({ page, request }) => {
+    test("public customer routes keep the same shell, header and footer frame", async ({ page, request }) => {
       const productSlug = await getActiveProductSlug(request);
-      const routes = [
-        { label: "home", path: "/?home=1", mainSelector: ".home-hero" },
-        { label: "shop", path: "/boutique", mainSelector: ".catalog-section" },
-        { label: "product", path: `/products/${productSlug}`, mainSelector: ".olive-product-page" },
-      ];
+      const routes = getPublicFrameRoutes(productSlug);
       const frames: Array<{ label: string; metrics: FrameMetrics }> = [];
 
       for (const route of routes) {
         await page.goto(route.path);
         await page.waitForLoadState("domcontentloaded");
 
-        const metrics = await readFrameMetrics(page, route.mainSelector);
+        const metrics = await readDesktopFrameMetrics(page, route.visibleSelector);
         expectNoHorizontalOverflow(metrics, route.label);
         frames.push({ label: route.label, metrics });
       }
@@ -124,8 +173,8 @@ test.describe("public visual frame", () => {
       const baseline = frames[0]!.metrics;
 
       for (const frame of frames.slice(1)) {
+        expectFrameClose(frame.metrics.shell, baseline.shell, `${frame.label} shell follows home`);
         expectFrameClose(frame.metrics.header, baseline.header, `${frame.label} header follows home`);
-        expectFrameClose(frame.metrics.main, baseline.main, `${frame.label} main follows home`);
         expectFrameClose(frame.metrics.footer, baseline.footer, `${frame.label} footer follows home`);
       }
     });
@@ -138,30 +187,18 @@ test.describe("public visual frame", () => {
       hasTouch: true,
     });
 
-    test("home, shop and product pages do not shift or overflow", async ({ page, request }) => {
+    test("public customer routes do not overflow on mobile", async ({ page, request }) => {
       const productSlug = await getActiveProductSlug(request);
-      const routes = [
-        { label: "home", path: "/?home=1", mainSelector: ".home-hero" },
-        { label: "shop", path: "/boutique", mainSelector: ".catalog-section" },
-        { label: "product", path: `/products/${productSlug}`, mainSelector: ".olive-product-page" },
-      ];
-      const frames: Array<{ label: string; metrics: FrameMetrics }> = [];
+      const routes = getPublicFrameRoutes(productSlug);
 
       for (const route of routes) {
         await page.goto(route.path);
         await page.waitForLoadState("domcontentloaded");
 
-        const metrics = await readFrameMetrics(page, route.mainSelector);
+        const metrics = await readMobileFrameMetrics(page, route.visibleSelector);
         expectNoHorizontalOverflow(metrics, route.label);
-        frames.push({ label: route.label, metrics });
-      }
-
-      const baseline = frames[0]!.metrics;
-
-      for (const frame of frames.slice(1)) {
-        expectFrameClose(frame.metrics.header, baseline.header, `${frame.label} mobile header follows home`);
-        expectFrameClose(frame.metrics.main, baseline.main, `${frame.label} mobile main follows home`);
-        expectFrameClose(frame.metrics.footer, baseline.footer, `${frame.label} mobile footer follows home`);
+        expect(metrics.shell.x, `${route.label} shell starts inside viewport`).toBeGreaterThanOrEqual(-1);
+        expect(metrics.shell.right, `${route.label} shell ends inside viewport`).toBeLessThanOrEqual(metrics.viewportWidth + 1);
       }
     });
   });
