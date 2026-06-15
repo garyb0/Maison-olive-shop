@@ -106,6 +106,11 @@ export function LoginClient({
   const [registerError, setRegisterError] = useState('')
   const [registerLoading, setRegisterLoading] = useState(false)
 
+  function navigateAfterAuth(role: unknown) {
+    router.replace(role === 'ADMIN' ? '/admin' : redirectTarget)
+    router.refresh()
+  }
+
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setLoginError('')
@@ -126,11 +131,7 @@ export function LoginClient({
           return
         }
 
-        if (data.role === 'ADMIN' || pendingRole === 'ADMIN') {
-          router.push('/admin')
-        } else {
-          router.push(redirectTarget)
-        }
+        navigateAfterAuth(data.role === 'ADMIN' || pendingRole === 'ADMIN' ? 'ADMIN' : 'CUSTOMER')
         return
       }
 
@@ -154,11 +155,7 @@ export function LoginClient({
         return
       }
 
-      if (data.role === 'ADMIN') {
-        router.push('/admin')
-      } else {
-        router.push(redirectTarget)
-      }
+      navigateAfterAuth(data.role)
     } catch {
       setLoginError(isFr ? 'Une erreur est survenue. Réessaie.' : 'Something went wrong. Please try again.')
     } finally {
@@ -201,11 +198,7 @@ export function LoginClient({
         return
       }
 
-      if (data.role === 'ADMIN') {
-        router.push('/admin')
-      } else {
-        router.push(redirectTarget)
-      }
+      navigateAfterAuth(data.role)
     } catch {
       setRegisterError(isFr ? 'Une erreur est survenue. Réessaie.' : 'Something went wrong. Please try again.')
     } finally {

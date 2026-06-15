@@ -65,7 +65,9 @@ async function openAccountPage(page: Page, route: string, title: RegExp) {
   await page.waitForLoadState("domcontentloaded");
   await expect(page.getByRole("heading", { name: title }).first()).toBeVisible();
   await expectNoHorizontalOverflow(page);
-  await expectMinTapSize(page.locator(".account-mobile-account-tab").first(), "account mobile nav first item");
+  await expect(page.locator(".account-mobile-account-nav")).toHaveCount(0);
+  await expect(page.locator(".pwa-app-nav:visible")).toHaveCount(1);
+  await expectMinTapSize(page.locator(".pwa-app-nav:visible a").first(), "app mobile nav first item");
 }
 
 test.describe("authenticated mobile account smoke", () => {
@@ -127,6 +129,19 @@ test.describe("authenticated mobile account smoke", () => {
     await openAccountPage(page, "/account/support", /support client|customer support/i);
     await expectMinTapSize(page.locator(".account-support-card__cta").first(), "support primary action");
     await screenshot(page, "account-support.png");
+  });
+
+  test("account routes keep a single bottom navigation in native mode", async ({ page }) => {
+    for (const route of ["/account", "/account/orders", "/account/support"]) {
+      await page.goto(`${route}?native=1`);
+      await page.waitForLoadState("domcontentloaded");
+
+      await expect(page.locator("html")).toHaveClass(/is-capacitor-native/);
+      await expect(page.locator(".account-mobile-account-nav")).toHaveCount(0);
+      await expect(page.locator(".pwa-app-nav:visible")).toHaveCount(1);
+      await expect(page.locator(".native-app-tabbar")).toBeVisible();
+      await expectNoHorizontalOverflow(page);
+    }
   });
 
   test("connected cart and checkout are readable on mobile", async ({ page }) => {

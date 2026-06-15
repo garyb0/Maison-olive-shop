@@ -21,6 +21,10 @@ function isExactOrChildPath(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+function getLoginHrefForReturnTo(returnTo: string) {
+  return `/login?returnTo=${encodeURIComponent(returnTo)}`;
+}
+
 export function isAppNavigationItemActive(pathname: string, href: string) {
   if (href === "/app") {
     return pathname === "/app";
@@ -65,7 +69,7 @@ export function AppMobileNav({ language, userRole, className, showSecondary = tr
     return {
       ...item,
       originalHref: item.href,
-      targetHref: requiresAccount && !userRole ? "/login" : item.href,
+      targetHref: requiresAccount && !userRole ? getLoginHrefForReturnTo(item.href) : item.href,
       label: navigationLabel(item, language),
     };
   });

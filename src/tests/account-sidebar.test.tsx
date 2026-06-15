@@ -35,30 +35,18 @@ describe("AccountSidebar", () => {
     vi.unstubAllGlobals();
   });
 
-  it("marque le tab mobile principal actif pour une page enfant de commandes", () => {
+  it("garde uniquement la navigation laterale et marque la page active", () => {
     navigationMock.pathname = "/account/orders/order_1";
 
     const { container } = render(<AccountSidebar language="fr" />);
-    const activeTab = container.querySelector(".account-mobile-account-tab--active");
+    const activeLink = container.querySelector(".account-sidebar__nav--desktop .admin-nav-item.active");
 
-    expect(activeTab).toHaveAttribute("href", "/account/orders");
-    expect(activeTab).toHaveTextContent("Commandes");
+    expect(activeLink).toHaveAttribute("href", "/account/orders");
+    expect(activeLink).toHaveTextContent("Mes commandes");
+    expect(container.querySelector(".account-mobile-account-nav")).not.toBeInTheDocument();
   });
 
-  it("affiche le libelle actif dans Plus compte quand la page active est secondaire", () => {
-    navigationMock.pathname = "/account/profile";
-
-    const { container } = render(<AccountSidebar language="fr" />);
-    const moreMenu = container.querySelector(".account-mobile-account-more");
-    const trigger = container.querySelector(".account-mobile-account-more__trigger");
-    const activeMoreItem = container.querySelector(".account-mobile-account-more__item--active");
-
-    expect(moreMenu).toHaveClass("account-mobile-account-more--active");
-    expect(trigger).toHaveTextContent("Profil et securite");
-    expect(activeMoreItem).toHaveAttribute("href", "/account/profile");
-  });
-
-  it("deconnecte avec le endpoint existant depuis le menu mobile", async () => {
+  it("deconnecte avec le endpoint existant depuis la navigation laterale", async () => {
     const fetchMock = vi.fn(async () => new Response("{}"));
     vi.stubGlobal("fetch", fetchMock);
 

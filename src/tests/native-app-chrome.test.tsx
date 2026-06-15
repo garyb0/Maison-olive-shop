@@ -61,7 +61,23 @@ describe("Native app chrome", () => {
     const nav = await screen.findByRole("navigation", { name: "Navigation application" });
     const hrefs = within(nav).getAllByRole("link").map((link) => link.getAttribute("href"));
 
-    expect(hrefs).toEqual(["/app", "/boutique", "/login", "/login", "/login"]);
+    expect(hrefs).toEqual([
+      "/app",
+      "/boutique",
+      "/login?returnTo=%2Faccount%2Forders",
+      "/login?returnTo=%2Faccount%2Fsupport",
+      "/login?returnTo=%2Faccount",
+    ]);
+  });
+
+  it("does not mount the global shell outside the native app", async () => {
+    document.body.className = "";
+    document.documentElement.className = "";
+
+    const { container } = render(<NativeAppChromeClient language="fr" userRole={null} />);
+
+    await waitFor(() => expect(container).toBeEmptyDOMElement());
+    expect(document.body).not.toHaveClass("has-native-client-chrome");
   });
 
   it.each([
