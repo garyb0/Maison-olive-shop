@@ -513,7 +513,58 @@ describe("public cart and checkout flow", () => {
     expect(screen.getByText(/Ce produit reste visible/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Checkout bloqué par le stock" })).toBeDisabled();
     expect(screen.queryByRole("link", { name: "Passer à la caisse" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Calcul...")).not.toBeInTheDocument();
+    expect(screen.getAllByText("À ajuster").length).toBeGreaterThanOrEqual(2);
     expect(fetchMock.mock.calls.some(([url]) => String(url).startsWith("/api/orders/quote"))).toBe(false);
+  });
+
+  it("explique un produit local retire sans laisser les totaux en calcul", async () => {
+    window.localStorage.setItem(
+      "chezolive_cart_v1",
+      JSON.stringify([{ productId: "prod_missing", name: "Abonnement QA Chez Olive", quantity: 1 }]),
+    );
+
+    render(
+      <CartClient
+        language="fr"
+        t={getDictionary("fr")}
+        user={null}
+        productIndex={productIndex}
+        shippingFlatCents={899}
+        shippingFreeThresholdCents={7500}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getAllByText("Abonnement QA Chez Olive").length).toBeGreaterThan(0));
+    expect(screen.getByText("Ce produit n'est plus disponible dans la boutique.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Checkout bloqué par le stock" })).toBeDisabled();
+    expect(screen.queryByText("Calcul...")).not.toBeInTheDocument();
+    expect(screen.getAllByText("À ajuster").length).toBeGreaterThanOrEqual(2);
+    expect(fetchMock.mock.calls.some(([url]) => String(url).startsWith("/api/orders/quote"))).toBe(false);
+  });
+
+  it("sort du mode calcul si l'API de quote refuse temporairement un panier valide", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      json: async () => ({ error: "Quote unavailable" }),
+    });
+    window.localStorage.setItem("chezolive_cart_v1", JSON.stringify([{ productId: "prod_cart", quantity: 1 }]));
+
+    render(
+      <CartClient
+        language="fr"
+        t={getDictionary("fr")}
+        user={null}
+        productIndex={productIndex}
+        shippingFlatCents={899}
+        shippingFreeThresholdCents={7500}
+      />,
+    );
+
+    await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => String(url).startsWith("/api/orders/quote"))).toBe(true));
+    await waitFor(() => expect(screen.queryByText("Calcul...")).not.toBeInTheDocument());
+    expect(screen.getAllByText("À confirmer").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByRole("link", { name: "Passer à la caisse" })).toBeInTheDocument();
   });
 
   it("garde le bouton produit clair selon la disponibilite", async () => {

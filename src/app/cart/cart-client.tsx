@@ -37,6 +37,8 @@ type CartQuote = {
   totalCents: number;
 };
 
+type QuoteStatus = "idle" | "loading" | "ready" | "blocked" | "error";
+
 type Props = {
   language: Language;
   t: Dictionary;
@@ -77,6 +79,7 @@ export function CartClient({
   const [cart, setCart] = useState<CartLine[]>([]);
   const [cartLoaded, setCartLoaded] = useState(false);
   const [quote, setQuote] = useState<CartQuote | null>(null);
+  const [quoteStatus, setQuoteStatus] = useState<QuoteStatus>("idle");
   const [isMobileCart, setIsMobileCart] = useState(false);
   const cartViewTrackedRef = useRef(false);
   const locale = language === "fr" ? "fr-CA" : "en-CA";
@@ -185,15 +188,24 @@ export function CartClient({
   }, []);
 
   useEffect(() => {
-    if (!cart.length || hasBlockedRows) {
-      const id = window.setTimeout(() => setQuote(null), 0);
-      return () => window.clearTimeout(id);
+    if (!cart.length) {
+      setQuote(null);
+      setQuoteStatus("idle");
+      return;
+    }
+
+    if (hasBlockedRows) {
+      setQuote(null);
+      setQuoteStatus("blocked");
+      return;
     }
 
     const controller = new AbortController();
 
     const loadQuote = async () => {
       try {
+        setQuote(null);
+        setQuoteStatus("loading");
         const response = await fetch("/api/orders/quote", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -205,14 +217,22 @@ export function CartClient({
 
         if (!response.ok) {
           setQuote(null);
+          setQuoteStatus("error");
           return;
         }
 
         const data = (await response.json()) as { quote?: CartQuote };
-        setQuote(data.quote ?? null);
+        if (data.quote) {
+          setQuote(data.quote);
+          setQuoteStatus("ready");
+        } else {
+          setQuote(null);
+          setQuoteStatus("error");
+        }
       } catch {
         if (!controller.signal.aborted) {
           setQuote(null);
+          setQuoteStatus("error");
         }
       }
     };
@@ -222,7 +242,18 @@ export function CartClient({
     return () => controller.abort();
   }, [cart, hasBlockedRows]);
 
-  const visibleQuote = rows.length > 0 ? quote : null;
+  const visibleQuote = rows.length > 0 && quoteStatus === "ready" ? quote : null;
+  const quoteFallbackLabel = hasBlockedRows || quoteStatus === "blocked"
+    ? language === "fr"
+      ? "À ajuster"
+      : "Review cart"
+    : quoteStatus === "error"
+      ? language === "fr"
+        ? "À confirmer"
+        : "To confirm"
+      : language === "fr"
+        ? "Calcul..."
+        : "Calculating...";
   const pricedSubtotalCents = visibleQuote?.subtotalCents ?? totalCents;
   const remainingForFreeShippingCents = Math.max(0, shippingFreeThresholdCents - pricedSubtotalCents);
   const qualifiesForFreeShipping = rows.length > 0 && visibleQuote?.shippingCents === 0;
@@ -501,7 +532,7 @@ export function CartClient({
                       {language === "fr" ? "Livraison estimée" : "Estimated shipping"}
                     </span>
                     <span className="cart-summary-value">
-                      {visibleQuote ? fmt(visibleQuote.shippingCents, "CAD", locale) : language === "fr" ? "Calcul..." : "Calculating..."}
+                      {visibleQuote ? fmt(visibleQuote.shippingCents, "CAD", locale) : quoteFallbackLabel}
                     </span>
                   </div>
                   <div className="cart-summary-row">
@@ -517,7 +548,7 @@ export function CartClient({
                       {language === "fr" ? "Taxes estimées" : "Estimated taxes"}
                     </span>
                     <span className="cart-summary-value">
-                      {visibleQuote ? fmt(visibleQuote.taxCents, "CAD", locale) : language === "fr" ? "Calcul..." : "Calculating..."}
+                      {visibleQuote ? fmt(visibleQuote.taxCents, "CAD", locale) : quoteFallbackLabel}
                     </span>
                   </div>
                   <div className="cart-summary-row cart-summary-row--total">
@@ -561,8 +592,8 @@ export function CartClient({
                 <p className="small cart-summary-note">
                   {hasBlockedRows
                     ? language === "fr"
-                      ? "Retire ou ajuste les articles en rupture avant de passer au checkout."
-                      : "Remove or adjust out-of-stock items before checkout."
+                      ? "Retire ou ajuste les articles indisponibles avant de passer au checkout."
+                      : "Remove or adjust unavailable items before checkout."
                     : language === "fr"
                       ? "Estimation avant confirmation de livraison au checkout."
                       : "Estimate shown before delivery confirmation at checkout."}
