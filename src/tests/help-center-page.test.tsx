@@ -30,7 +30,7 @@ vi.mock("@/lib/business", () => ({
     brand: "Chez Olive",
     supportEmail: "support@chezolive.ca",
     supportHours: "Lundi au vendredi, 9h à 17h",
-    shippingPolicy: "Livraison locale à Rimouski et environs, confirmée au panier.",
+    shippingPolicy: "Livraison à domicile à Rimouski et environs, confirmée au panier.",
   }),
 }));
 
@@ -43,12 +43,14 @@ describe("FaqPage help center hub", () => {
     expect(screen.getAllByRole("button", { name: "Écrire à l’équipe" }).length).toBeGreaterThan(0);
     expect(screen.getAllByText("Ou par courriel: support@chezolive.ca").length).toBeGreaterThan(0);
 
-    for (const id of ["livraison", "commandes", "paiement", "retours", "compte", "colliers-qr", "conditions"]) {
+    for (const id of ["livraison", "commandes", "paiement", "retours", "compte", "conditions"]) {
       expect(container.querySelector(`#${id}`)).toBeInTheDocument();
     }
+    expect(container.querySelector("#colliers-qr")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /GÃ©rer mes chiens/ })).not.toBeInTheDocument();
 
     expect(screen.getByRole("link", { name: /Suivre ma commande/ })).toHaveAttribute("href", "/account/orders");
-    expect(screen.getByRole("link", { name: /Voir la livraison locale/ })).toHaveAttribute("href", "/faq#livraison");
+    expect(screen.getByRole("link", { name: /Voir la livraison à domicile/ })).toHaveAttribute("href", "/faq#livraison");
     expect(screen.getByRole("link", { name: /Retour ou problème/ })).toHaveAttribute("href", "/faq#retours");
   });
 

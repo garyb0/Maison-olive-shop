@@ -43,16 +43,16 @@ const formatMoney = (amountCents: number, currency: string, language: "fr" | "en
 const buildShippingPolicy = (language: "fr" | "en") => {
   if (env.shippingFlatCents === 0 || env.shippingFreeThresholdCents === 0) {
     return language === "fr"
-      ? "Livraison locale gratuite pour les adresses desservies."
-      : "Free local delivery for addresses inside the service area.";
+      ? "Livraison à domicile gratuite pour les adresses desservies."
+      : "Free home delivery for addresses inside the service area.";
   }
 
   const flatFeeLabel = formatMoney(env.shippingFlatCents, "CAD", language);
   const freeThresholdLabel = formatMoney(env.shippingFreeThresholdCents, "CAD", language);
 
   return language === "fr"
-    ? `Livraison locale forfaitaire de ${flatFeeLabel}. Gratuite dès ${freeThresholdLabel} après rabais, avant taxes.`
-    : `Flat local delivery fee of ${flatFeeLabel}. Free from ${freeThresholdLabel} after discounts, before taxes.`;
+    ? `Livraison à domicile forfaitaire de ${flatFeeLabel}. Gratuite dès ${freeThresholdLabel} après rabais, avant taxes.`
+    : `Flat home delivery fee of ${flatFeeLabel}. Free from ${freeThresholdLabel} after discounts, before taxes.`;
 };
 
 const formatDateTime = (date: Date | string | null | undefined, language: "fr" | "en") => {

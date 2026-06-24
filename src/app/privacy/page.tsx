@@ -21,7 +21,7 @@ export default async function PrivacyPage() {
     ? [
         {
           title: "Données que nous collectons",
-          body: "Nous collectons les informations nécessaires pour exploiter la boutique: compte, commandes, adresse de livraison, messages de support, profils de chiens QR, préférences de notifications et informations techniques de sécurité.",
+          body: "Nous collectons les informations nécessaires pour exploiter la boutique animalière locale: compte, commandes, adresse de livraison à domicile, messages de support, préférences de notifications, services associés et informations techniques de sécurité.",
         },
         {
           title: "Paiements",
@@ -43,7 +43,7 @@ export default async function PrivacyPage() {
     : [
         {
           title: "Data we collect",
-          body: "We collect the information needed to run the shop: account details, orders, delivery address, support messages, dog QR profiles, notification preferences, and security-related technical information.",
+          body: "We collect the information needed to run the local pet boutique: account details, orders, home delivery address, support messages, notification preferences, related services, and security-related technical information.",
         },
         {
           title: "Payments",
@@ -76,8 +76,8 @@ export default async function PrivacyPage() {
           <h1>{language === "fr" ? "Politique de confidentialité" : "Privacy policy"}</h1>
           <p className="small">
             {language === "fr"
-              ? "Cette page couvre le site Chez Olive, l'app client Android, les commandes, le support, les notifications et les profils chiens QR."
-              : "This page covers the Chez Olive website, Android customer app, orders, support, notifications, and dog QR profiles."}
+              ? "Cette page couvre le site Chez Olive, l'app client Android, les commandes, le support, les notifications et les services associés."
+              : "This page covers the Chez Olive website, Android customer app, orders, support, notifications, and related services."}
           </p>
           <p className="small">
             {language === "fr" ? "Dernière mise à jour: 4 mai 2026." : "Last updated: May 4, 2026."}

@@ -99,6 +99,52 @@ async function checkMaintenanceState(): Promise<CheckResult> {
   };
 }
 
+async function checkDeliveryReadiness(): Promise<CheckResult> {
+  try {
+    const { getCheckoutDeliverySlots } = await import("../src/lib/delivery");
+    const payload = await getCheckoutDeliverySlots({
+      postalCode: "G5L 1A1",
+      country: "CA",
+    });
+
+    if (payload.mode !== "dynamic") {
+      return {
+        name: "delivery-capacity",
+        level: "warn",
+        details: `delivery slot mode is ${payload.mode}; dynamic routing is not active for checkout`,
+      };
+    }
+
+    if (payload.activeDriverCount <= 0) {
+      return {
+        name: "delivery-capacity",
+        level: "fail",
+        details: "ACTIVE_DRIVERS has zero active drivers; checkout will not show delivery windows",
+      };
+    }
+
+    if (payload.slots.length === 0) {
+      return {
+        name: "delivery-capacity",
+        level: "warn",
+        details: `activeDrivers=${payload.activeDriverCount}, but no checkout delivery window is available for G5L 1A1`,
+      };
+    }
+
+    return {
+      name: "delivery-capacity",
+      level: "pass",
+      details: `activeDrivers=${payload.activeDriverCount}, windows=${payload.slots.length}`,
+    };
+  } catch (error) {
+    return {
+      name: "delivery-capacity",
+      level: "fail",
+      details: error instanceof Error ? error.message : "delivery capacity check failed",
+    };
+  }
+}
+
 function checkCommercialReadiness(): CheckResult[] {
   const stripeKey = process.env.STRIPE_SECRET_KEY?.trim() ?? "";
   const webhook = process.env.STRIPE_WEBHOOK_SECRET?.trim() ?? "";
@@ -199,6 +245,7 @@ async function main() {
   checks.push(await checkMaintenanceState());
   checks.push(await checkHealth(baseUrl));
   checks.push(await checkPublicHomepage(baseUrl));
+  checks.push(await checkDeliveryReadiness());
   checks.push(...checkCommercialReadiness());
 
   console.log("Pre-opening check");

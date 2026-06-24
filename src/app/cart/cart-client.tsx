@@ -6,7 +6,7 @@ import type { Dictionary, Language } from "@/lib/i18n";
 import type { CurrentUser } from "@/lib/types";
 import { trackConversionEvent } from "@/lib/conversion-tracker";
 import { Navigation } from "@/components/Navigation";
-import { PwaAppHeader } from "@/app/app/pwa-app-header";
+import { MobileAppChrome } from "@/components/MobileAppChrome";
 
 type ProductInfo = {
   id: string;
@@ -188,16 +188,13 @@ export function CartClient({
   }, []);
 
   useEffect(() => {
-    if (!cart.length) {
-      setQuote(null);
-      setQuoteStatus("idle");
-      return;
-    }
-
-    if (hasBlockedRows) {
-      setQuote(null);
-      setQuoteStatus("blocked");
-      return;
+    if (!cart.length || hasBlockedRows) {
+      const nextStatus: QuoteStatus = !cart.length ? "idle" : "blocked";
+      const id = window.setTimeout(() => {
+        setQuote(null);
+        setQuoteStatus(nextStatus);
+      }, 0);
+      return () => window.clearTimeout(id);
     }
 
     const controller = new AbortController();
@@ -285,10 +282,8 @@ export function CartClient({
   }, [cartLoaded, itemCount, language, totalCents]);
 
   return (
-    <div className="app-shell cart-app-shell">
-      <div className="cart-mobile-chrome">
-        <PwaAppHeader language={language} userRole={user?.role ?? null} />
-      </div>
+    <div className="app-shell cart-app-shell mobile-app-clone-shell">
+      <MobileAppChrome language={language} userRole={user?.role ?? null} className="cart-mobile-chrome" />
       <header className="topbar cart-desktop-topbar">
         <div className="brand">{t.brandName}</div>
         <Navigation language={language} t={t} user={user} />
@@ -327,7 +322,7 @@ export function CartClient({
           </div>
         </div>
         <div className="cart-market-promises" aria-label={language === "fr" ? "Promesses de commande" : "Order promises"}>
-          <span>{language === "fr" ? "Livraison locale" : "Local delivery"}</span>
+          <span>{language === "fr" ? "Livraison à domicile" : "Home delivery"}</span>
           <span>{language === "fr" ? "Paiement sécurisé" : "Secure payment"}</span>
           <span>{language === "fr" ? "Support attentionné" : "Thoughtful support"}</span>
         </div>
@@ -584,8 +579,8 @@ export function CartClient({
                             ? `Plus que ${fmt(remainingForFreeShippingCents, "CAD", locale)} pour profiter de la livraison gratuite.`
                             : `Add ${fmt(remainingForFreeShippingCents, "CAD", locale)} more to unlock free shipping.`
                           : language === "fr"
-                            ? `La livraison locale commence à ${fmt(shippingFlatCents, "CAD", locale)}.`
-                            : `Local delivery starts at ${fmt(shippingFlatCents, "CAD", locale)}.`}
+                            ? `La livraison à domicile commence à ${fmt(shippingFlatCents, "CAD", locale)}.`
+                            : `Home delivery starts at ${fmt(shippingFlatCents, "CAD", locale)}.`}
                     </p>
                   </div>
                 ) : null}
@@ -600,12 +595,12 @@ export function CartClient({
                 </p>
                 <div className="cart-summary-next-steps" aria-label={language === "fr" ? "Prochaines étapes" : "Next steps"}>
                   <strong>{language === "fr" ? "Ensuite au checkout" : "Next in checkout"}</strong>
-                  <span>{language === "fr" ? "Adresse locale" : "Local address"}</span>
+                  <span>{language === "fr" ? "Adresse de livraison" : "Delivery address"}</span>
                   <span>{language === "fr" ? "Créneau de livraison" : "Delivery window"}</span>
                   <span>{language === "fr" ? "Paiement final" : "Final payment"}</span>
                 </div>
                 <div className="cart-summary-trust">
-                  <span>{language === "fr" ? "Livraison locale à Rimouski" : "Local delivery in Rimouski"}</span>
+                  <span>{language === "fr" ? "Livraison à domicile à Rimouski" : "Home delivery in Rimouski"}</span>
                   <span>
                     {language === "fr"
                       ? user
@@ -624,7 +619,7 @@ export function CartClient({
                       {language === "fr" ? "Voir l'aide commande" : "View order help"}
                     </Link>
                     <Link href="/faq#livraison">
-                      {language === "fr" ? "Livraison locale" : "Local delivery"}
+                      {language === "fr" ? "Livraison à domicile" : "Home delivery"}
                     </Link>
                     <Link href="/faq#paiement">
                       {language === "fr" ? "Paiement" : "Payment"}

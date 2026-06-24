@@ -15,6 +15,7 @@ describe("navigation configuration", () => {
       "/account/support",
       "/account",
     ]);
+    expect(appNavigationItems.map((item) => item.href)).not.toContain("/account/dogs");
     expect(appNavigationItems.every((item) => item.icon)).toBe(true);
   });
 
@@ -27,15 +28,15 @@ describe("navigation configuration", () => {
     ]);
   });
 
-  it("structure le compte autour des commandes, chiens QR, abonnements, profil et support", () => {
+  it("structure le compte sans entree QR client visible", () => {
     expect(accountNavigationItems.map((item) => item.href)).toEqual([
       "/account",
       "/account/orders",
-      "/account/dogs",
       "/account/subscriptions",
       "/account/profile",
       "/account/support",
     ]);
+    expect(accountNavigationItems.map((item) => item.href)).not.toContain("/account/dogs");
   });
 
   it("regroupe l'admin par logique metier et expose les enfants en mobile", () => {
@@ -50,6 +51,7 @@ describe("navigation configuration", () => {
 
     const mobileHrefs = getAdminMobileItems("fr").map((item) => item.href);
     expect(mobileHrefs).toContain("/admin/products");
+    expect(mobileHrefs).toContain("/admin/dogs");
     expect(mobileHrefs).toContain("/admin/delivery/runs");
     expect(mobileHrefs).toContain("/admin/support/settings");
     expect(new Set(mobileHrefs).size).toBe(mobileHrefs.length);

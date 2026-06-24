@@ -63,16 +63,11 @@ test.describe("authenticated mobile admin lite smoke", () => {
     await page.goto("/app");
     await page.waitForLoadState("domcontentloaded");
 
-    await page.locator(".pwa-more-panel > summary").click();
-    await expect(page.getByRole("heading", { name: "Centre d'actions" })).toBeVisible();
-    await expect(page.getByText("In-app actif")).toBeVisible();
-    await expect(page.getByText("Alertes admin")).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Admin quotidien" })).toBeVisible();
-    await expect(page.getByRole("link", { name: /Admin complet/i })).toHaveAttribute("href", "/admin");
-    await expect(page.locator('.pwa-admin-lite a[href="/admin/orders"]').first()).toBeVisible();
-    await expect(page.locator('.pwa-admin-lite a[href="/admin/delivery/runs"]').first()).toBeVisible();
-    await expect(page.locator('.pwa-admin-lite a[href="/admin/support"]').first()).toBeVisible();
-    await expectMinTapSize(page.getByRole("link", { name: /Admin complet/i }), "full admin link");
+    await expect(page.locator(".pwa-app-header")).toBeVisible();
+    await expect(page.locator(".pwa-app-nav:visible a")).toHaveCount(5);
+    await expectMinTapSize(page.locator(".pwa-app-nav:visible a").first(), "app mobile nav first item");
+    await expect(page.getByRole("link", { name: /^Admin$/i })).toHaveAttribute("href", "/admin");
+    await expectMinTapSize(page.getByRole("link", { name: /^Admin$/i }), "admin header link");
     await expectNoHorizontalOverflow(page);
     await screenshot(page, "admin-lite-app.png");
   });
@@ -96,7 +91,8 @@ test.describe("authenticated mobile admin lite smoke", () => {
         await expect(page.locator('.admin-mobile-drawer__link[href="/admin/delivery/runs"]').first()).toBeVisible();
         await expectMinTapSize(page.locator(".admin-mobile-drawer__link").first(), "admin drawer first link");
         await page.screenshot({ path: path.join(artifactDir, "admin-mobile-drawer.png"), fullPage: true });
-        await page.getByRole("button", { name: /Fermer le menu admin|Close admin menu/i }).click();
+        await page.keyboard.press("Escape");
+        await expect(page.locator(".admin-mobile-drawer--open")).toHaveCount(0);
       }
       await expectNoHorizontalOverflow(page);
       await screenshot(page, item.file);

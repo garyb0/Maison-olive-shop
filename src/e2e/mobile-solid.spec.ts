@@ -14,6 +14,11 @@ type ProductsPayload = {
     slug: string;
     stock?: number;
     isActive?: boolean;
+    variants?: Array<{
+      id: string;
+      stock?: number;
+      isActive?: boolean;
+    }>;
   }>;
 };
 
@@ -72,22 +77,30 @@ async function firstAvailableProduct(page: Page) {
   const response = await page.request.get("/api/products");
   expect(response.ok(), "products API response").toBe(true);
   const payload = (await response.json()) as ProductsPayload;
-  const product = payload.products?.find((item) => item.isActive !== false && (item.stock ?? 0) > 0);
+  const product = payload.products?.find((item) => {
+    const variantInStock = item.variants?.some((variant) => variant.isActive !== false && (variant.stock ?? 0) > 0);
+    return item.isActive !== false && (variantInStock || (item.stock ?? 0) > 0);
+  });
   expect(product?.id, "a visible in-stock product is required for solid mobile checkout").toBeTruthy();
   return product!;
+}
+
+function getCartLine(product: NonNullable<ProductsPayload["products"]>[number]) {
+  const variant = product.variants?.find((item) => item.isActive !== false && (item.stock ?? 0) > 0);
+  return variant ? { productId: product.id, variantId: variant.id, quantity: 1 } : { productId: product.id, quantity: 1 };
 }
 
 test.describe("solid mobile release recipe", () => {
   test("public, app, account and admin surfaces are mobile-stable", async ({ page }, testInfo) => {
     const routes = [
-      { path: "/?home=1", name: "01-home", heading: /Boutique locale, achat direct/i, tapTarget: ".home-hero-primary" },
-      { path: "/boutique", name: "02-boutique", heading: /Catalogue|Catalog/i, tapTarget: ".catalog-side-link, .catalog-cat-pill" },
+      { path: "/?home=1", name: "01-home", heading: /Boutique animalière locale|Local pet shop/i, tapTarget: ".home-hero-primary" },
+      { path: "/boutique", name: "02-boutique", heading: /Catalogue|Catalog/i, tapTarget: ".catalog-cat-pill" },
       { path: "/faq", name: "03-faq", heading: /Comment peut-on|How can we help/i, tapTarget: ".help-anchor-nav a" },
       {
         path: "/cart",
         name: "04-cart",
         heading: /panier|cart/i,
-        tapTarget: ".pwa-app-header a[href='/cart'], .nav-marketplace-cart, .nav-hamburger",
+        tapTarget: ".pwa-app-header a[href='/cart'], .pwa-app-nav a",
       },
       { path: "/account", name: "05-account-guard", heading: /Connecte-toi|Sign in/i, tapTarget: ".account-access-actions .btn" },
       { path: "/admin", name: "06-admin-guard", heading: /Administration|Admin/i, tapTarget: ".btn, .admin-mobile-menu-button" },
@@ -116,7 +129,7 @@ test.describe("solid mobile release recipe", () => {
       await capture(page, testInfo, route.name);
     }
 
-    await expect(page.locator(".nav-marketplace")).toHaveCount(0);
+    await expect(page.locator(".nav-marketplace").first()).toBeHidden();
     await expect(page.locator(".pwa-app-header")).toBeVisible();
   });
 
@@ -128,12 +141,15 @@ test.describe("solid mobile release recipe", () => {
     await expectNoHorizontalOverflow(page);
     await expect(page.locator(".olive-product-add-btn").first()).toBeVisible();
     await expectMinTapSize(page.locator(".olive-product-add-btn").first(), "product add button");
-    await expect(page.locator(".olive-product-purchase-note")).toContainText(/Livraison locale|Local delivery/i);
+    const productAddBox = await page.locator(".olive-product-add-btn").first().boundingBox();
+    expect(productAddBox, "product add button should be measurable").not.toBeNull();
+    expect(productAddBox!.y, "product add button should appear in the first mobile screen").toBeLessThan(MOBILE_VIEWPORT.height);
+    await expect(page.locator(".olive-product-trust-grid")).toContainText(/Livraison locale|Livraison à domicile|Local delivery|Home delivery/i);
     await capture(page, testInfo, "08-product");
 
-    await page.evaluate((productId) => {
-      window.localStorage.setItem("chezolive_cart_v1", JSON.stringify([{ productId, quantity: 1 }]));
-    }, product.id);
+    await page.evaluate((line) => {
+      window.localStorage.setItem("chezolive_cart_v1", JSON.stringify([line]));
+    }, getCartLine(product));
 
     await page.goto("/cart");
     await page.waitForLoadState("domcontentloaded");
@@ -159,19 +175,18 @@ test.describe("solid mobile release recipe", () => {
     await page.goto("/app");
     await page.waitForLoadState("domcontentloaded");
     await expect(page.getByRole("heading", { name: /Bienvenue|Welcome/i })).toBeVisible();
-    await page.locator(".pwa-more-panel > summary").click();
-    await expect(page.getByRole("region", { name: "Installer Chez Olive" })).toBeVisible();
     await expect(page.locator("a[href^='/login']").first()).toBeVisible();
     await expect(page.getByRole("heading", { name: "Centre d'actions" })).toHaveCount(0);
+    await expect(page.locator(".pwa-core-action-grid a, .pwa-core-action-grid button")).toHaveCount(4);
     await expectNoHorizontalOverflow(page);
     await capture(page, testInfo, "11-app-install-optional-public");
   });
 
-  test("native boutique shows a compact two-column product grid", async ({ page }, testInfo) => {
+  test("native boutique shows the compact app product list", async ({ page }, testInfo) => {
     await page.goto("/boutique?native=1");
     await page.waitForLoadState("domcontentloaded");
 
-    await expect(page.locator("html")).toHaveClass(/is-capacitor-native/);
+    await expect(page.locator("html")).toHaveAttribute("data-native-app", "chezolive");
     await expectNoHorizontalOverflow(page);
 
     const cards = page.locator(".catalog-product-card");
@@ -181,18 +196,15 @@ test.describe("solid mobile release recipe", () => {
     const firstCard = cards.nth(0);
     await expect(firstCard).toBeVisible();
 
-    if (cardCount === 1) {
-      await expect(page.locator(".catalog-section--single")).toBeVisible();
-      await expect(firstCard.locator(".catalog-product-description")).toBeVisible();
-    } else {
+    if (cardCount > 1) {
       const secondCard = cards.nth(1);
       await expect(secondCard).toBeVisible();
 
       const [firstBox, secondBox] = await Promise.all([firstCard.boundingBox(), secondCard.boundingBox()]);
       expect(firstBox, "first product card box").not.toBeNull();
       expect(secondBox, "second product card box").not.toBeNull();
-      expect(Math.abs(firstBox!.y - secondBox!.y), "first two products should share the same row").toBeLessThanOrEqual(4);
-      expect(secondBox!.x, "second product should sit in the second column").toBeGreaterThan(firstBox!.x + firstBox!.width * 0.75);
+      expect(secondBox!.y, "second product should stack below first product").toBeGreaterThan(firstBox!.y + firstBox!.height * 0.75);
+      expect(Math.abs(firstBox!.x - secondBox!.x), "product cards should share the same list column").toBeLessThanOrEqual(4);
     }
 
     await expect(firstCard.locator(".catalog-stock-pill")).toBeVisible();
@@ -201,9 +213,9 @@ test.describe("solid mobile release recipe", () => {
     await expect(firstCard.locator(".catalog-product-rating")).toBeHidden();
     await expect(firstCard.locator(".catalog-product-fast-note")).toBeHidden();
     await expect(firstCard.locator(".catalog-product-view")).toBeHidden();
+    await expect(firstCard.locator(".catalog-product-secondary-actions")).toBeHidden();
     await expectMinTapSize(firstCard.locator(".catalog-product-add"), "native boutique add button");
-    await expectMinTapSize(firstCard.locator(".product-share__primary"), "native boutique share button");
 
-    await capture(page, testInfo, "12-native-boutique-compact-grid");
+    await capture(page, testInfo, "12-native-boutique-compact-list");
   });
 });

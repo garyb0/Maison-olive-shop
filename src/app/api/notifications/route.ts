@@ -1,4 +1,5 @@
 import {
+  CLIENT_HIDDEN_NOTIFICATION_TYPES,
   listAppNotificationsForUser,
   markAppNotificationsRead,
 } from "@/lib/app-notifications";
@@ -15,7 +16,9 @@ export async function GET(request: Request) {
     const user = await requireUser();
     const url = new URL(request.url);
     const take = Math.min(50, Math.max(1, Number.parseInt(url.searchParams.get("take") ?? "20", 10) || 20));
-    const result = await listAppNotificationsForUser(user, take);
+    const result = await listAppNotificationsForUser(user, take, {
+      excludeTypes: CLIENT_HIDDEN_NOTIFICATION_TYPES,
+    });
     return jsonOk(result);
   } catch (error) {
     if (error instanceof Error && error.message === "UNAUTHORIZED") return jsonError("Unauthorized", 401);

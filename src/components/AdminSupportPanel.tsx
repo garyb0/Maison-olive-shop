@@ -909,6 +909,65 @@ export function AdminSupportPanel({ language }: Props) {
   const unreadTotal = items.reduce((sum, c) => sum + (c.unreadCount ?? 0), 0);
   const needsReplyCount = items.filter((c) => c.status !== "CLOSED" && c.needsReply).length;
 
+  const renderTicketMessages = (conversation: Conversation) => (
+    <div
+      className="support-admin-messages"
+      aria-label={language === "fr" ? "Messages du ticket" : "Ticket messages"}
+    >
+      {conversation.messages.length === 0 && (
+        <div className="support-admin-no-msg">
+          <p className="small">{t.waiting}</p>
+        </div>
+      )}
+      {conversation.messages.map((msg, idx) => {
+        const prevMsg = conversation.messages[idx - 1];
+        const showDateSep = msg.createdAt && (
+          !prevMsg?.createdAt ||
+          new Date(msg.createdAt).toDateString() !== new Date(prevMsg.createdAt).toDateString()
+        );
+        return (
+          <div key={msg.id}>
+            {showDateSep && msg.createdAt && (
+              <div className="support-date-sep">
+                <span className="support-date-sep-label">{formatDateLabel(msg.createdAt, language)}</span>
+              </div>
+            )}
+            <div
+              className={`support-msg ${
+                msg.senderType === "CUSTOMER"
+                  ? "support-msg-customer"
+                  : msg.senderType === "ADMIN"
+                    ? "support-msg-admin"
+                    : "support-msg-system"
+              }`}
+            >
+              {msg.senderType === "CUSTOMER" && (
+                <div className="support-msg-avatar support-msg-avatar-customer">
+                  {conversation.customerName.charAt(0).toUpperCase()}
+                </div>
+              )}
+              {msg.senderType === "ADMIN" && (
+                <div className="support-msg-avatar">🫒</div>
+              )}
+              <div className="support-msg-body">
+                <div className="support-msg-bubble">{msg.content}</div>
+                {msg.createdAt && (
+                  <span className="support-msg-time">{formatTime(msg.createdAt)}</span>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+      {conversation.status === "CLOSED" && (
+        <div className="support-win-closed">
+          {t.closed} · {getCloseReasonLabel(conversation.closedReason, language)}
+        </div>
+      )}
+      <div ref={messagesEndRef} />
+    </div>
+  );
+
   return (
     <section className="section" style={{ padding: 0, overflow: "hidden" }}>
       {/* Panel header */}
@@ -1351,6 +1410,8 @@ export function AdminSupportPanel({ language }: Props) {
               </div>
 
               <div className="support-admin-detail-scroll">
+              {renderTicketMessages(selected)}
+
               {/* Customer context */}
               <div className="support-admin-context">
                 <div className="support-admin-context__header">
@@ -1574,61 +1635,6 @@ export function AdminSupportPanel({ language }: Props) {
                     </button>
                   </div>
                 ) : null}
-              </div>
-
-              {/* Messages */}
-              <div className="support-admin-messages">
-                {selected.messages.length === 0 && (
-                  <div className="support-admin-no-msg">
-                    <p className="small">{t.waiting}</p>
-                  </div>
-                )}
-                {selected.messages.map((msg, idx) => {
-                  const prevMsg = selected.messages[idx - 1];
-                  const showDateSep = msg.createdAt && (
-                    !prevMsg?.createdAt ||
-                    new Date(msg.createdAt).toDateString() !== new Date(prevMsg.createdAt).toDateString()
-                  );
-                  return (
-                    <div key={msg.id}>
-                      {showDateSep && msg.createdAt && (
-                        <div className="support-date-sep">
-                          <span className="support-date-sep-label">{formatDateLabel(msg.createdAt, language)}</span>
-                        </div>
-                      )}
-                      <div
-                        className={`support-msg ${
-                          msg.senderType === "CUSTOMER"
-                            ? "support-msg-customer"
-                            : msg.senderType === "ADMIN"
-                            ? "support-msg-admin"
-                            : "support-msg-system"
-                        }`}
-                      >
-                        {msg.senderType === "CUSTOMER" && (
-                          <div className="support-msg-avatar support-msg-avatar-customer">
-                            {selected.customerName.charAt(0).toUpperCase()}
-                          </div>
-                        )}
-                        {msg.senderType === "ADMIN" && (
-                          <div className="support-msg-avatar">🫒</div>
-                        )}
-                        <div className="support-msg-body">
-                          <div className="support-msg-bubble">{msg.content}</div>
-                          {msg.createdAt && (
-                            <span className="support-msg-time">{formatTime(msg.createdAt)}</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-                {selected.status === "CLOSED" && (
-                  <div className="support-win-closed">
-                    {t.closed} · {getCloseReasonLabel(selected.closedReason, language)}
-                  </div>
-                )}
-                <div ref={messagesEndRef} />
               </div>
 
               {/* Message */}

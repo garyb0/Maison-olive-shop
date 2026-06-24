@@ -13,7 +13,6 @@ export const helpTopicIds = [
   "paiement",
   "retours",
   "compte",
-  "colliers-qr",
   "conditions",
 ] as const;
 
@@ -70,7 +69,7 @@ export function getHelpQuickActions(language: Language): HelpQuickAction[] {
         href: "/account/orders",
       },
       {
-        title: "Voir la livraison locale",
+        title: "Voir la livraison à domicile",
         description: "Zone desservie, frais, seuil gratuit et créneaux disponibles.",
         href: "/faq#livraison",
       },
@@ -95,7 +94,7 @@ export function getHelpQuickActions(language: Language): HelpQuickAction[] {
       href: "/account/orders",
     },
     {
-      title: "View local delivery",
+      title: "View home delivery",
       description: "Service area, fees, free-delivery threshold, and available slots.",
       href: "/faq#livraison",
     },
@@ -113,8 +112,8 @@ export function getHelpTopics(language: Language, business: BusinessInfo): HelpT
       {
         id: "livraison",
         eyebrow: "Livraison",
-        title: "Livraison locale",
-        body: "Chez Olive livre surtout à Rimouski et dans les environs. L’adresse est validée au panier et au passage à la caisse pour confirmer les options disponibles.",
+        title: "Livraison à domicile à Rimouski",
+        body: "Chez Olive est une boutique animalière locale avec livraison à domicile à Rimouski et dans les environs. L’adresse est validée au panier et au passage à la caisse pour confirmer les options disponibles.",
         points: [
           business.shippingPolicy,
           "Les frais, les taxes et le total final sont affichés avant la confirmation.",
@@ -164,33 +163,20 @@ export function getHelpTopics(language: Language, business: BusinessInfo): HelpT
         id: "compte",
         eyebrow: "Compte",
         title: "Mon Chez Olive",
-        body: "Ton espace client centralise les commandes, les adresses, les profils de chiens et les informations utiles pour simplifier les prochaines visites.",
+        body: "Ton espace client centralise les commandes, les adresses et les informations utiles pour simplifier les prochaines visites.",
         points: [
           "Tu peux consulter l’historique de commandes et les détails de livraison.",
-          "Les profils de chiens servent aux colliers QR et aux informations publiques choisies.",
+          "Tes informations de compte aident à accélérer les prochains passages à la caisse.",
           "Le support peut t’aider si tu n’arrives plus à accéder au compte.",
         ],
         ctaLabel: "Ouvrir mon compte",
         ctaHref: "/account",
       },
       {
-        id: "colliers-qr",
-        eyebrow: "Colliers QR",
-        title: "Profils publics de chiens",
-        body: "Les colliers QR mènent vers un profil public que tu contrôles. Tu choisis ce qui est visible pour aider quelqu’un à retrouver ton chien rapidement.",
-        points: [
-          "Le profil peut inclure le nom, la photo, les notes utiles et les contacts choisis.",
-          "L’activation se fait depuis Mon compte, Mes chiens, ou par le scan du QR.",
-          "Les informations publiques restent modifiables après l’activation.",
-        ],
-        ctaLabel: "Gérer mes chiens",
-        ctaHref: "/account/dogs",
-      },
-      {
         id: "conditions",
         eyebrow: "Conditions",
         title: "Conditions de vente, version claire",
-        body: `${business.brand} est une boutique locale en ligne avec support humain. Les commandes sont soumises à la disponibilité des produits et aux options de livraison offertes à l’adresse fournie.`,
+        body: `${business.brand} est une boutique animalière locale avec livraison à domicile à Rimouski et support humain. Les commandes sont soumises à la disponibilité des produits et aux options de livraison offertes à l’adresse fournie.`,
         points: [
           "Les descriptions, prix et disponibilités peuvent être corrigés en cas d’erreur évidente avant l’exécution de la commande.",
           "La livraison dépend de l’adresse, de la zone desservie et des créneaux disponibles.",
@@ -204,8 +190,8 @@ export function getHelpTopics(language: Language, business: BusinessInfo): HelpT
     {
       id: "livraison",
       eyebrow: "Delivery",
-      title: "Local delivery",
-      body: "Chez Olive mainly delivers in Rimouski and nearby areas. Your address is checked in cart and checkout to confirm the available options.",
+      title: "Home delivery in Rimouski",
+      body: "Chez Olive is a local pet boutique with home delivery in Rimouski and nearby areas. Your address is checked in cart and checkout to confirm the available options.",
       points: [
         business.shippingPolicy,
         "Fees, taxes, and the final total are shown before confirmation.",
@@ -255,33 +241,20 @@ export function getHelpTopics(language: Language, business: BusinessInfo): HelpT
       id: "compte",
       eyebrow: "Account",
       title: "My Chez Olive",
-      body: "Your customer area keeps orders, addresses, dog profiles, and useful information together for easier future visits.",
+      body: "Your customer area keeps orders, addresses, and useful information together for easier future visits.",
       points: [
         "You can view order history and delivery details.",
-        "Dog profiles support QR collars and the public information you choose.",
+        "Your account information helps speed up future checkouts.",
         "Support can help if you cannot access your account anymore.",
       ],
       ctaLabel: "Open my account",
       ctaHref: "/account",
     },
     {
-      id: "colliers-qr",
-      eyebrow: "QR collars",
-      title: "Public dog profiles",
-      body: "QR collars lead to a public profile you control. You choose what is visible to help someone bring your dog home quickly.",
-      points: [
-        "The profile can include the name, photo, useful notes, and selected contacts.",
-        "Activation happens from My account, My dogs, or by scanning the QR.",
-        "Public information stays editable after activation.",
-      ],
-      ctaLabel: "Manage my dogs",
-      ctaHref: "/account/dogs",
-    },
-    {
       id: "conditions",
       eyebrow: "Terms",
       title: "Terms of sale, clearly",
-      body: `${business.brand} is a local online shop with human support. Orders are subject to product availability and the delivery options offered for the provided address.`,
+      body: `${business.brand} is a local pet boutique with home delivery in Rimouski and human support. Orders are subject to product availability and the delivery options offered for the provided address.`,
       points: [
         "Descriptions, prices, and availability may be corrected before fulfillment if there is an obvious error.",
         "Delivery depends on the address, service area, and available slots.",
@@ -300,8 +273,8 @@ export function getHelpCenterCards(language: Language, business: BusinessInfo): 
   if (language === "fr") {
     return [
       {
-        title: "Livraison locale",
-        description: "Zone desservie, frais, seuil gratuit et planification.",
+        title: "Livraison à domicile",
+        description: "Livraison à domicile, zone desservie, frais, seuil gratuit et planification.",
         href: "/faq#livraison",
       },
       {
@@ -330,8 +303,8 @@ export function getHelpCenterCards(language: Language, business: BusinessInfo): 
 
   return [
     {
-      title: "Local delivery",
-      description: "Service area, fees, free threshold, and scheduling details.",
+      title: "Home delivery",
+      description: "Home delivery area, fees, free threshold, and scheduling details.",
       href: "/faq#livraison",
     },
     {
@@ -369,7 +342,7 @@ export function getHelpCenterQuestions(language: Language, business: BusinessInf
       {
         topicId: "livraison",
         q: "Où livrez-vous ?",
-        a: "Chez Olive dessert surtout Rimouski et les environs. Le passage à la caisse confirme si l’adresse entre bien dans notre zone locale.",
+        a: "Chez Olive offre la livraison à domicile à Rimouski et dans les environs. Le passage à la caisse confirme si l’adresse entre bien dans notre zone locale.",
       },
       {
         topicId: "paiement",
@@ -386,11 +359,6 @@ export function getHelpCenterQuestions(language: Language, business: BusinessInf
         q: "Que faire si j’ai un problème avec ma commande ?",
         a: `Ouvre la bulle Aide ou écris-nous à ${business.supportEmail}. On pourra t’aider pour une commande, une livraison ou un retour.`,
       },
-      {
-        topicId: "colliers-qr",
-        q: "À quoi sert le collier QR ?",
-        a: "Il mène vers le profil public du chien. Tu contrôles les informations visibles, comme la photo, les notes utiles et les contacts choisis.",
-      },
     ];
   }
 
@@ -403,7 +371,7 @@ export function getHelpCenterQuestions(language: Language, business: BusinessInf
     {
       topicId: "livraison",
       q: "Where do you deliver?",
-      a: "Chez Olive mainly serves Rimouski and nearby areas. Checkout confirms whether your address is inside our local delivery zone.",
+      a: "Chez Olive offers home delivery in Rimouski and nearby areas. Checkout confirms whether your address is inside our home delivery zone.",
     },
     {
       topicId: "paiement",
@@ -420,11 +388,6 @@ export function getHelpCenterQuestions(language: Language, business: BusinessInf
       q: "What should I do if there is a problem with my order?",
       a: `Open the Help bubble or email ${business.supportEmail}. We can help with an order, delivery, or return issue.`,
     },
-    {
-      topicId: "colliers-qr",
-      q: "What is the QR collar for?",
-      a: "It links to the dog’s public profile. You control what is visible, including the photo, useful notes, and selected contacts.",
-    },
   ];
 }
 
@@ -433,7 +396,7 @@ export function getShippingSections(language: Language, business: BusinessInfo):
     return [
       {
         title: "Zone desservie",
-        body: "La livraison est offerte surtout à Rimouski et dans les environs. L’adresse est validée au passage à la caisse pour confirmer si elle fait partie de la zone locale desservie.",
+        body: "La livraison à domicile est offerte surtout à Rimouski et dans les environs. L’adresse est validée au passage à la caisse pour confirmer si elle fait partie de la zone locale desservie.",
       },
       {
         title: "Délais et planification",
@@ -457,7 +420,7 @@ export function getShippingSections(language: Language, business: BusinessInfo):
   return [
     {
       title: "Delivery area",
-      body: "Delivery is mainly offered in Rimouski and nearby areas. The address is checked at checkout to confirm whether it is inside the local service zone.",
+      body: "Home delivery is mainly offered in Rimouski and nearby areas. The address is checked at checkout to confirm whether it is inside the local service zone.",
     },
     {
       title: "Timing and scheduling",
@@ -533,7 +496,7 @@ export function getTermsSections(language: Language, business: BusinessInfo): He
     return [
       {
         title: "Commerçant",
-        body: `${business.brand} est une boutique locale qui vend ses produits en ligne avec support client à ${business.supportEmail}.`,
+        body: `${business.brand} est une boutique animalière locale avec livraison à domicile à Rimouski et support client à ${business.supportEmail}.`,
       },
       {
         title: "Commande et paiement",
@@ -561,7 +524,7 @@ export function getTermsSections(language: Language, business: BusinessInfo): He
   return [
     {
       title: "Merchant",
-      body: `${business.brand} is a local shop selling products online with customer support at ${business.supportEmail}.`,
+      body: `${business.brand} is a local pet boutique with home delivery in Rimouski and customer support at ${business.supportEmail}.`,
     },
     {
       title: "Orders and payment",

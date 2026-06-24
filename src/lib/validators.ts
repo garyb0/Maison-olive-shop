@@ -879,6 +879,16 @@ export const supportGuestReadSchema = z.object({
   guestToken: z.string().trim().min(1).max(2000),
 });
 
+export const supportConversationCloseSchema = z.object({
+  reason: z.enum(["RESOLVED", "DELIVERY", "PRODUCT", "PAYMENT", "REFUND", "DUPLICATE", "OTHER"]).optional(),
+  note: z.preprocess(emptyToUndefined, z.string().trim().max(500).optional()),
+});
+
+export const supportGuestCloseSchema = supportConversationCloseSchema.extend({
+  guestEmail: z.string().trim().email().max(160),
+  guestToken: z.string().trim().min(1).max(2000),
+});
+
 export const adminSupportConversationPatchSchema = z
   .object({
     priority: z.enum(["LOW", "NORMAL", "HIGH", "URGENT"]).optional(),

@@ -1,5 +1,6 @@
 import { jsonError, jsonOk } from "@/lib/http";
-import { getSupportConversationPublic } from "@/lib/support";
+import { getCurrentUser } from "@/lib/auth";
+import { getSupportConversationForCustomer, getSupportConversationPublic } from "@/lib/support";
 
 /**
  * Public endpoint — no auth required.
@@ -9,6 +10,14 @@ import { getSupportConversationPublic } from "@/lib/support";
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params;
+    const user = await getCurrentUser();
+    if (user) {
+      if (user.role === "ADMIN") return jsonError("Forbidden", 403);
+      const conversation = await getSupportConversationForCustomer(id, user);
+      if (!conversation) return jsonError("Conversation not found", 404);
+      return jsonOk({ conversation });
+    }
+
     const url = new URL(_request.url);
     const guestToken = url.searchParams.get("token")?.trim();
     if (!guestToken) return jsonError("Forbidden", 403);

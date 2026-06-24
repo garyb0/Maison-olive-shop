@@ -22,10 +22,10 @@ import {
 import { isRimouskiPostalCode } from "@/lib/delivery-zone";
 import { getConversionSessionKey, trackConversionEvent } from "@/lib/conversion-tracker";
 import { Navigation } from "@/components/Navigation";
+import { MobileAppChrome } from "@/components/MobileAppChrome";
 import { GoogleAuthButton } from "@/components/GoogleAuthButton";
 import { StripeInlineCheckout } from "@/components/StripeInlineCheckoutSurface";
 import { CheckoutSuccessView } from "@/components/CheckoutSuccessView";
-import { PwaAppHeader } from "@/app/app/pwa-app-header";
 
 type ProductIndex = Record<
   string,
@@ -1134,10 +1134,8 @@ export function CheckoutClient({
 
   if (inlineConfirmation) {
     return (
-      <div className="app-shell checkout-app-shell">
-        <div className="checkout-mobile-chrome">
-          <PwaAppHeader language={language} userRole={user?.role ?? null} />
-        </div>
+      <div className="app-shell checkout-app-shell mobile-app-clone-shell">
+        <MobileAppChrome language={language} userRole={user?.role ?? null} className="checkout-mobile-chrome" />
         <header className="topbar checkout-desktop-topbar">
           <div className="brand">{t.brandName}</div>
           <Navigation language={language} t={t} user={user} />
@@ -1154,10 +1152,8 @@ export function CheckoutClient({
   }
 
   return (
-    <div className="app-shell checkout-app-shell">
-      <div className="checkout-mobile-chrome">
-        <PwaAppHeader language={language} userRole={user?.role ?? null} />
-      </div>
+    <div className="app-shell checkout-app-shell mobile-app-clone-shell">
+      <MobileAppChrome language={language} userRole={user?.role ?? null} className="checkout-mobile-chrome" />
       <header className="topbar checkout-desktop-topbar">
         <div className="brand">{t.brandName}</div>
         <Navigation language={language} t={t} user={user} />
@@ -1193,10 +1189,10 @@ export function CheckoutClient({
                 {language === "fr"
                   ? user
                     ? t.checkoutSubtitle
-                    : "Livraison locale (Rimouski) — paiement par carte en invité; paiement local avec compte."
+                    : "Livraison à domicile (Rimouski) — paiement par carte en invité; paiement local avec compte."
                   : user
                     ? t.checkoutSubtitle
-                    : "Local delivery (Rimouski) — guest card checkout; local payment with an account."}
+                    : "Home delivery (Rimouski) — guest card checkout; local payment with an account."}
               </p>
             </div>
           </div>
@@ -1374,8 +1370,8 @@ export function CheckoutClient({
                   </h2>
                   <p className="checkout-section-subtitle">
                     {language === "fr"
-                      ? "Livraison locale à Rimouski seulement 📍"
-                      : "Local delivery in Rimouski area only 📍"}
+                      ? "Livraison à domicile à Rimouski seulement 📍"
+                      : "Home delivery in Rimouski area only 📍"}
                   </p>
                 </div>
               </div>
@@ -1757,8 +1753,8 @@ export function CheckoutClient({
                   )}
                   <p className="small" style={{ marginTop: 6, marginBottom: 0 }}>
                     {language === "fr"
-                      ? "Seules les adresses de livraison locales dans notre zone sont acceptées."
-                      : "Only local delivery addresses inside our service area are accepted."}
+                      ? "Seules les adresses de livraison à domicile dans notre zone sont acceptées."
+                      : "Only home delivery addresses inside our service area are accepted."}
                   </p>
                   {addressError && (
                     <p className="checkout-postal-hint" style={{ color: "#dc2626" }}>
@@ -1886,7 +1882,7 @@ export function CheckoutClient({
                   </div>
                 </div>
                 <div className="checkout-delivery-banner">
-                <strong>{language === "fr" ? "Livraison locale à Rimouski et environs" : "Local delivery in Rimouski and nearby"}</strong>
+                <strong>{language === "fr" ? "Livraison à domicile à Rimouski et environs" : "Home delivery in Rimouski and nearby"}</strong>
                   <span>{deliveryStepLabel}</span>
                 </div>
               </div>
@@ -1916,7 +1912,7 @@ export function CheckoutClient({
                   ) : null}
 
                   {deliverySlots.length === 0 ? (
-                    <div className="checkout-delivery-feedback" style={{ marginTop: 0 }}>
+                    <div className="checkout-delivery-feedback checkout-delivery-empty" style={{ marginTop: 0 }}>
                       <p className="small" style={{ margin: 0, fontWeight: 700 }}>
                         {language === "fr" ? "Planification manuelle activée" : "Manual scheduling enabled"}
                       </p>
@@ -1924,6 +1920,11 @@ export function CheckoutClient({
                         {language === "fr"
                           ? "Aucune période n'est disponible pour l'instant. Tu peux finaliser la commande quand même et notre équipe t'appellera pour convenir d'une plage de livraison."
                           : "No delivery periods are available right now. You can still complete your order and our team will call you to arrange a delivery window."}
+                      </p>
+                      <p className="small checkout-delivery-empty-note">
+                        {language === "fr"
+                          ? "Ajoute ton numéro de téléphone pour qu'on puisse te proposer un moment de livraison rapidement."
+                          : "Add your phone number so we can quickly suggest a delivery time."}
                       </p>
                     </div>
                   ) : (
@@ -2052,7 +2053,7 @@ export function CheckoutClient({
                             {language === "fr" ? "Bon à savoir" : "Good to know"}
                           </span>
                           <ul className="checkout-delivery-benefits">
-                            <li>{language === "fr" ? "Livraison locale uniquement, selon le code postal." : "Local delivery only, based on your postal code."}</li>
+                            <li>{language === "fr" ? "Livraison à domicile uniquement, selon le code postal." : "Home delivery only, based on your postal code."}</li>
                             <li>{language === "fr" ? "Le téléphone aide le livreur si besoin." : "A phone number helps the driver if needed."}</li>
                             <li>{language === "fr" ? "S'il n'y a plus de place, nous te contacterons." : "If no slots remain, we will contact you directly."}</li>
                           </ul>
@@ -2184,10 +2185,10 @@ export function CheckoutClient({
                     <span className="checkout-payment-option-desc">
                       {language === "fr"
                         ? user
-                          ? "Paiement comptant au moment de la livraison. Livraison locale uniquement (région de Rimouski)."
+                          ? "Paiement comptant au moment de la livraison à domicile. Zone de Rimouski seulement."
                           : "Connecte-toi pour payer localement à la livraison; sinon utilise le paiement par carte en invité."
                         : user
-                          ? "Cash payment at the time of delivery. Local delivery only (Rimouski area)."
+                          ? "Cash payment at the time of home delivery. Rimouski area only."
                           : "Sign in to use local pay-on-delivery; otherwise use guest card checkout."}
                     </span>
                   </div>
@@ -2358,8 +2359,8 @@ export function CheckoutClient({
                 {/* Info zone livraison */}
                 <div className="checkout-zone-note">
                   📍 {language === "fr"
-                    ? "Livraison locale à Rimouski et environs seulement."
-                    : "Local delivery in Rimouski area only."}
+                    ? "Livraison à domicile à Rimouski et environs seulement."
+                    : "Home delivery in Rimouski area only."}
                 </div>
 
                 <details className="checkout-final-trust checkout-final-trust--details" open={checkoutHelpDetailsOpen}>

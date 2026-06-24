@@ -134,7 +134,7 @@ describe("app notifications", () => {
     expect(payload).not.toHaveProperty("metadata");
   });
 
-  it("deduplique les notifications QR chien recentes", async () => {
+  it("desactive temporairement les notifications QR chien cote client", async () => {
     prismaMock.appNotification.findFirst.mockResolvedValueOnce({ id: "notif_existing" });
     const { createDogQrScanNotification } = await import("@/lib/app-notifications");
 
@@ -145,7 +145,56 @@ describe("app notifications", () => {
     });
 
     expect(notification).toBeNull();
+    expect(prismaMock.appNotification.findFirst).not.toHaveBeenCalled();
     expect(prismaMock.appNotification.create).not.toHaveBeenCalled();
+    expect(sendNotificationMock).not.toHaveBeenCalled();
+  });
+
+  it("exclut les notifications QR client du listing et du compteur", async () => {
+    prismaMock.appNotification.findMany.mockResolvedValueOnce([
+      {
+        id: "notif_order_1",
+        type: "ORDER_UPDATE",
+        audience: "CUSTOMER",
+        title: "Commande",
+        body: "Commande recue.",
+        href: "/account/orders",
+        readAt: null,
+        createdAt: new Date("2026-05-03T13:00:00.000Z"),
+      },
+    ]);
+    prismaMock.appNotification.count.mockResolvedValueOnce(1);
+    const { listAppNotificationsForUser } = await import("@/lib/app-notifications");
+
+    const result = await listAppNotificationsForUser(
+      {
+        id: "user_1",
+        email: "client@chezolive.ca",
+        firstName: "Client",
+        lastName: "Olive",
+        role: "CUSTOMER",
+        language: "fr",
+      },
+      8,
+      { excludeTypes: ["DOG_QR_UPDATE"] },
+    );
+
+    expect(result.unreadCount).toBe(1);
+    expect(result.notifications).toHaveLength(1);
+    expect(prismaMock.appNotification.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: {
+        userId: "user_1",
+        type: { notIn: ["DOG_QR_UPDATE"] },
+      },
+      take: 8,
+    }));
+    expect(prismaMock.appNotification.count).toHaveBeenCalledWith({
+      where: {
+        userId: "user_1",
+        type: { notIn: ["DOG_QR_UPDATE"] },
+        readAt: null,
+      },
+    });
   });
 
   it("resume les notifications admin recentes et les abonnements push invalides", async () => {

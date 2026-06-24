@@ -411,17 +411,78 @@ export async function isAnyAdminAvailable() {
 export async function getSupportStateForUser(user: CurrentUser | null) {
   const adminAvailable = await isAnyAdminAvailable();
   if (!user || user.role === "ADMIN") {
-    return { adminAvailable, activeConversation: null };
+    return { adminAvailable, activeConversation: null, conversations: [] };
   }
-  const activeConversation = await prisma.supportConversation.findFirst({
-    where: { customerUserId: user.id, status: { in: [...ACTIVE_STATUSES] } },
-    orderBy: { updatedAt: "desc" },
-    include: conversationInclude,
-  });
+  const inbox = await getCustomerSupportInbox(user);
   return {
     adminAvailable,
-    activeConversation: activeConversation ? await enrichSupportConversation(activeConversation, "customer") : null,
+    activeConversation: inbox.activeConversation,
+    conversations: inbox.conversations,
   };
+}
+
+function getCustomerConversationWhere(user: CurrentUser) {
+  const normalizedEmail = normalizeGuestEmail(user.email);
+  const emailCandidates = normalizedEmail === user.email ? [user.email] : [user.email, normalizedEmail];
+
+  return {
+    OR: [{ customerUserId: user.id }, { customerEmail: { in: emailCandidates } }],
+  };
+}
+
+function sortCustomerConversations<T extends { status: string; lastMessageAt?: Date | string | null; updatedAt?: Date | string | null }>(
+  conversations: T[],
+) {
+  const activeRank = (status: string) => (ACTIVE_STATUSES.includes(status as (typeof ACTIVE_STATUSES)[number]) ? 0 : 1);
+  const timestamp = (conversation: T) =>
+    new Date(conversation.lastMessageAt ?? conversation.updatedAt ?? 0).getTime();
+
+  return [...conversations].sort((a, b) => {
+    const rankDelta = activeRank(a.status) - activeRank(b.status);
+    if (rankDelta !== 0) return rankDelta;
+    return timestamp(b) - timestamp(a);
+  });
+}
+
+export async function getCustomerSupportInbox(user: CurrentUser) {
+  if (user.role === "ADMIN") throw new Error("FORBIDDEN");
+
+  const [adminAvailable, conversations] = await Promise.all([
+    isAnyAdminAvailable(),
+    prisma.supportConversation.findMany({
+      where: getCustomerConversationWhere(user),
+      orderBy: [{ lastMessageAt: "desc" }, { updatedAt: "desc" }],
+      take: 12,
+      include: conversationInclude,
+    }),
+  ]);
+
+  const sorted = sortCustomerConversations(conversations);
+  const enriched = await Promise.all(sorted.map((conversation) => enrichSupportConversation(conversation, "customer")));
+  const activeConversation = enriched.find((conversation) =>
+    ACTIVE_STATUSES.includes(conversation.status as (typeof ACTIVE_STATUSES)[number]),
+  ) ?? null;
+
+  return {
+    adminAvailable,
+    activeConversation,
+    conversations: enriched,
+  };
+}
+
+export async function getSupportConversationForCustomer(conversationId: string, user: CurrentUser) {
+  if (user.role === "ADMIN") throw new Error("FORBIDDEN");
+
+  const conversation = await prisma.supportConversation.findFirst({
+    where: {
+      id: conversationId,
+      ...getCustomerConversationWhere(user),
+    },
+    include: conversationInclude,
+  });
+
+  if (!conversation) return null;
+  return enrichSupportConversation(conversation, "customer");
 }
 
 export async function createSupportConversation(input: {
@@ -454,7 +515,7 @@ export async function createSupportConversation(input: {
   if (input.user) {
     const existing = await prisma.supportConversation.findFirst({
       where: {
-        customerUserId: input.user.id,
+        ...getCustomerConversationWhere(input.user),
         status: { in: [...ACTIVE_STATUSES] },
       },
       orderBy: { updatedAt: "desc" },
@@ -462,10 +523,11 @@ export async function createSupportConversation(input: {
 
     if (existing) {
       const nextTags = topicTag ? normalizeTags([...parseTags(existing.tagsJson), topicTag]) : null;
-      if ((linkedOrderId && existing.orderId !== linkedOrderId) || nextTags) {
+      if ((linkedOrderId && existing.orderId !== linkedOrderId) || nextTags || !existing.customerUserId) {
         await prisma.supportConversation.update({
           where: { id: existing.id },
           data: {
+            ...(!existing.customerUserId ? { customerUserId: input.user.id } : {}),
             ...(linkedOrderId && existing.orderId !== linkedOrderId ? { orderId: linkedOrderId } : {}),
             ...(nextTags ? { tagsJson: JSON.stringify(nextTags) } : {}),
           },
@@ -578,7 +640,10 @@ export async function createSupportConversation(input: {
 export async function createSupportMessageAsCustomer(conversationId: string, user: CurrentUser, content: string) {
   const result = await prisma.$transaction(async (tx) => {
     const conversation = await tx.supportConversation.findFirst({
-      where: { id: conversationId, customerUserId: user.id },
+      where: {
+        id: conversationId,
+        ...getCustomerConversationWhere(user),
+      },
     });
 
     if (!conversation) throw new Error("CONVERSATION_NOT_FOUND");
@@ -604,6 +669,7 @@ export async function createSupportMessageAsCustomer(conversationId: string, use
     await tx.supportConversation.update({
       where: { id: conversationId },
       data: {
+        ...(!conversation.customerUserId ? { customerUserId: user.id } : {}),
         lastMessageAt: new Date(),
         status: conversation.status === "CLOSED" || conversation.status === "WAITING" ? "OPEN" : conversation.status,
         reopenedAt: conversation.status === "CLOSED" ? new Date() : conversation.reopenedAt,
@@ -753,33 +819,47 @@ export async function assignSupportConversation(conversationId: string, admin: C
   return enrichSupportConversation(result, "admin", admin);
 }
 
-export async function closeSupportConversation(
+async function closeSupportConversationCore(
   conversationId: string,
-  admin: CurrentUser,
-  input?: { reason?: SupportConversationCloseReason; note?: string },
+  input: {
+    actorUserId?: string | null;
+    assignedAdminId?: string | null;
+    reason?: SupportConversationCloseReason;
+    note?: string;
+    perspective: "admin" | "customer";
+    admin?: CurrentUser | null;
+  },
 ) {
   const result = await prisma.$transaction(async (tx) => {
     const conversation = await tx.supportConversation.findUnique({ where: { id: conversationId } });
     if (!conversation) throw new Error("CONVERSATION_NOT_FOUND");
-    const closedNote = input?.note?.trim() || null;
+
+    if (conversation.status === "CLOSED") {
+      return tx.supportConversation.findUniqueOrThrow({
+        where: { id: conversationId },
+        include: conversationInclude,
+      });
+    }
+
+    const closedNote = input.note?.trim() || null;
 
     await tx.supportConversation.update({
       where: { id: conversationId },
       data: {
-        assignedAdminId: conversation.assignedAdminId ?? admin.id,
+        ...(input.assignedAdminId ? { assignedAdminId: conversation.assignedAdminId ?? input.assignedAdminId } : {}),
         status: "CLOSED",
         closedAt: new Date(),
-        closedReason: input?.reason ?? "RESOLVED",
+        closedReason: input.reason ?? "RESOLVED",
         closedNote,
         slaDueAt: null,
       },
     });
 
-    if (closedNote) {
+    if (closedNote && input.assignedAdminId) {
       await tx.supportInternalNote.create({
         data: {
           conversationId,
-          adminUserId: admin.id,
+          adminUserId: input.assignedAdminId,
           content: `Fermeture: ${closedNote}`,
         },
       });
@@ -787,11 +867,15 @@ export async function closeSupportConversation(
 
     await tx.auditLog.create({
       data: {
-        actorUserId: admin.id,
+        actorUserId: input.actorUserId ?? null,
         action: "SUPPORT_CONVERSATION_CLOSED",
         entity: "SupportConversation",
         entityId: conversationId,
-        metadata: JSON.stringify({ reason: input?.reason ?? "RESOLVED", hasNote: Boolean(closedNote) }),
+        metadata: JSON.stringify({
+          reason: input.reason ?? "RESOLVED",
+          hasNote: Boolean(closedNote),
+          actor: input.assignedAdminId ? "admin" : input.actorUserId ? "customer" : "guest",
+        }),
       },
     });
 
@@ -800,7 +884,73 @@ export async function closeSupportConversation(
       include: conversationInclude,
     });
   });
-  return enrichSupportConversation(result, "admin", admin);
+
+  return enrichSupportConversation(result, input.perspective, input.admin ?? null);
+}
+
+export async function closeSupportConversation(
+  conversationId: string,
+  admin: CurrentUser,
+  input?: { reason?: SupportConversationCloseReason; note?: string },
+) {
+  return closeSupportConversationCore(conversationId, {
+    actorUserId: admin.id,
+    assignedAdminId: admin.id,
+    reason: input?.reason,
+    note: input?.note,
+    perspective: "admin",
+    admin,
+  });
+}
+
+export async function closeSupportConversationAsCustomer(
+  conversationId: string,
+  user: CurrentUser,
+  input?: { reason?: SupportConversationCloseReason; note?: string },
+) {
+  if (user.role === "ADMIN") throw new Error("FORBIDDEN");
+
+  const conversation = await prisma.supportConversation.findFirst({
+    where: {
+      id: conversationId,
+      ...getCustomerConversationWhere(user),
+    },
+    select: { id: true },
+  });
+  if (!conversation) throw new Error("CONVERSATION_NOT_FOUND");
+
+  return closeSupportConversationCore(conversationId, {
+    actorUserId: user.id,
+    reason: input?.reason,
+    note: input?.note,
+    perspective: "customer",
+  });
+}
+
+export async function closeSupportConversationAsGuest(
+  conversationId: string,
+  guestEmail: string,
+  guestToken: string,
+  input?: { reason?: SupportConversationCloseReason; note?: string },
+) {
+  const conversation = await prisma.supportConversation.findUnique({ where: { id: conversationId } });
+  if (!conversation) throw new Error("CONVERSATION_NOT_FOUND");
+
+  const normalizedGuestEmail = normalizeGuestEmail(guestEmail);
+  if (conversation.customerEmail.toLowerCase() !== normalizedGuestEmail) {
+    throw new Error("FORBIDDEN");
+  }
+
+  if (!verifySupportGuestAccessToken(guestToken, conversation.id, conversation.customerEmail)) {
+    throw new Error("FORBIDDEN");
+  }
+
+  return closeSupportConversationCore(conversationId, {
+    actorUserId: null,
+    reason: input?.reason,
+    note: input?.note,
+    perspective: "customer",
+  });
 }
 
 export async function getSupportConversationPublic(conversationId: string, guestToken: string) {
@@ -988,7 +1138,10 @@ export async function createSupportMessageAsAdmin(conversationId: string, admin:
 
 export async function markSupportConversationReadAsCustomer(conversationId: string, user: CurrentUser) {
   const conversation = await prisma.supportConversation.findFirst({
-    where: { id: conversationId, customerUserId: user.id },
+    where: {
+      id: conversationId,
+      ...getCustomerConversationWhere(user),
+    },
     include: conversationInclude,
   });
 
@@ -1201,8 +1354,8 @@ const DEFAULT_QUICK_REPLY_MACROS = {
       category: "commande",
     },
     {
-      title: "Livraison locale",
-      content: "Je vérifie les détails de livraison locale à Rimouski et environs pour vous confirmer la meilleure suite.",
+      title: "Livraison à domicile",
+      content: "Je vérifie les détails de livraison à domicile à Rimouski et environs pour vous confirmer la meilleure suite.",
       category: "livraison",
     },
     {
@@ -1223,8 +1376,8 @@ const DEFAULT_QUICK_REPLY_MACROS = {
       category: "order",
     },
     {
-      title: "Local delivery",
-      content: "I will check the local delivery details around Rimouski and confirm the best next step.",
+      title: "Home delivery",
+      content: "I will check the home delivery details around Rimouski and confirm the best next step.",
       category: "delivery",
     },
     {

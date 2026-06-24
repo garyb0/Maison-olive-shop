@@ -6,7 +6,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Chez Olive",
     short_name: "Chez Olive",
     description:
-      "Boutique, compte client, chiens QR, support et livraison locale Chez Olive.",
+      "Boutique animalière locale avec livraison à domicile à Rimouski.",
     lang: "fr-CA",
     start_url: "/app",
     scope: "/",
@@ -40,7 +40,7 @@ export default function manifest(): MetadataRoute.Manifest {
       {
         name: "Boutique",
         short_name: "Boutique",
-        description: "Magasiner les produits Chez Olive.",
+        description: "Magasiner la boutique animalière locale Chez Olive.",
         url: "/boutique",
         icons: [{ src: "/pwa-icon-192.png", sizes: "192x192", type: "image/png" }],
       },

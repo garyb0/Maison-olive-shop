@@ -26,7 +26,7 @@ export default async function DataDeletionPage() {
           },
           {
             title: "Données couvertes",
-            body: "La demande peut couvrir votre compte, vos préférences de notifications, vos messages de support et les profils chiens QR. Certaines données de commande peuvent devoir être conservées temporairement pour les obligations légales, fiscales, antifraude ou de service.",
+            body: "La demande peut couvrir votre compte, vos préférences de notifications, vos messages de support et les services associés. Certaines données de commande peuvent devoir être conservées temporairement pour les obligations légales, fiscales, antifraude ou de service.",
           },
           {
             title: "Délai de traitement",
@@ -40,7 +40,7 @@ export default async function DataDeletionPage() {
           },
           {
             title: "Covered data",
-            body: "The request may cover your account, notification preferences, support messages, and dog QR profiles. Some order data may need to be retained temporarily for legal, tax, fraud-prevention, or service obligations.",
+            body: "The request may cover your account, notification preferences, support messages, and related services. Some order data may need to be retained temporarily for legal, tax, fraud-prevention, or service obligations.",
           },
           {
             title: "Processing time",

@@ -35,7 +35,7 @@ test.describe("Chez Olive PWA app hub", () => {
     );
   });
 
-  test("mobile hub renders, installs through simulated prompt and saves driver link", async ({ page }) => {
+  test("mobile hub renders the final guest app structure", async ({ page }) => {
     await page.addInitScript(() => {
       const originalAddEventListener = window.addEventListener.bind(window);
       const patchedAddEventListener = (
@@ -67,20 +67,13 @@ test.describe("Chez Olive PWA app hub", () => {
     await expect(page.locator(".nav-marketplace")).toHaveCount(0);
     await expect(page.locator(".pwa-app-header")).toBeVisible();
     await expect(page.getByRole("link", { name: "Boutique" }).first()).toHaveAttribute("href", "/boutique");
+    await expect(page.getByRole("heading", { name: "Bienvenue chez Olive" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Magasiner chez Olive" })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Magasiner/i }).first()).toHaveAttribute("href", "/boutique");
+    await expect(page.getByRole("link", { name: /Me connecter|Connexion/i }).first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Centre d'actions" })).toHaveCount(0);
+    await expect(page.locator(".pwa-core-action-grid a, .pwa-core-action-grid button")).toHaveCount(4);
     await expectNoHorizontalOverflow(page);
-
-    await page.locator(".pwa-more-panel > summary").click();
-    await expect(page.getByRole("button", { name: "Installer l'app" })).toBeVisible();
-    await page.getByRole("button", { name: "Installer l'app" }).click();
-    await expect(page.getByText(/Mode app activ/i)).toBeVisible();
-
-    await page.getByLabel("Lien chauffeur ou token").fill("driver_token_123456789");
-    await page.getByRole("button", { name: "Garder ce lien" }).click();
-    await expect(page.getByText("Dernier lien livreur")).toBeVisible();
-    await expect(page.getByRole("link", { name: "Ouvrir ma tournee" })).toHaveAttribute(
-      "href",
-      "/driver/run/driver_token_123456789",
-    );
 
     await page.screenshot({ path: "test-results/pwa-app-mobile.png", fullPage: true });
   });
@@ -108,8 +101,9 @@ test.describe("Chez Olive PWA app hub", () => {
     await page.goto("/app");
     await page.waitForLoadState("domcontentloaded");
 
-    await page.locator(".pwa-more-panel > summary").click();
-    await expect(page.getByText(/Mode app activ/i)).toBeVisible();
+    await expect(page.locator(".pwa-app-header")).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Bienvenue|Welcome/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Centre d'actions" })).toHaveCount(0);
     await expectNoHorizontalOverflow(page);
     await page.screenshot({ path: "test-results/pwa-app-standalone-mobile.png", fullPage: true });
   });

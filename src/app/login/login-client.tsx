@@ -18,6 +18,7 @@ import {
 import { useRouter } from 'next/navigation'
 import { Suspense, useEffect, useState, type FormEvent } from 'react'
 import { GoogleAuthButton } from '@/components/GoogleAuthButton'
+import { MobileAppChrome } from '@/components/MobileAppChrome'
 import { Navigation } from '@/components/Navigation'
 import { getDictionary, normalizeLanguage, type Language } from '@/lib/i18n'
 
@@ -207,7 +208,8 @@ export function LoginClient({
   }
 
   return (
-    <div className="app-shell login-page">
+    <div className="app-shell login-page mobile-app-clone-shell">
+      <MobileAppChrome language={language} userRole={null} />
       <header className="topbar">
         <Suspense fallback={null}>
           <Navigation language={language} t={t} user={null} />

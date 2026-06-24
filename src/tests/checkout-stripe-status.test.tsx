@@ -15,6 +15,7 @@ vi.mock("next/link", () => ({
 }));
 
 vi.mock("next/navigation", () => ({
+  usePathname: () => "/checkout",
   useSearchParams: () => new URLSearchParams(),
 }));
 

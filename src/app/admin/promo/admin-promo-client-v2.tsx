@@ -132,7 +132,7 @@ export function AdminPromoClient({ language, banners: initialBanners, freeShippi
     const nextForm = copyFrenchValuesToEnglish({
       ...emptyForm,
       sortOrder: String((banners.at(-1)?.sortOrder ?? 0) + 10),
-      badgeFr: "Livraison locale",
+      badgeFr: "Livraison à domicile",
       titleFr: `Livraison gratuite dès ${freeShippingThresholdLabel}`,
       price1Fr: "Rimouski et environs",
       price2Fr: "Commande simple, locale et rapide",
@@ -144,7 +144,7 @@ export function AdminPromoClient({ language, banners: initialBanners, freeShippi
 
     setForm({
       ...nextForm,
-      badgeEn: "Local delivery",
+      badgeEn: "Home delivery",
       titleEn: `Free delivery from ${freeShippingThresholdLabel}`,
       price1En: "Rimouski area and nearby",
       price2En: "Simple, local, fast ordering",

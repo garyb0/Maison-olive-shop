@@ -7,8 +7,8 @@ const baseBanner = {
   sortOrder: 0,
   badgeFr: "Offre limitée",
   badgeEn: "Limited offer",
-  titleFr: "Livraison locale",
-  titleEn: "Local delivery",
+  titleFr: "Livraison à domicile",
+  titleEn: "Home delivery",
   price1Fr: "1 pour 64,99 $",
   price1En: "1 for $64.99",
   price2Fr: "2 pour 100 $",
@@ -28,7 +28,7 @@ describe("promo banner localization", () => {
   it("uses English copy when it is available", () => {
     const banner = localizePromoBanner(baseBanner, "en");
 
-    expect(banner.title).toBe("Local delivery");
+    expect(banner.title).toBe("Home delivery");
     expect(banner.ctaText).toBe("Shop now →");
   });
 
@@ -42,7 +42,7 @@ describe("promo banner localization", () => {
       "en",
     );
 
-    expect(banner.title).toBe("Livraison locale");
+    expect(banner.title).toBe("Livraison à domicile");
     expect(banner.ctaText).toBe("Magasiner →");
   });
 

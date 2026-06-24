@@ -3,6 +3,7 @@ export {};
 const {
   requireAdminMock,
   addSupportInternalNoteMock,
+  createSupportMessageAsAdminMock,
   createSupportQuickReplyMock,
   listSupportQuickRepliesMock,
   reopenSupportConversationMock,
@@ -12,6 +13,7 @@ const {
 } = vi.hoisted(() => ({
   requireAdminMock: vi.fn(),
   addSupportInternalNoteMock: vi.fn(),
+  createSupportMessageAsAdminMock: vi.fn(),
   createSupportQuickReplyMock: vi.fn(),
   listSupportQuickRepliesMock: vi.fn(),
   reopenSupportConversationMock: vi.fn(),
@@ -26,6 +28,7 @@ vi.mock("@/lib/permissions", () => ({
 
 vi.mock("@/lib/support", () => ({
   addSupportInternalNote: (...args: unknown[]) => addSupportInternalNoteMock(...args),
+  createSupportMessageAsAdmin: (...args: unknown[]) => createSupportMessageAsAdminMock(...args),
   createSupportQuickReply: (...args: unknown[]) => createSupportQuickReplyMock(...args),
   listSupportQuickReplies: (...args: unknown[]) => listSupportQuickRepliesMock(...args),
   reopenSupportConversation: (...args: unknown[]) => reopenSupportConversationMock(...args),
@@ -67,6 +70,10 @@ describe("admin support workflow routes", () => {
     vi.clearAllMocks();
     requireAdminMock.mockResolvedValue(admin);
     addSupportInternalNoteMock.mockResolvedValue(conversation);
+    createSupportMessageAsAdminMock.mockResolvedValue({
+      ...conversation,
+      messages: [{ id: "msg_admin_1", senderType: "ADMIN", content: "Bonjour, je regarde ça." }],
+    });
     createSupportQuickReplyMock.mockResolvedValue(quickReply);
     listSupportQuickRepliesMock.mockResolvedValue([quickReply]);
     reopenSupportConversationMock.mockResolvedValue(conversation);
@@ -104,6 +111,22 @@ describe("admin support workflow routes", () => {
 
     expect(response.status).toBe(200);
     expect(addSupportInternalNoteMock).toHaveBeenCalledWith("conv_1", admin, "Client à rappeler.");
+  });
+
+  it("envoie une reponse admin visible au client", async () => {
+    const { POST } = await import("@/app/api/admin/support/conversations/[id]/messages/route");
+    const request = new Request("http://localhost:3101/api/admin/support/conversations/conv_1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: "Bonjour, je regarde ça." }),
+    });
+
+    const response = await POST(request, routeContext());
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(createSupportMessageAsAdminMock).toHaveBeenCalledWith("conv_1", admin, "Bonjour, je regarde ça.");
+    expect(payload.conversation.messages[0]).toEqual(expect.objectContaining({ senderType: "ADMIN" }));
   });
 
   it("reouvre et libere une conversation", async () => {

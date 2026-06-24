@@ -16,7 +16,7 @@ describe("help center shipping policy", () => {
     const { getShippingSections } = await import("@/lib/help-center");
 
     const business = getBusinessInfo("fr");
-    expect(business.shippingPolicy).toMatch(/Livraison locale forfaitaire de 8,99/);
+    expect(business.shippingPolicy).toMatch(/Livraison à domicile forfaitaire de 8,99/);
     expect(business.shippingPolicy).toMatch(/Gratuite dès 75,00/);
     expect(business.shippingPolicy).toContain("après rabais, avant taxes");
 

@@ -133,12 +133,6 @@ export default async function AccountDashboardPage({ searchParams }: AccountDash
               {language === "fr" ? "Suivi, détails et facture de tes achats." : "Track, review, and access your order invoices."}
             </p>
           </Link>
-          <Link className="account-home-shortcut" href="/account/dogs">
-            <span className="account-home-shortcut__title">{language === "fr" ? "Gérer mes chiens" : "Manage my dogs"}</span>
-            <p className="small account-home-shortcut__copy">
-              {language === "fr" ? "Mettre à jour leurs profils et infos utiles." : "Update their profiles and useful information."}
-            </p>
-          </Link>
           <Link className="account-home-shortcut" href="/account/subscriptions">
             <span className="account-home-shortcut__title">{language === "fr" ? "Gérer mes abonnements" : "Manage my subscriptions"}</span>
             <p className="small account-home-shortcut__copy">

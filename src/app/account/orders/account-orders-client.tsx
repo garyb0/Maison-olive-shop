@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { NavIcon } from "@/components/NavIcon";
+import { formatDate } from "@/lib/format";
 
 export type AccountOrderListItem = {
   id: string;
@@ -14,41 +15,22 @@ export type AccountOrderListItem = {
   deliveryStatus: string;
   deliveryWindowStartAt: string | null;
   deliveryWindowEndAt: string | null;
-  totalCents: number;
-  currency: string;
   items: Array<{
     id: string;
-    productId: string;
     slug: string;
-    imageUrl: string | null;
-    currentStock: number;
-    isActive: boolean;
     productNameFr: string;
     productNameEn: string;
     quantity: number;
   }>;
 };
 
-export type AccountFavoriteProduct = {
-  id: string;
-  slug: string;
-  nameFr: string;
-  nameEn: string;
-  imageUrl: string | null;
-  priceLabel: string | null;
-  stock: number;
-  isActive: boolean;
-};
-
 type AccountOrdersClientProps = {
   language: "fr" | "en";
   orders: AccountOrderListItem[];
-  favoriteProducts: AccountFavoriteProduct[];
 };
 
 type OrderFilter = "all" | "active" | "delivered" | "attention";
-type OrderSort = "newest" | "oldest" | "amount";
-type SupportTopic = "DELIVERY" | "PRODUCT" | "PAYMENT" | "CHANGE_CANCEL";
+type OrderSort = "newest" | "oldest";
 
 type CartLine = {
   productId: string;
@@ -132,30 +114,6 @@ const PAYMENT_STATUS_EN: Record<string, string> = {
   REFUNDED: "Refunded",
 };
 
-const PAYMENT_METHOD_FR: Record<string, string> = {
-  MANUAL: "Paiement local",
-  STRIPE: "Carte",
-};
-
-const PAYMENT_METHOD_EN: Record<string, string> = {
-  MANUAL: "Local payment",
-  STRIPE: "Card",
-};
-
-const SUPPORT_TOPIC_LABELS_FR: Record<SupportTopic, string> = {
-  DELIVERY: "Livraison",
-  PRODUCT: "Produit",
-  PAYMENT: "Paiement/facture",
-  CHANGE_CANCEL: "Modification/annulation",
-};
-
-const SUPPORT_TOPIC_LABELS_EN: Record<SupportTopic, string> = {
-  DELIVERY: "Delivery",
-  PRODUCT: "Product",
-  PAYMENT: "Payment/invoice",
-  CHANGE_CANCEL: "Change/cancel",
-};
-
 function readCart() {
   try {
     const raw = localStorage.getItem(CART_STORAGE_KEY);
@@ -193,12 +151,8 @@ function needsAttention(order: AccountOrderListItem) {
   );
 }
 
-function getItemName(orderItem: AccountOrderListItem["items"][number] | AccountFavoriteProduct, language: "fr" | "en") {
-  if ("productNameFr" in orderItem) {
-    return language === "fr" ? orderItem.productNameFr : orderItem.productNameEn;
-  }
-
-  return language === "fr" ? orderItem.nameFr : orderItem.nameEn;
+function getItemName(orderItem: AccountOrderListItem["items"][number], language: "fr" | "en") {
+  return language === "fr" ? orderItem.productNameFr : orderItem.productNameEn;
 }
 
 function formatDeliveryWindow(
@@ -216,33 +170,32 @@ function formatDeliveryWindow(
 
   const dateLabel = new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(start);
   const timeFormatter = new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" });
-  return `${dateLabel} · ${timeFormatter.format(start)}${language === "fr" ? " à " : " to "}${timeFormatter.format(end)}`;
+  return `${dateLabel} - ${timeFormatter.format(start)}${language === "fr" ? " à " : " to "}${timeFormatter.format(end)}`;
 }
 
-function getItemAvailabilityLabel(item: AccountOrderListItem["items"][number], language: "fr" | "en") {
-  if (!item.isActive) return language === "fr" ? "Produit désactivé" : "Product disabled";
-  if (item.currentStock <= 0) return language === "fr" ? "Rupture" : "Out of stock";
-  if (item.currentStock < item.quantity) {
-    return language === "fr" ? `${item.currentStock} disponible${item.currentStock > 1 ? "s" : ""}` : `${item.currentStock} available`;
-  }
-  return language === "fr" ? "Disponible" : "Available";
+function orderItemSummary(order: AccountOrderListItem, language: "fr" | "en") {
+  const totalItems = order.items.reduce((sum, item) => sum + item.quantity, 0);
+  return `${totalItems} ${language === "fr" ? `article${totalItems !== 1 ? "s" : ""}` : `item${totalItems !== 1 ? "s" : ""}`}`;
 }
 
-export function AccountOrdersClient({ language, orders, favoriteProducts }: AccountOrdersClientProps) {
+export function AccountOrdersClient({ language, orders }: AccountOrdersClientProps) {
   const locale = language === "fr" ? "fr-CA" : "en-CA";
   const [filter, setFilter] = useState<OrderFilter>("all");
   const [sort, setSort] = useState<OrderSort>("newest");
   const [search, setSearch] = useState("");
-  const [favoriteIds, setFavoriteIds] = useState(() => new Set(favoriteProducts.map((product) => product.id)));
-  const [favorites, setFavorites] = useState(favoriteProducts);
   const [cartCount, setCartCount] = useState(0);
   const [busyOrderId, setBusyOrderId] = useState<string | null>(null);
   const [reorderNotice, setReorderNotice] = useState<Record<string, string>>({});
-  const [supportTopics, setSupportTopics] = useState<Record<string, SupportTopic>>({});
-  const totalSpentCents = useMemo(() => orders.reduce((sum, order) => sum + order.totalCents, 0), [orders]);
   const latestOrder = orders[0] ?? null;
   const featuredOrder = orders.find(isActiveOrder) ?? latestOrder;
   const trimmedSearch = search.trim().toLowerCase();
+
+  const activeOrderCount = useMemo(() => orders.filter(isActiveOrder).length, [orders]);
+  const deliveredOrderCount = useMemo(
+    () => orders.filter((order) => order.status === "DELIVERED" || order.deliveryStatus === "DELIVERED").length,
+    [orders],
+  );
+  const attentionOrderCount = useMemo(() => orders.filter(needsAttention).length, [orders]);
 
   useEffect(() => {
     const refreshCartCount = () => {
@@ -276,56 +229,16 @@ export function AccountOrdersClient({ language, orders, favoriteProducts }: Acco
       })
       .sort((a, b) => {
         if (sort === "oldest") return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-        if (sort === "amount") return b.totalCents - a.totalCents;
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       });
   }, [filter, orders, sort, trimmedSearch]);
 
   const tabs = [
     { id: "all" as const, label: language === "fr" ? "Toutes" : "All", count: orders.length },
-    { id: "active" as const, label: language === "fr" ? "En cours" : "Active", count: orders.filter(isActiveOrder).length },
-    {
-      id: "delivered" as const,
-      label: language === "fr" ? "Livrées" : "Delivered",
-      count: orders.filter((order) => order.status === "DELIVERED" || order.deliveryStatus === "DELIVERED").length,
-    },
-    { id: "attention" as const, label: language === "fr" ? "À surveiller" : "Watch", count: orders.filter(needsAttention).length },
+    { id: "active" as const, label: language === "fr" ? "En cours" : "Active", count: activeOrderCount },
+    { id: "delivered" as const, label: language === "fr" ? "Livrées" : "Delivered", count: deliveredOrderCount },
+    { id: "attention" as const, label: language === "fr" ? "À surveiller" : "Watch", count: attentionOrderCount },
   ];
-
-  const toggleFavorite = async (item: AccountOrderListItem["items"][number]) => {
-    const isFavorite = favoriteIds.has(item.productId);
-    const response = await fetch(isFavorite ? `/api/account/favorites/${item.productId}` : "/api/account/favorites", {
-      method: isFavorite ? "DELETE" : "POST",
-      headers: { "Content-Type": "application/json" },
-      body: isFavorite ? undefined : JSON.stringify({ productId: item.productId }),
-    });
-    if (!response.ok) return;
-
-    setFavoriteIds((current) => {
-      const next = new Set(current);
-      if (isFavorite) next.delete(item.productId);
-      else next.add(item.productId);
-      return next;
-    });
-
-    setFavorites((current) => {
-      if (isFavorite) return current.filter((product) => product.id !== item.productId);
-      if (current.some((product) => product.id === item.productId)) return current;
-      return [
-        {
-          id: item.productId,
-          slug: item.slug,
-          nameFr: item.productNameFr,
-          nameEn: item.productNameEn,
-          imageUrl: item.imageUrl,
-          priceLabel: null,
-          stock: item.currentStock,
-          isActive: item.isActive,
-        },
-        ...current,
-      ];
-    });
-  };
 
   const handleReorder = async (order: AccountOrderListItem) => {
     setBusyOrderId(order.id);
@@ -388,18 +301,16 @@ export function AccountOrdersClient({ language, orders, favoriteProducts }: Acco
   };
 
   const openSupport = (order: AccountOrderListItem) => {
-    const topic = supportTopics[order.id] ?? "DELIVERY";
-    const topicLabel = (language === "fr" ? SUPPORT_TOPIC_LABELS_FR : SUPPORT_TOPIC_LABELS_EN)[topic];
     const draft =
       language === "fr"
-        ? `Bonjour, j'ai besoin d'aide avec la commande #${order.orderNumber}. Sujet: ${topicLabel}.`
-        : `Hello, I need help with order #${order.orderNumber}. Topic: ${topicLabel}.`;
+        ? `Bonjour, j'ai besoin d'aide avec la commande #${order.orderNumber}.`
+        : `Hello, I need help with order #${order.orderNumber}.`;
 
     window.dispatchEvent(
       new CustomEvent("chezolive:support-open", {
         detail: {
           orderId: order.id,
-          topic,
+          topic: "DELIVERY",
           draft,
         },
       }),
@@ -431,8 +342,8 @@ export function AccountOrdersClient({ language, orders, favoriteProducts }: Acco
           <h1>{language === "fr" ? "Centre de commandes" : "Order command center"}</h1>
           <p className="small account-section-copy">
             {language === "fr"
-              ? "Suivi, rachat sécurisé, favoris et support au même endroit."
-              : "Tracking, safe reorder, favorites, and support in one place."}
+              ? "Suivi, aide et rachat au même endroit."
+              : "Tracking, help, and reorders in one place."}
           </p>
         </div>
 
@@ -442,56 +353,17 @@ export function AccountOrdersClient({ language, orders, favoriteProducts }: Acco
             <strong>{orders.length}</strong>
           </div>
           <div>
-            <span>{language === "fr" ? "Montant" : "Amount"}</span>
-            <strong>{formatCurrency(totalSpentCents, "CAD", locale)}</strong>
+            <span>{language === "fr" ? "En cours" : "Active"}</span>
+            <strong>{activeOrderCount}</strong>
           </div>
           <div>
-            <span>{language === "fr" ? "Essentiels" : "Essentials"}</span>
-            <strong>{favorites.length}</strong>
+            <span>{language === "fr" ? "À surveiller" : "Watch"}</span>
+            <strong>{attentionOrderCount}</strong>
           </div>
         </div>
       </section>
 
       {renderCartReminder()}
-
-      <section className="account-essentials-section">
-        <div className="account-orders-section-head">
-          <div>
-            <p className="account-home-hero__eyebrow">{language === "fr" ? "Favoris" : "Favorites"}</p>
-            <h2>{language === "fr" ? "Mes essentiels" : "My essentials"}</h2>
-          </div>
-          <Link className="btn btn-secondary" href="/boutique">
-            {language === "fr" ? "Ajouter des essentiels" : "Add essentials"}
-          </Link>
-        </div>
-        {favorites.length > 0 ? (
-          <div className="account-essentials-grid">
-            {favorites.slice(0, 6).map((product) => (
-              <Link className="account-essential-card" href={`/products/${product.slug}`} key={product.id}>
-                {product.imageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={product.imageUrl} alt={getItemName(product, language)} />
-                ) : (
-                  <span aria-hidden="true">CO</span>
-                )}
-                <strong>{getItemName(product, language)}</strong>
-                <small>
-                  {product.priceLabel ? `${product.priceLabel} · ` : ""}
-                  {product.isActive && product.stock > 0
-                    ? language === "fr" ? "Disponible" : "Available"
-                    : language === "fr" ? "Non disponible" : "Unavailable"}
-                </small>
-              </Link>
-            ))}
-          </div>
-        ) : (
-          <p className="small account-empty-inline">
-            {language === "fr"
-              ? "Sauvegarde tes produits répétés depuis une commande ou la boutique."
-              : "Save repeat products from an order or the shop."}
-          </p>
-        )}
-      </section>
 
       {featuredOrder ? (
         <section className="account-orders-featured" aria-label={language === "fr" ? "Prochaine action commande" : "Next order action"}>
@@ -513,12 +385,14 @@ export function AccountOrdersClient({ language, orders, favoriteProducts }: Acco
 
       {orders.length === 0 ? (
         <section className="section account-orders-empty">
-          <div className="account-orders-empty__icon" aria-hidden="true">CO</div>
+          <div className="account-orders-empty__icon" aria-hidden="true">
+            <NavIcon name="orders" size={30} />
+          </div>
           <h2>{language === "fr" ? "Aucune commande pour le moment" : "No orders yet"}</h2>
           <p className="small">
             {language === "fr"
-              ? "La boutique, le panier et tes favoris sont prêts pour ton premier achat."
-              : "The shop, cart, and favorites are ready for your first purchase."}
+              ? "La boutique et le panier sont prêts pour ton premier achat."
+              : "The shop and cart are ready for your first purchase."}
           </p>
           <Link className="btn" href="/boutique">
             {language === "fr" ? "Découvrir la boutique" : "Browse the shop"}
@@ -561,7 +435,6 @@ export function AccountOrdersClient({ language, orders, favoriteProducts }: Acco
               >
                 <option value="newest">{language === "fr" ? "Plus récentes" : "Newest"}</option>
                 <option value="oldest">{language === "fr" ? "Plus anciennes" : "Oldest"}</option>
-                <option value="amount">{language === "fr" ? "Montant élevé" : "Highest amount"}</option>
               </select>
             </div>
           </section>
@@ -579,13 +452,10 @@ export function AccountOrdersClient({ language, orders, favoriteProducts }: Acco
                 const orderStatusLabel = (language === "fr" ? ORDER_STATUS_FR : ORDER_STATUS_EN)[order.status] ?? order.status;
                 const paymentStatusLabel =
                   (language === "fr" ? PAYMENT_STATUS_FR : PAYMENT_STATUS_EN)[order.paymentStatus] ?? order.paymentStatus;
-                const paymentMethodLabel =
-                  (language === "fr" ? PAYMENT_METHOD_FR : PAYMENT_METHOD_EN)[order.paymentMethod] ?? order.paymentMethod;
                 const deliveryStatusLabel =
                   (language === "fr" ? DELIVERY_STATUS_FR : DELIVERY_STATUS_EN)[order.deliveryStatus] ?? order.deliveryStatus;
                 const deliveryWindowLabel = formatDeliveryWindow(order.deliveryWindowStartAt, order.deliveryWindowEndAt, locale, language);
-                const totalItems = order.items.reduce((sum, item) => sum + item.quantity, 0);
-                const topic = supportTopics[order.id] ?? "DELIVERY";
+                const itemSummary = orderItemSummary(order, language);
 
                 return (
                   <article key={order.id} className="account-order-card account-order-card--premium account-order-card--command">
@@ -597,10 +467,6 @@ export function AccountOrdersClient({ language, orders, favoriteProducts }: Acco
                           {language === "fr" ? "Passée le " : "Placed on "}
                           {formatDate(order.createdAt, locale)}
                         </p>
-                      </div>
-                      <div className="account-order-card__total-block">
-                        <span>{language === "fr" ? "Total" : "Total"}</span>
-                        <strong>{formatCurrency(order.totalCents, order.currency, locale)}</strong>
                       </div>
                     </div>
 
@@ -619,78 +485,48 @@ export function AccountOrdersClient({ language, orders, favoriteProducts }: Acco
                       ))}
                     </div>
 
-                    <div className="account-order-card__details">
+                    <div className="account-order-card__details account-order-card__details--simple">
                       <div className="account-order-card__detail-block">
                         <span className="account-order-card__meta-label">{language === "fr" ? "Livraison" : "Delivery"}</span>
                         <strong>{deliveryWindowLabel}</strong>
                       </div>
                       <div className="account-order-card__detail-block">
-                        <span className="account-order-card__meta-label">{language === "fr" ? "Paiement" : "Payment"}</span>
-                        <strong>{paymentMethodLabel}</strong>
-                      </div>
-                      <div className="account-order-card__detail-block">
                         <span className="account-order-card__meta-label">{language === "fr" ? "Articles" : "Items"}</span>
-                        <strong>
-                          {totalItems} {language === "fr" ? `article${totalItems !== 1 ? "s" : ""}` : `item${totalItems !== 1 ? "s" : ""}`}
-                        </strong>
+                        <strong>{itemSummary}</strong>
                       </div>
                     </div>
 
-                    <div className="account-order-command-items">
-                      {order.items.map((item) => {
-                        const isFavorite = favoriteIds.has(item.productId);
-                        return (
-                          <div className="account-order-command-item" key={item.id}>
-                            <Link className="account-order-command-item__media" href={`/products/${item.slug}`}>
-                              {item.imageUrl ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={item.imageUrl} alt={getItemName(item, language)} />
-                              ) : (
-                                <span aria-hidden="true">CO</span>
-                              )}
-                            </Link>
-                            <div className="account-order-command-item__copy">
-                              <Link href={`/products/${item.slug}`}>{getItemName(item, language)}</Link>
-                              <small>
-                                x {item.quantity} · {getItemAvailabilityLabel(item, language)}
-                              </small>
-                            </div>
-                            <button className="btn btn-secondary" type="button" onClick={() => void toggleFavorite(item)}>
-                              {isFavorite ? (language === "fr" ? "Favori" : "Saved") : (language === "fr" ? "Sauvegarder" : "Save")}
-                            </button>
-                          </div>
-                        );
-                      })}
+                    <div className="account-order-command-items account-order-command-items--simple">
+                      {order.items.slice(0, 3).map((item) => (
+                        <Link className="account-order-command-item account-order-command-item--simple" href={`/products/${item.slug}`} key={item.id}>
+                          <span className="account-order-command-item__quantity">x{item.quantity}</span>
+                          <span className="account-order-command-item__copy">
+                            <strong>{getItemName(item, language)}</strong>
+                          </span>
+                        </Link>
+                      ))}
+                      {order.items.length > 3 ? (
+                        <p className="small account-order-command-items__more">
+                          {language === "fr"
+                            ? `+ ${order.items.length - 3} autre${order.items.length - 3 > 1 ? "s" : ""} article${order.items.length - 3 > 1 ? "s" : ""}`
+                            : `+ ${order.items.length - 3} more item${order.items.length - 3 > 1 ? "s" : ""}`}
+                        </p>
+                      ) : null}
                     </div>
 
                     {reorderNotice[order.id] ? <p className="small account-reorder-notice">{reorderNotice[order.id]}</p> : null}
 
-                    <div className="account-order-support-row">
-                      <select
-                        className="account-order-topic-select"
-                        value={topic}
-                        onChange={(event) => setSupportTopics((current) => ({ ...current, [order.id]: event.target.value as SupportTopic }))}
-                        aria-label={language === "fr" ? "Sujet de support" : "Support topic"}
-                      >
-                        {(Object.keys(SUPPORT_TOPIC_LABELS_FR) as SupportTopic[]).map((option) => (
-                          <option value={option} key={option}>
-                            {(language === "fr" ? SUPPORT_TOPIC_LABELS_FR : SUPPORT_TOPIC_LABELS_EN)[option]}
-                          </option>
-                        ))}
-                      </select>
-                      <button className="btn btn-secondary" type="button" onClick={() => openSupport(order)}>
-                        {language === "fr" ? "Demander de l’aide" : "Ask for help"}
-                      </button>
-                    </div>
-
                     <div className="account-order-card__actions account-order-card__actions--command">
-                      <Link className="btn btn-secondary" href={`/account/orders/${order.id}`}>
-                        {language === "fr" ? "Voir le détail" : "View detail"}
+                      <Link className="btn" href={`/account/orders/${order.id}`}>
+                        {language === "fr" ? "Voir le suivi" : "View tracking"}
                       </Link>
-                      <button className="btn" type="button" disabled={busyOrderId === order.id} onClick={() => void handleReorder(order)}>
+                      <button className="btn btn-secondary" type="button" disabled={busyOrderId === order.id} onClick={() => void handleReorder(order)}>
                         {busyOrderId === order.id
                           ? language === "fr" ? "Préparation..." : "Preparing..."
                           : language === "fr" ? "Acheter à nouveau" : "Buy again"}
+                      </button>
+                      <button className="btn btn-secondary" type="button" onClick={() => openSupport(order)}>
+                        {language === "fr" ? "Besoin d'aide" : "Need help"}
                       </button>
                     </div>
                   </article>

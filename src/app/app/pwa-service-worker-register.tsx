@@ -9,6 +9,8 @@ export function PwaServiceWorkerRegister() {
     navigator.serviceWorker.register("/sw.js", {
       scope: "/",
       updateViaCache: "none",
+    }).then((registration) => {
+      registration.update().catch(() => undefined);
     }).catch(() => undefined);
   }, []);
 

@@ -104,7 +104,7 @@ const supportAiInstructions = [
   "Never claim a refund, delivery date, product availability, or order status unless it appears in the provided context.",
   "Never provide veterinary diagnosis or medical certainty. Suggest checking with a professional for health concerns.",
   "The draft is admin-only and must be reviewed before being sent to the customer.",
-  "Chez Olive has online ordering and local delivery first; do not refer to a physical storefront at launch.",
+  "Present Chez Olive as a local pet boutique with home delivery in Rimouski. Do not frame it as a generic remote checkout flow, and do not promise a public physical storefront at launch.",
 ].join("\n");
 
 function normalizeAiTags(tags: string[]) {
@@ -151,7 +151,7 @@ export function createPrivacySafeSupportAiInput(rawContext: RawSupportAiContext)
     mode: "admin_suggestion_only",
     locale: "fr-CA",
     launchContext:
-      "Chez Olive sert les clients par commande en ligne, livraison locale a Rimouski et accompagnement support. Ne pas parler d'une boutique physique au lancement.",
+      "Chez Olive est une boutique animaliere locale avec livraison a domicile a Rimouski et accompagnement support. Ne pas la presenter comme un simple service de commande a distance, et ne pas promettre de comptoir physique ouvert au public au lancement.",
     guardrails: [
       "Suggestion interne seulement; aucune reponse automatique au client.",
       "Contexte personnel minimise: pas de courriel, telephone, adresse complete ou donnee de paiement.",

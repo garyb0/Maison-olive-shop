@@ -82,7 +82,7 @@ function LegacyAdminPromoClient({ language, banners: initialBanners, freeShippin
       id: null,
       isActive: true,
       sortOrder: String((banners.at(-1)?.sortOrder ?? 0) + 10),
-      badge: language === "fr" ? "Livraison locale" : "Local delivery",
+      badge: language === "fr" ? "Livraison à domicile" : "Home delivery",
       title:
         language === "fr"
           ? `Livraison gratuite des ${freeShippingThresholdLabel}`

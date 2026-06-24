@@ -7,6 +7,7 @@ import type { CurrentUser } from "@/lib/types";
 import { trackConversionEvent } from "@/lib/conversion-tracker";
 import { GoogleAuthButton } from "@/components/GoogleAuthButton";
 import { Navigation } from "@/components/Navigation";
+import { MobileAppChrome } from "@/components/MobileAppChrome";
 import { ProductFavoriteButton } from "@/components/ProductFavoriteButton";
 import { ProductShareButton } from "@/components/ProductShareButton";
 import { sumActiveVariantStock, type PublicProductVariant } from "@/lib/product-variants";
@@ -138,7 +139,7 @@ function getCatalogProductBenefitLabels(product: ProductCard, language: Language
 
   return [
     selectionLabel,
-    language === "fr" ? "Livraison Rimouski" : "Rimouski delivery",
+    language === "fr" ? "Livraison à domicile" : "Home delivery",
     language === "fr" ? "Paiement sécurisé" : "Secure payment",
   ];
 }
@@ -265,7 +266,7 @@ export function StorefrontClient({
     },
     {
       value: "Rimouski",
-      label: language === "fr" ? "livraison locale" : "local delivery",
+      label: language === "fr" ? "livraison à domicile" : "home delivery",
     },
   ], [categories.length, language, products.length]);
 
@@ -279,14 +280,14 @@ export function StorefrontClient({
     {
       title: language === "fr" ? "Sélection locale" : "Local selection",
       text: language === "fr"
-        ? "Une boutique pensée pour choisir des produits utiles, fiables et adaptés aux routines d'ici."
-        : "A shop built around useful, reliable products for local routines.",
+        ? "Une boutique animalière locale pensée pour les routines d'ici."
+        : "A local pet boutique built around local routines.",
     },
     {
-      title: language === "fr" ? "Achat rassurant" : "Easy checkout",
+      title: language === "fr" ? "Livraison à domicile" : "Home delivery",
       text: language === "fr"
-        ? "Livraison locale, paiement sécurisé et suivi clair de la commande."
-        : "Local delivery, secure payment, and clear order follow-up.",
+        ? "Livraison à domicile à Rimouski, paiement sécurisé et suivi clair."
+        : "Home delivery in Rimouski, secure payment, and clear follow-up.",
     },
   ], [language]);
 
@@ -398,7 +399,7 @@ export function StorefrontClient({
     if ((product.variants?.length ?? 0) > 0) return;
     if (product.stock <= 0) return;
 
-    const requestedQuantity = Math.max(1, quantities[product.id] ?? 1);
+    const requestedQuantity = isShopSurface ? 1 : Math.max(1, quantities[product.id] ?? 1);
     const existingQuantity = cart.find((line) => line.productId === product.id)?.quantity ?? 0;
     const quantity = Math.min(requestedQuantity, Math.max(0, product.stock - existingQuantity));
     if (quantity <= 0) return;
@@ -535,7 +536,8 @@ export function StorefrontClient({
         </div>
       ))}
 
-      <div className={`app-shell ${isShopSurface ? "app-shell--shop" : "app-shell--home"}`}>
+      <div className={`app-shell mobile-app-clone-shell ${isShopSurface ? "app-shell--shop" : "app-shell--home"}`}>
+        <MobileAppChrome language={language} userRole={user?.role ?? null} />
         <header className="topbar">
           <Navigation
             language={language}
@@ -577,13 +579,13 @@ export function StorefrontClient({
             </p>
             <h1 id="home-hero-title">
               {language === "fr"
-                ? "Boutique locale, achat direct"
-                : "Local shop, direct checkout"}
+                ? "Boutique animalière locale à Rimouski"
+                : "Local pet boutique in Rimouski"}
             </h1>
             <p className="home-hero-text">
               {language === "fr"
-                ? "Produits utiles, livraison à Rimouski, panier clair et suivi client dans une expérience simple."
-                : "Useful products, Rimouski delivery, a clear cart, and customer follow-up in one simple experience."}
+                ? "Produits pour chiens et chats, sélection d'ici et livraison à domicile à Rimouski."
+                : "Products for dogs and cats, local selection, and home delivery in Rimouski."}
             </p>
             <div className="home-hero-actions">
               <Link className="btn home-hero-primary" href="/boutique">
@@ -630,7 +632,7 @@ export function StorefrontClient({
         <section className="home-trust-band" aria-label={language === "fr" ? "Avantages Chez Olive" : "Chez Olive benefits"}>
           <article>
             <span aria-hidden="true">🚚</span>
-            <strong>{language === "fr" ? "Livraison locale" : "Local delivery"}</strong>
+            <strong>{language === "fr" ? "Livraison à domicile" : "Home delivery"}</strong>
             <small>{language === "fr" ? "Rimouski et environs" : "Rimouski area"}</small>
           </article>
           <article>
@@ -656,7 +658,7 @@ export function StorefrontClient({
         <section className="home-market-overview" aria-label={language === "fr" ? "Aperçu boutique" : "Shop overview"}>
           <div className="home-market-copy">
             <p className="home-eyebrow">
-              {language === "fr" ? "Boutique locale" : "Local shop"}
+              {language === "fr" ? "Boutique animalière locale" : "Local pet boutique"}
             </p>
             <h2>
               {language === "fr"
@@ -665,8 +667,8 @@ export function StorefrontClient({
             </h2>
             <p>
               {language === "fr"
-                ? "Des produits sélectionnés pour chiens et chats, avec livraison locale à Rimouski et paiement sécurisé."
-                : "Selected products for dogs and cats, with local Rimouski delivery and secure payment."}
+                ? "Des produits sélectionnés pour chiens et chats, avec livraison à domicile à Rimouski et paiement sécurisé."
+                : "Selected products for dogs and cats, with home delivery in Rimouski and secure payment."}
             </p>
 
             <div className="home-market-stats">
@@ -1045,8 +1047,8 @@ export function StorefrontClient({
               <h2>{language === "fr" ? "Disponible maintenant" : "Available now"}</h2>
               <p>
                 {language === "fr"
-                  ? "Confort choisi pour les routines locales, avec stock clair et livraison à Rimouski."
-                  : "Comfort selected for local routines, with clear stock and Rimouski delivery."}
+                  ? "Confort choisi pour les routines locales, avec stock clair et livraison à domicile à Rimouski."
+                  : "Comfort selected for local routines, with clear stock and home delivery in Rimouski."}
               </p>
             </div>
           ) : null}
@@ -1176,8 +1178,12 @@ export function StorefrontClient({
                 >
                   {/* Visuel — image ou emoji de catégorie */}
                   <Link className="catalog-product-media" href={`/products/${product.slug}`}>
-                    <span className="catalog-product-category">
-                      {getLocalizedCategoryLabel(product.category, language)}
+                    <span
+                      aria-label={getLocalizedCategoryLabel(product.category, language)}
+                      className="catalog-product-category"
+                      title={getLocalizedCategoryLabel(product.category, language)}
+                    >
+                      <span aria-hidden="true">{getCategoryEmoji(product.category)}</span>
                     </span>
                     {product.subscriptionAvailable ? (
                       <span className="catalog-subscription-badge">
@@ -1260,15 +1266,13 @@ export function StorefrontClient({
                   <div className="catalog-product-footer">
                     <strong className="catalog-product-price">{product.priceLabel}</strong>
                     <div className="catalog-product-actions">
-                      {(product.variants?.length ?? 0) > 0 ? (
+                      {getCatalogDisplayStock(product) === 0 ? (
+                        <button className="catalog-product-add" type="button" disabled>
+                          {language === "fr" ? "Indisponible" : "Unavailable"}
+                        </button>
+                      ) : (product.variants?.length ?? 0) > 0 ? (
                         <Link className="catalog-product-add" href={`/products/${product.slug}`}>
-                          {smallCatalogMode
-                            ? language === "fr"
-                              ? "Choisir la couleur"
-                              : "Choose color"
-                            : language === "fr"
-                              ? "Voir les couleurs"
-                              : "View colors"}
+                          {language === "fr" ? "Voir le produit" : "View product"}
                         </Link>
                       ) : (
                       <>
@@ -1304,9 +1308,13 @@ export function StorefrontClient({
                             ? language === "fr"
                               ? "Ajouté"
                               : "Added"
-                            : language === "fr"
-                              ? "Ajouter au panier"
-                              : "Add to cart"}
+                            : isShopSurface
+                              ? language === "fr"
+                                ? "Ajout rapide"
+                                : "Quick add"
+                              : language === "fr"
+                                ? "Ajouter au panier"
+                                : "Add to cart"}
                       </button>
                       </>
                       )}

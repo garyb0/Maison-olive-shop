@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NavIcon } from "@/components/NavIcon";
@@ -15,7 +14,7 @@ type Props = {
   showSecondary?: boolean;
 };
 
-const accountSecondaryPaths = ["/account/dogs", "/account/profile", "/account/subscriptions"];
+const accountSecondaryPaths = ["/account/profile", "/account/subscriptions"];
 
 function isExactOrChildPath(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
@@ -49,20 +48,8 @@ export function isAppNavigationItemActive(pathname: string, href: string) {
   return isExactOrChildPath(pathname, href);
 }
 
-export function AppMobileNav({ language, userRole, className, showSecondary = true }: Props) {
+export function AppMobileNav({ language, userRole, className }: Props) {
   const pathname = usePathname() ?? "";
-  const [driverHref, setDriverHref] = useState<string | null>(null);
-
-  useEffect(() => {
-    const id = window.setTimeout(() => {
-      const saved = window.localStorage.getItem("chezolive_last_driver_run_href");
-      if (saved?.startsWith("/driver/run/")) {
-        setDriverHref(saved);
-      }
-    }, 0);
-
-    return () => window.clearTimeout(id);
-  }, []);
 
   const items = appNavigationItems.map((item) => {
     const requiresAccount = item.href.startsWith("/account");
@@ -86,18 +73,6 @@ export function AppMobileNav({ language, userRole, className, showSecondary = tr
           <span>{item.label}</span>
         </Link>
       ))}
-      {showSecondary && driverHref ? (
-        <Link className="pwa-app-nav__secondary" href={driverHref}>
-          <NavIcon name="delivery" size={19} />
-          <span>{language === "fr" ? "Livreur" : "Driver"}</span>
-        </Link>
-      ) : null}
-      {showSecondary && userRole === "ADMIN" ? (
-        <Link className="pwa-app-nav__secondary" href="/admin">
-          <NavIcon name="admin" size={19} />
-          <span>Admin</span>
-        </Link>
-      ) : null}
     </nav>
   );
 }

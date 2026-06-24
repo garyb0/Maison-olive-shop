@@ -11,9 +11,15 @@ type Props = {
 export function ConditionalSupportChat({ language, user }: Props) {
   const pathname = usePathname();
 
-  if (pathname.startsWith("/dog/") || pathname.startsWith("/admin") || pathname.startsWith("/driver")) {
+  if (
+    pathname.startsWith("/dog/") ||
+    pathname.startsWith("/admin") ||
+    pathname.startsWith("/driver") ||
+    pathname === "/account/support" ||
+    pathname.startsWith("/account/support/")
+  ) {
     return null;
   }
 
-  return <SupportChatWidget language={language} user={user} />;
+  return <SupportChatWidget language={language} user={user} showFloatingButton />;
 }

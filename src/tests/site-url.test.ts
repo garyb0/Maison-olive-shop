@@ -142,7 +142,7 @@ describe("validateEnv production hardening", () => {
     const report = validateEnv("production");
 
     expect(report.warnings).toContain(
-      "SHIPPING_FLAT_CENTS is 0 while SHIPPING_FREE_THRESHOLD_CENTS is above 0; local delivery is free before the configured free-delivery threshold.",
+      "SHIPPING_FLAT_CENTS is 0 while SHIPPING_FREE_THRESHOLD_CENTS is above 0; home delivery is free before the configured free-delivery threshold.",
     );
   });
 });

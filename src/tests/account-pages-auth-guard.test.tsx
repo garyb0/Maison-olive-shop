@@ -41,8 +41,10 @@ vi.mock("@/lib/prisma", () => ({
   prisma: prismaMock,
 }));
 
-vi.mock("@/lib/favorites", () => ({
-  getFavoriteProductsForUser: vi.fn().mockResolvedValue([]),
+vi.mock("@/lib/env", () => ({
+  env: {
+    businessSupportEmail: "support@chezolive.ca",
+  },
 }));
 
 describe("account pages auth guard", () => {
@@ -71,7 +73,7 @@ describe("account pages auth guard", () => {
     expect(prismaMock.order.findMany).not.toHaveBeenCalled();
   });
 
-  it("renders account order cards with translated statuses and readable delivery windows", async () => {
+  it("renders account order cards without spending summaries", async () => {
     getCurrentUserMock.mockResolvedValue({
       id: "user_1",
       role: "CUSTOMER",
@@ -120,10 +122,15 @@ describe("account pages auth guard", () => {
     expect(screen.getAllByText("Commande reçue").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Paiement en attente").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Livraison terminée").length).toBeGreaterThan(0);
-    expect(screen.getByText("Paiement local")).toBeInTheDocument();
     expect(screen.getByText("2 articles")).toBeInTheDocument();
     expect(screen.getByText("Biscuits au saumon")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Voir le détail" })).toHaveAttribute("href", "/account/orders/order_1");
+    expect(screen.getAllByRole("link", { name: "Voir le suivi" })[0]).toHaveAttribute("href", "/account/orders/order_1");
+    expect(screen.queryByText("Montant")).not.toBeInTheDocument();
+    expect(screen.queryByText("Amount")).not.toBeInTheDocument();
+    expect(screen.queryByText(/0,58/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: /Montant/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Sauvegarder" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Sujet de support" })).not.toBeInTheDocument();
     expect(screen.queryByText("PENDING")).not.toBeInTheDocument();
   });
 
@@ -139,16 +146,10 @@ describe("account pages auth guard", () => {
         deliveryStatus: "SCHEDULED",
         deliveryWindowStartAt: new Date("2026-04-27T08:00:00-04:00").toISOString(),
         deliveryWindowEndAt: new Date("2026-04-27T10:00:00-04:00").toISOString(),
-        totalCents: 3299,
-        currency: "CAD",
         items: [
           {
             id: "item_active",
-            productId: "prod_harness",
             slug: "harnais-olive",
-            imageUrl: null,
-            currentStock: 6,
-            isActive: true,
             productNameFr: "Harnais Olive",
             productNameEn: "Olive harness",
             quantity: 1,
@@ -165,16 +166,10 @@ describe("account pages auth guard", () => {
         deliveryStatus: "DELIVERED",
         deliveryWindowStartAt: new Date("2026-04-21T08:00:00-04:00").toISOString(),
         deliveryWindowEndAt: new Date("2026-04-21T10:00:00-04:00").toISOString(),
-        totalCents: 1899,
-        currency: "CAD",
         items: [
           {
             id: "item_delivered",
-            productId: "prod_shampoo",
             slug: "shampoing-doux",
-            imageUrl: null,
-            currentStock: 3,
-            isActive: true,
             productNameFr: "Shampoing doux",
             productNameEn: "Soft shampoo",
             quantity: 1,
@@ -183,7 +178,7 @@ describe("account pages auth guard", () => {
       },
     ];
 
-    const { container } = render(<AccountOrdersClient language="fr" orders={orders} favoriteProducts={[]} />);
+    const { container } = render(<AccountOrdersClient language="fr" orders={orders} />);
     const ordersGrid = () => {
       const grid = container.querySelector(".account-orders-grid");
       expect(grid).not.toBeNull();
@@ -200,9 +195,17 @@ describe("account pages auth guard", () => {
     expect(ordersGrid().queryByText("#MO-LIVREE")).not.toBeInTheDocument();
   });
 
-  it("rachète vers le panier local, ouvre le support prérempli et sauvegarde un favori", async () => {
+  it("uses the orders icon instead of the CO placeholder when the list is empty", () => {
+    const { container } = render(<AccountOrdersClient language="fr" orders={[]} />);
+
+    expect(screen.getByRole("heading", { name: "Aucune commande pour le moment" })).toBeInTheDocument();
+    expect(screen.queryByText("CO")).not.toBeInTheDocument();
+    expect(container.querySelector(".account-orders-empty__icon svg")).not.toBeNull();
+  });
+
+  it("rachète vers le panier local et ouvre le support prérempli", async () => {
     localStorage.clear();
-    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+    const fetchMock = vi.fn(async (url: string) => {
       if (url === "/api/orders/reorder-cart") {
         return new Response(JSON.stringify({
           orderNumber: "MO-ACTIVE",
@@ -210,13 +213,6 @@ describe("account pages auth guard", () => {
           unavailableItems: [{ productId: "prod_out", name: "Os", requestedQuantity: 1, reason: "out_of_stock" }],
           adjustedItems: [],
         }), { status: 200, headers: { "content-type": "application/json" } });
-      }
-
-      if (url === "/api/account/favorites" && init?.method === "POST") {
-        return new Response(JSON.stringify({ favorite: { productId: "prod_harness" } }), {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        });
       }
 
       return new Response("{}", { status: 404 });
@@ -235,16 +231,10 @@ describe("account pages auth guard", () => {
       deliveryStatus: "SCHEDULED",
       deliveryWindowStartAt: null,
       deliveryWindowEndAt: null,
-      totalCents: 3299,
-      currency: "CAD",
       items: [
         {
           id: "item_active",
-          productId: "prod_harness",
           slug: "harnais-olive",
-          imageUrl: null,
-          currentStock: 5,
-          isActive: true,
           productNameFr: "Harnais Olive",
           productNameEn: "Olive harness",
           quantity: 1,
@@ -252,7 +242,10 @@ describe("account pages auth guard", () => {
       ],
     };
 
-    render(<AccountOrdersClient language="fr" orders={[order]} favoriteProducts={[]} />);
+    render(<AccountOrdersClient language="fr" orders={[order]} />);
+
+    expect(screen.queryByRole("button", { name: "Sauvegarder" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Sujet de support" })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Acheter à nouveau" }));
     expect(await screen.findByText(/1 article\(s\) ajouté/)).toBeInTheDocument();
@@ -260,7 +253,7 @@ describe("account pages auth guard", () => {
       { productId: "prod_harness", name: "Harnais Olive", quantity: 1 },
     ]);
 
-    fireEvent.click(screen.getByRole("button", { name: "Demander de l’aide" }));
+    fireEvent.click(screen.getByRole("button", { name: "Besoin d'aide" }));
     expect(supportSpy).toHaveBeenCalled();
     expect((supportSpy.mock.calls[0]?.[0] as CustomEvent).detail).toMatchObject({
       orderId: "order_active",
@@ -268,10 +261,26 @@ describe("account pages auth guard", () => {
     });
     expect((supportSpy.mock.calls[0]?.[0] as CustomEvent).detail.draft).toContain("#MO-ACTIVE");
 
-    fireEvent.click(screen.getByRole("button", { name: "Sauvegarder" }));
-    expect(fetchMock).toHaveBeenCalledWith("/api/account/favorites", expect.objectContaining({ method: "POST" }));
-
     window.removeEventListener("chezolive:support-open", supportSpy);
     vi.unstubAllGlobals();
+  });
+
+  it("rend la messagerie support du compte", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "user_1",
+      role: "CUSTOMER",
+      firstName: "Gary",
+      lastName: "Olive",
+      email: "gary@example.com",
+    });
+
+    const { default: AccountSupportPage } = await import("@/app/account/support/page");
+    render(await AccountSupportPage());
+
+    expect(screen.getByRole("heading", { name: "Messages" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Messagerie support" })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Écris ton message")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Centre d'aide" })).toHaveAttribute("href", "/faq");
+    expect(screen.getByRole("link", { name: "Courriel" })).toHaveAttribute("href", "mailto:support@chezolive.ca");
   });
 });

@@ -3,8 +3,7 @@ import { getCurrentLanguage } from "@/lib/language";
 import { getDictionary } from "@/lib/i18n";
 import { getCurrentUser } from "@/lib/auth";
 import { Navigation } from "@/components/Navigation";
-import { AppMobileNav } from "@/app/app/app-mobile-nav";
-import { PwaAppHeader } from "@/app/app/pwa-app-header";
+import { MobileAppChrome } from "@/components/MobileAppChrome";
 import { AccountSidebar } from "./account-sidebar";
 
 export default async function AccountLayout({
@@ -18,9 +17,7 @@ export default async function AccountLayout({
   if (!user) {
     return (
       <div className="app-shell account-app-shell">
-        <div className="account-mobile-chrome">
-          <PwaAppHeader language={language} userRole={null} />
-        </div>
+        <MobileAppChrome language={language} userRole={null} className="account-mobile-chrome" />
         <header className="topbar account-desktop-topbar">
           <Navigation language={language} t={t} user={user} />
         </header>
@@ -29,8 +26,8 @@ export default async function AccountLayout({
           <h1>{language === "fr" ? "Connecte-toi à ton compte" : "Sign in to your account"}</h1>
           <p className="small">
             {language === "fr"
-              ? "Tu dois être connecté pour accéder à tes commandes, tes profils de chiens et tes préférences."
-              : "You must be signed in to access your orders, dog profiles, and preferences."}
+              ? "Tu dois être connecté pour accéder à tes commandes et tes préférences."
+              : "You must be signed in to access your orders and preferences."}
           </p>
           <div className="account-access-actions">
             <Link className="btn" href="/login">
@@ -41,18 +38,13 @@ export default async function AccountLayout({
             </Link>
           </div>
         </section>
-        <div className="account-mobile-chrome">
-          <AppMobileNav language={language} userRole={null} showSecondary={false} />
-        </div>
       </div>
     );
   }
 
   return (
     <div className="app-shell account-app-shell">
-      <div className="account-mobile-chrome">
-        <PwaAppHeader language={language} userRole={user.role} />
-      </div>
+      <MobileAppChrome language={language} userRole={user.role} className="account-mobile-chrome" />
       <header className="topbar account-desktop-topbar">
         <Navigation language={language} t={t} user={user} />
       </header>
@@ -61,9 +53,6 @@ export default async function AccountLayout({
         <main className="admin-main account-main">
           {children}
         </main>
-      </div>
-      <div className="account-mobile-chrome">
-        <AppMobileNav language={language} userRole={user.role} showSecondary={false} />
       </div>
     </div>
   );

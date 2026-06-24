@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import Image from "next/image";
+import { MessageCircle, SendHorizontal, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 type SupportMessage = {
@@ -27,6 +28,7 @@ type SupportConversation = {
 type Props = {
   language: "fr" | "en";
   user?: { firstName?: string; lastName?: string; email?: string; role?: string } | null;
+  showFloatingButton?: boolean;
 };
 
 type SupportStatePayload = {
@@ -41,7 +43,7 @@ type SupportOpenDetail = {
 };
 
 const STORAGE_KEY = "support_conv";
-const AVATAR_URL = "/Logo/Olive.png";
+const AVATAR_URL = "/images/chez-olive/olive-head.png";
 
 function loadGuestSession(): { id: string; email: string; name: string; token: string } | null {
   try {
@@ -136,7 +138,7 @@ function getConversationStatusLabel(
   }
 }
 
-export function SupportChatWidget({ language, user }: Props) {
+export function SupportChatWidget({ language, user, showFloatingButton = true }: Props) {
   const [open, setOpen] = useState(false);
   const [conversation, setConversation] = useState<SupportConversation | null>(null);
   const [guestName, setGuestName] = useState("");
@@ -157,31 +159,31 @@ export function SupportChatWidget({ language, user }: Props) {
   const previousMessageCount = useRef(0);
 
   const t = {
-    title: language === "fr" ? "Support Chez Olive" : "Chez Olive Support",
+    title: language === "fr" ? "Aide Chez Olive" : "Chez Olive Help",
     subtitleAvailable:
-      language === "fr" ? "Notre équipe peut vous répondre ici" : "Our team can reply to you here",
+      language === "fr" ? "On te répond ici" : "We'll reply here",
     subtitleOffline:
-      language === "fr" ? "Laissez-nous un message, on reviendra vers vous" : "Leave us a message and we'll get back to you",
+      language === "fr" ? "Écris-nous, on te répond ici" : "Write to us and we'll reply here",
     floating: language === "fr" ? "Aide" : "Help",
     floatingActive: language === "fr" ? "Discussion ouverte" : "Chat open",
     guestIntro:
       language === "fr"
-        ? "Laissez votre prénom, votre email et votre message. On vous répondra ici avec douceur."
-        : "Leave your name, email, and message. We'll reply right here.",
+        ? "Écris ton prénom, ton courriel et ton message. On te répond ici."
+        : "Write your name, email, and message. We'll reply here.",
     signedInIntro:
       language === "fr"
-        ? "Posez votre question. Notre équipe vous répondra ici."
-        : "Ask your question and our team will reply here.",
+        ? "Écris ton message. On te répond ici."
+        : "Write your message. We'll reply here.",
     guestReplyIntro:
       language === "fr"
-        ? "Vous pouvez continuer la conversation ici en tout temps."
-        : "You can keep the conversation going here anytime.",
+        ? "Tu peux continuer la conversation ici."
+        : "You can keep the conversation going here.",
     name: language === "fr" ? "Prénom" : "Name",
-    email: "Email",
+    email: language === "fr" ? "Courriel" : "Email",
     placeholder:
       language === "fr"
-        ? "Bonjour, j'ai besoin d'aide avec..."
-        : "Hello, I need help with...",
+        ? "Écris ton message"
+        : "Write your message",
     send: language === "fr" ? "Envoyer" : "Send",
     sending: language === "fr" ? "Envoi..." : "Sending...",
     start: language === "fr" ? "Envoyer le premier message" : "Send first message",
@@ -216,6 +218,13 @@ export function SupportChatWidget({ language, user }: Props) {
   const canSend = draft.trim().length > 0 && (Boolean(user) || canSendGuestIdentity || Boolean(conversation));
   const isClosed = conversation?.status === "CLOSED";
   const statusLabel = getConversationStatusLabel(conversation?.status, language);
+  const floatingLabel = open
+    ? language === "fr"
+      ? "Réduire l'aide"
+      : "Minimize help"
+    : language === "fr"
+      ? "Ouvrir l'aide"
+      : "Open help";
 
   useEffect(() => {
     const openFromHelpCenter = (event: Event) => {
@@ -352,6 +361,13 @@ export function SupportChatWidget({ language, user }: Props) {
   }, [open, conversation?.messages.length]);
 
   useEffect(() => {
+    document.body.classList.toggle("support-lite-widget-open", open);
+    return () => {
+      document.body.classList.remove("support-lite-widget-open");
+    };
+  }, [open]);
+
+  useEffect(() => {
     if (!open || !conversation || readMarking || (conversation.unreadCount ?? 0) <= 0) return;
 
     const markRead = async () => {
@@ -482,34 +498,38 @@ export function SupportChatWidget({ language, user }: Props) {
 
   return (
     <>
-      <button
-        className="support-lite-float"
-        type="button"
-        aria-label={open ? t.floatingActive : t.floating}
-        onClick={() => {
-          setOpen((current) => !current);
-          setUnread(0);
-        }}
-      >
-        <span className="support-lite-float__icon">💬</span>
-        <span className="support-lite-float__text">
-          <span className="support-lite-float__label">{open ? t.floatingActive : t.floating}</span>
-          <span className="support-lite-float__meta">
-            {unread > 0
-              ? language === "fr"
-                ? `${unread} nouveau${unread > 1 ? "x" : ""}`
-                : `${unread} new`
-              : adminAvailable
-                ? language === "fr"
-                  ? "Réponse ici"
-                  : "Reply here"
-                : language === "fr"
-                  ? "Message hors ligne"
-                  : "Offline message"}
+      {showFloatingButton ? (
+        <button
+          className={`support-lite-float${open ? " support-lite-float--open" : ""}`}
+          type="button"
+          aria-label={floatingLabel}
+          onClick={() => {
+            setOpen((current) => !current);
+            setUnread(0);
+          }}
+        >
+          <span className="support-lite-float__icon" aria-hidden="true">
+            <MessageCircle size={21} strokeWidth={2.4} />
           </span>
-        </span>
-        {unread > 0 ? <span className="support-lite-float__badge">{unread}</span> : null}
-      </button>
+          <span className="support-lite-float__text">
+            <span className="support-lite-float__label">{open ? t.floatingActive : t.floating}</span>
+            <span className="support-lite-float__meta">
+              {unread > 0
+                ? language === "fr"
+                  ? `${unread} nouveau${unread > 1 ? "x" : ""}`
+                  : `${unread} new`
+                : adminAvailable
+                  ? language === "fr"
+                    ? "Réponse ici"
+                    : "Reply here"
+                  : language === "fr"
+                    ? "Message hors ligne"
+                    : "Offline message"}
+            </span>
+          </span>
+          {unread > 0 ? <span className="support-lite-float__badge">{unread}</span> : null}
+        </button>
+      ) : null}
 
       {open ? (
         <section className="support-lite-window" aria-label={t.title} role="dialog">
@@ -524,8 +544,13 @@ export function SupportChatWidget({ language, user }: Props) {
                 {statusLabel ? <span className="support-lite-status">{statusLabel}</span> : null}
               </div>
             </div>
-            <button className="support-lite-close" onClick={() => setOpen(false)} type="button">
-              ✕
+            <button
+              className="support-lite-close"
+              aria-label={language === "fr" ? "Réduire l'aide" : "Minimize help"}
+              onClick={() => setOpen(false)}
+              type="button"
+            >
+              <X size={18} strokeWidth={2.3} aria-hidden="true" />
             </button>
           </header>
           <div className="support-lite-connection-row">
@@ -624,8 +649,9 @@ export function SupportChatWidget({ language, user }: Props) {
                 rows={3}
                 value={draft}
               />
-              <button className="btn" disabled={loading || !canSend} onClick={() => void submit()} type="button">
-                {loading ? t.sending : conversation ? t.send : t.start}
+              <button className="btn support-lite-send" disabled={loading || !canSend} onClick={() => void submit()} type="button">
+                <span>{loading ? t.sending : t.send}</span>
+                <SendHorizontal size={16} strokeWidth={2.3} aria-hidden="true" />
               </button>
             </div>
           )}

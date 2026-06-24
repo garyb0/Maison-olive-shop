@@ -21,15 +21,15 @@ export default async function TermsPage() {
     ? [
         {
           title: "Utilisation du service",
-          body: "Chez Olive fournit une boutique en ligne, un espace client, un suivi de commandes, du support et des profils chiens QR. Vous devez fournir des informations exactes et protéger l'accès à votre compte.",
+          body: "Chez Olive fournit une boutique animalière locale avec livraison à domicile à Rimouski, un espace client, un suivi de commandes, du support et des services associés. Vous devez fournir des informations exactes et protéger l'accès à votre compte.",
         },
         {
           title: "Commandes et disponibilité",
           body: "Les prix, stocks et disponibilités peuvent changer. Une commande peut être refusée ou ajustée si un produit devient indisponible, si une adresse est hors zone ou si une vérification est requise.",
         },
         {
-          title: "Livraison locale",
-          body: "Les frais, fenêtres et zones de livraison sont confirmés au panier et au passage à la caisse. Les délais peuvent varier selon la météo, le volume et les contraintes opérationnelles.",
+          title: "Livraison à domicile",
+          body: "Les frais, fenêtres et zones de livraison à domicile sont confirmés au panier et au passage à la caisse. Les délais peuvent varier selon la météo, le volume et les contraintes opérationnelles.",
         },
         {
           title: "Retours et support",
@@ -43,15 +43,15 @@ export default async function TermsPage() {
     : [
         {
           title: "Using the service",
-          body: "Chez Olive provides an online shop, customer area, order tracking, support, and dog QR profiles. You must provide accurate information and protect access to your account.",
+          body: "Chez Olive provides a local pet boutique with home delivery in Rimouski, a customer area, order tracking, support, and related services. You must provide accurate information and protect access to your account.",
         },
         {
           title: "Orders and availability",
           body: "Prices, stock, and availability may change. An order may be refused or adjusted if a product becomes unavailable, an address is outside the delivery area, or verification is required.",
         },
         {
-          title: "Local delivery",
-          body: "Fees, windows, and delivery areas are confirmed in cart and checkout. Timing may vary with weather, volume, and operational constraints.",
+          title: "Home delivery",
+          body: "Home delivery fees, windows, and delivery areas are confirmed in cart and checkout. Timing may vary with weather, volume, and operational constraints.",
         },
         {
           title: "Returns and support",

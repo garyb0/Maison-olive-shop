@@ -41,6 +41,8 @@ export type AppNotificationPreferencesDTO = {
   driverRunUpdates: boolean;
 };
 
+export const CLIENT_HIDDEN_NOTIFICATION_TYPES: AppNotificationType[] = ["DOG_QR_UPDATE"];
+
 export type AdminNotificationOpsSnapshot = {
   recent: AppNotificationDTO[];
   unreadCount: number;
@@ -203,13 +205,19 @@ export async function updateAppNotificationPreferences(
   return normalizePreferences(saved);
 }
 
-export async function listAppNotificationsForUser(user: CurrentUser, take = 20) {
+export async function listAppNotificationsForUser(
+  user: CurrentUser,
+  take = 20,
+  options?: { excludeTypes?: AppNotificationType[] },
+) {
   if (!(await hasAppNotificationSchemaTables())) {
     return { notifications: [] as AppNotificationDTO[], unreadCount: 0 };
   }
 
+  const excludeTypes = options?.excludeTypes?.filter((type) => type.length > 0) ?? [];
   const where = {
     userId: user.id,
+    ...(excludeTypes.length > 0 ? { type: { notIn: excludeTypes } } : {}),
   };
 
   const [rows, unreadCount] = await Promise.all([
@@ -609,48 +617,15 @@ export async function createAdminAppNotification(input: {
   return created.filter((notification): notification is AppNotificationDTO => Boolean(notification));
 }
 
-export async function createDogQrScanNotification(input: {
+export async function createDogQrScanNotification(_input: {
   userId: string;
   dogId: string;
   dogName: string | null;
   lostMode?: boolean;
   locationShared?: boolean;
 }) {
-  if (!(await hasAppNotificationSchemaTables())) return null;
-
-  const event = input.locationShared ? "location" : input.lostMode ? "lost-scan" : "scan";
-  const dedupeWindowMs = input.locationShared ? 5 * 60 * 1000 : input.lostMode ? 10 * 60 * 1000 : 30 * 60 * 1000;
-  const dedupeSince = new Date(Date.now() - dedupeWindowMs);
-  const existing = await prisma.appNotification.findFirst({
-    where: {
-      userId: input.userId,
-      type: "DOG_QR_UPDATE",
-      createdAt: { gte: dedupeSince },
-      AND: [
-        { metadataJson: { contains: `"dogId":"${input.dogId}"` } },
-        { metadataJson: { contains: `"event":"${event}"` } },
-      ],
-    },
-    select: { id: true },
-  });
-
-  if (existing) return null;
-
-  const dogLabel = input.dogName?.trim() || "Ton chien";
-  const body = input.locationShared
-    ? `${dogLabel}: une position a ete partagee depuis son medaillon.`
-    : input.lostMode
-      ? `Le QR de ${dogLabel} vient d'etre scanne pendant le mode perdu.`
-      : `${dogLabel} vient d'etre consulte depuis son medaillon.`;
-  return createAppNotification({
-    userId: input.userId,
-    audience: "CUSTOMER",
-    type: "DOG_QR_UPDATE",
-    title: "Profil QR consulté",
-    body,
-    href: "/account/dogs",
-    metadata: { dogId: input.dogId, event },
-  });
+  void _input;
+  return null;
 }
 
 export async function registerWebPushSubscriptionForUser(

@@ -6,6 +6,7 @@ import { Capacitor } from "@capacitor/core";
 import type {
   AppNotificationDTO,
   AppNotificationPreferencesDTO,
+  AppNotificationType,
 } from "@/lib/app-notifications";
 import type { Language } from "@/lib/i18n";
 
@@ -26,6 +27,18 @@ type NavigatorWithBadges = Navigator & {
 type BrowserPushPermission = NotificationPermission | "unsupported";
 
 const defaultHeaders = { "Content-Type": "application/json" };
+const clientHiddenNotificationTypes = new Set<AppNotificationType>(["DOG_QR_UPDATE"]);
+
+function getClientVisibleNotifications(notifications: AppNotificationDTO[]) {
+  return notifications.filter((notification) => !clientHiddenNotificationTypes.has(notification.type));
+}
+
+function getClientUnreadCount(notifications: AppNotificationDTO[], unreadCount: number) {
+  const hasHiddenNotifications = notifications.some((notification) => clientHiddenNotificationTypes.has(notification.type));
+  if (!hasHiddenNotifications) return unreadCount;
+
+  return getClientVisibleNotifications(notifications).filter((notification) => !notification.readAt).length;
+}
 
 function urlBase64ToUint8Array(base64String: string) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -72,8 +85,8 @@ export function AppNotificationCenter({
   initialUnreadCount,
   initialPreferences,
 }: Props) {
-  const [notifications, setNotifications] = useState(initialNotifications);
-  const [unreadCount, setUnreadCount] = useState(initialUnreadCount);
+  const [notifications, setNotifications] = useState(getClientVisibleNotifications(initialNotifications));
+  const [unreadCount, setUnreadCount] = useState(getClientUnreadCount(initialNotifications, initialUnreadCount));
   const [preferences, setPreferences] = useState(initialPreferences);
   const [isSupported, setIsSupported] = useState(false);
   const [isNativeApp, setIsNativeApp] = useState(false);
@@ -142,11 +155,6 @@ export function AppNotificationCenter({
         label: "Support",
         description: language === "fr" ? "Reponses de l'equipe." : "Team replies.",
       },
-      {
-        key: "dogQrUpdates",
-        label: language === "fr" ? "Chiens QR" : "QR dogs",
-        description: language === "fr" ? "Consultation d'un profil QR." : "QR profile views.",
-      },
     ];
 
     if (userRole === "ADMIN") {
@@ -196,8 +204,12 @@ export function AppNotificationCenter({
       notifications?: AppNotificationDTO[];
       unreadCount?: number;
     };
-    setNotifications(Array.isArray(payload.notifications) ? payload.notifications : []);
-    setUnreadCount(typeof payload.unreadCount === "number" ? payload.unreadCount : 0);
+    const nextNotifications = Array.isArray(payload.notifications) ? payload.notifications : [];
+    setNotifications(getClientVisibleNotifications(nextNotifications));
+    setUnreadCount(getClientUnreadCount(
+      nextNotifications,
+      typeof payload.unreadCount === "number" ? payload.unreadCount : 0,
+    ));
     if (showMessage) setMessage(copy.refreshed);
   };
 

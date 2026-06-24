@@ -100,7 +100,6 @@ export const appNavigationItems: NavigationItem[] = [
 export const accountNavigationItems: NavigationItem[] = [
   { href: "/account", icon: "dashboard", labelFr: "Tableau de bord", labelEn: "Dashboard" },
   { href: "/account/orders", icon: "orders", labelFr: "Mes commandes", labelEn: "My orders" },
-  { href: "/account/dogs", icon: "dog", labelFr: "Chiens QR", labelEn: "QR dogs" },
   { href: "/account/subscriptions", icon: "subscriptions", labelFr: "Abonnements", labelEn: "Subscriptions" },
   { href: "/account/profile", icon: "profile", labelFr: "Profil et securite", labelEn: "Profile and security" },
   { href: "/account/support", icon: "support", labelFr: "Support", labelEn: "Support" },

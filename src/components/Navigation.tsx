@@ -417,7 +417,7 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
                 onClick={() => setMenuOpen(false)}
               >
                 <NavIcon name="location" size={17} />
-                <span>{language === "fr" ? "Livraison locale à Rimouski" : "Local delivery in Rimouski"}</span>
+                <span>{language === "fr" ? "Livraison à domicile à Rimouski" : "Home delivery in Rimouski"}</span>
               </Link>
 
               <Link
@@ -746,7 +746,7 @@ export function Navigation({ language, t, user, catalogCategories = [], onLogout
               onClick={() => setMenuOpen(false)}
             >
               <NavIcon name="location" size={17} />
-              <span>{language === "fr" ? "Livraison locale à Rimouski" : "Local delivery in Rimouski"}</span>
+              <span>{language === "fr" ? "Livraison à domicile à Rimouski" : "Home delivery in Rimouski"}</span>
             </Link>
 
             <Link

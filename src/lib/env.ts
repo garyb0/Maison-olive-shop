@@ -109,7 +109,7 @@ export function validateEnv(target: "development" | "production" = "development"
 
   if (env.shippingFlatCents === 0 && env.shippingFreeThresholdCents > 0) {
     warnings.push(
-      "SHIPPING_FLAT_CENTS is 0 while SHIPPING_FREE_THRESHOLD_CENTS is above 0; local delivery is free before the configured free-delivery threshold."
+      "SHIPPING_FLAT_CENTS is 0 while SHIPPING_FREE_THRESHOLD_CENTS is above 0; home delivery is free before the configured free-delivery threshold."
     );
   }
 

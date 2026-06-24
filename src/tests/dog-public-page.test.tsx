@@ -104,6 +104,47 @@ describe("dog public page", () => {
     expect(callLink).toHaveClass("w-full", "text-lg", "py-5");
   });
 
+  it("ne renvoie pas le proprietaire vers la gestion QR client", async () => {
+    getCurrentUserMock.mockResolvedValue({
+      id: "user_1",
+      email: "client@chezolive.ca",
+      firstName: "Gary",
+      lastName: "Olive",
+      role: "CUSTOMER",
+      language: "fr",
+    });
+    getDogProfileByPublicTokenMock.mockResolvedValue({
+      id: "dog_1",
+      userId: "user_1",
+      publicToken: "dog-token-001",
+      name: "Kratos",
+      photoUrl: "/dogs/kratos.webp",
+      ageLabel: "9 ans",
+      ownerPhone: "418 318-3984",
+      importantNotes: "Operation au cou",
+      publicProfileEnabled: true,
+      showPhotoPublic: true,
+      showAgePublic: true,
+      showPhonePublic: true,
+      showNotesPublic: true,
+      isActive: true,
+      claimedAt: new Date("2026-04-19T12:00:00.000Z"),
+      createdAt: new Date("2026-04-19T12:00:00.000Z"),
+      updatedAt: new Date("2026-04-19T12:00:00.000Z"),
+    });
+
+    const { default: DogPublicPage } = await import("@/app/dog/[publicToken]/page");
+    const element = await DogPublicPage({ params: Promise.resolve({ publicToken: "dog-token-001" }) });
+    const { container } = render(element);
+
+    expect(screen.getByRole("heading", { name: "Kratos" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /G.rer mes chiens|Manage my dogs/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: /G.rer cette fiche|Manage this profile/i }),
+    ).not.toBeInTheDocument();
+    expect(container.querySelector('a[href="/account/dogs"]')).toBeNull();
+  });
+
   it("ne montre pas le téléphone si le propriétaire n'a pas autorisé l'appel public", async () => {
     getDogProfileByPublicTokenMock.mockResolvedValue({
       id: "dog_1",

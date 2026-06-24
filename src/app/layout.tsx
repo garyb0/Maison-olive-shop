@@ -1,5 +1,5 @@
 ﻿import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist_Mono, Inter, Playfair_Display } from "next/font/google";
 import type { Viewport } from "next";
 import { GlobalSupportChat } from "@/components/GlobalSupportChat";
 import { NativeAppChrome } from "@/components/NativeAppChrome";
@@ -42,9 +42,17 @@ const nativeAppBootstrap = `
 })();
 `;
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const inter = Inter({
+  variable: "--font-sans",
   subsets: ["latin"],
+  display: "swap",
+});
+
+const playfairDisplay = Playfair_Display({
+  variable: "--font-display",
+  subsets: ["latin"],
+  display: "swap",
+  weight: ["400", "500", "600", "700", "800", "900"],
 });
 
 const geistMono = Geist_Mono({
@@ -56,21 +64,22 @@ export const metadata: Metadata = {
   metadataBase: new URL(env.siteUrl),
   manifest: "/manifest.webmanifest",
   title: {
-    default: "Chez Olive — Boutique animalière",
+    default: "Chez Olive — Boutique animalière locale à Rimouski",
     template: "%s | Chez Olive",
   },
-  description: "Boutique animalière bilingue, indépendante et fiable - Nourriture, jouets et accessoires premium pour animaux.",
+  description: "Boutique animalière locale avec livraison à domicile à Rimouski - Nourriture, jouets et accessoires premium pour animaux.",
   applicationName: "Chez Olive",
   keywords: [
     "boutique animale",
-    "animalerie en ligne",
+    "boutique animalière Rimouski",
+    "livraison à domicile animaux Rimouski",
     "produits pour chiens",
     "accessoires pour animaux",
     "Chez Olive",
   ],
   creator: "Chez Olive",
   publisher: "Chez Olive",
-  category: "ecommerce",
+  category: "local business",
   appleWebApp: {
     capable: true,
     title: "Chez Olive",
@@ -94,8 +103,8 @@ export const metadata: Metadata = {
     type: "website",
     url: "/",
     siteName: "Chez Olive",
-    title: "Chez Olive — Boutique animalière",
-    description: "Boutique animalière bilingue, indépendante et fiable - Nourriture, jouets et accessoires premium pour animaux.",
+    title: "Chez Olive — Boutique animalière locale à Rimouski",
+    description: "Boutique animalière locale avec livraison à domicile à Rimouski - Nourriture, jouets et accessoires premium pour animaux.",
     locale: "fr_CA",
     images: [
       {
@@ -108,8 +117,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Chez Olive — Boutique animalière",
-    description: "Boutique animalière bilingue, indépendante et fiable - Nourriture, jouets et accessoires premium pour animaux.",
+    title: "Chez Olive — Boutique animalière locale à Rimouski",
+    description: "Boutique animalière locale avec livraison à domicile à Rimouski - Nourriture, jouets et accessoires premium pour animaux.",
     images: ["/olive-logo-2.png"],
   },
 };
@@ -127,7 +136,7 @@ export default function RootLayout({
   return (
     <html
       lang="fr"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${inter.variable} ${playfairDisplay.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col" suppressHydrationWarning>

@@ -67,8 +67,8 @@ export default async function OfflinePage() {
               <strong>{language === "fr" ? "Donnees fraiches" : "Fresh data"}</strong>
               <p>
                 {language === "fr"
-                  ? "Les commandes, profils QR, support et admin se rechargent quand la connexion revient."
-                  : "Orders, QR profiles, support, and admin refresh when the connection comes back."}
+                  ? "Les commandes, le support et les espaces sécurisés se rechargent quand la connexion revient."
+                  : "Orders, support, and secure areas refresh when the connection comes back."}
               </p>
             </div>
             <div className="pwa-hub-card">

@@ -25,6 +25,11 @@ type ProductsPayload = {
 
 type ProductPayloadItem = NonNullable<ProductsPayload["products"]>[number];
 
+function isSellableProduct(product: ProductPayloadItem) {
+  const variantInStock = product.variants?.some((variant) => variant.isActive !== false && (variant.stock ?? 0) > 0);
+  return product.isActive !== false && (variantInStock || (product.stock ?? 0) > 0);
+}
+
 function getAvailableCartLine(product: ProductPayloadItem, quantity = 1) {
   const availableVariant = product.variants?.find((variant) => variant.isActive !== false && (variant.stock ?? 0) > 0);
 
@@ -73,6 +78,24 @@ async function expectMinTapSize(locator: Locator, label: string, min = 44) {
   expect(box!.height, `${label} height`).toBeGreaterThanOrEqual(min - 0.5);
 }
 
+async function expectNoOverlap(page: Page, firstSelector: string, secondSelector: string, label: string) {
+  const result = await page.evaluate(({ firstSelector, secondSelector }) => {
+    const first = document.querySelector(firstSelector)?.getBoundingClientRect();
+    const second = document.querySelector(secondSelector)?.getBoundingClientRect();
+    if (!first || !second || first.width === 0 || second.width === 0 || first.height === 0 || second.height === 0) {
+      return { measurable: false, overlaps: false };
+    }
+
+    return {
+      measurable: true,
+      overlaps: !(first.right <= second.left || second.right <= first.left || first.bottom <= second.top || second.bottom <= first.top),
+    };
+  }, { firstSelector, secondSelector });
+
+  expect(result.measurable, `${label} elements should be measurable`).toBe(true);
+  expect(result.overlaps, label).toBe(false);
+}
+
 test.describe("mobile public layout", () => {
   for (const route of PUBLIC_ROUTES) {
     test(`${route.label}: no horizontal overflow and drawer starts fully hidden`, async ({ page }) => {
@@ -107,17 +130,13 @@ test.describe("mobile public layout", () => {
     await page.goto("/boutique");
     await page.waitForLoadState("domcontentloaded");
 
-    await expectMinTapSize(page.locator(".nav-hamburger").first(), "hamburger");
-    await expectMinTapSize(page.locator(".nav-marketplace-search button").first(), "mobile search submit");
-    await expectMinTapSize(page.locator(".nav-marketplace-mobile-actions .nav-marketplace-cart").first(), "mobile cart");
-
-    await page.locator(".nav-hamburger").first().click();
-
-    await expect(page.locator(".nav-drawer").first()).toHaveAttribute("aria-hidden", "false");
-    await expectMinTapSize(page.locator(".nav-drawer-close").first(), "drawer close");
-    await expectMinTapSize(page.locator(".nav-drawer .nav-search-submit").first(), "drawer search submit");
-    await expectMinTapSize(page.locator(".nav-drawer-lang").first(), "drawer language");
-    await expectMinTapSize(page.locator(".nav-drawer-link").first(), "drawer first link");
+    await expect(page.locator(".pwa-app-header")).toBeVisible();
+    await expect(page.locator(".nav-marketplace").first()).toBeHidden();
+    await expectMinTapSize(page.locator(".pwa-app-header__action[href='/cart']").first(), "app cart");
+    await expectMinTapSize(page.locator(".pwa-app-header__action[href='/login'], .pwa-app-header__action[href='/account']").first(), "app account");
+    await expect(page.locator(".pwa-app-nav a")).toHaveCount(5);
+    await expectMinTapSize(page.locator(".pwa-app-nav a").first(), "bottom nav first item");
+    await expect(page.locator(".pwa-app-nav a svg")).toHaveCount(5);
   });
 
   test("promo carousel dots keep 44px touch areas", async ({ page }) => {
@@ -173,9 +192,10 @@ test.describe("mobile public layout", () => {
 
     await expectNoHorizontalOverflow(page);
 
-    for (const id of ["livraison", "commandes", "paiement", "retours", "compte", "colliers-qr", "conditions"]) {
+    for (const id of ["livraison", "commandes", "paiement", "retours", "compte", "conditions"]) {
       await expect(page.locator(`#${id}`), `#${id} section should exist`).toBeAttached();
     }
+    await expect(page.locator("#colliers-qr")).not.toBeAttached();
 
     const anchorBox = await page.locator(".help-anchor-nav a").first().boundingBox();
     expect(anchorBox, "first FAQ anchor should be measurable").not.toBeNull();
@@ -230,7 +250,7 @@ test.describe("mobile public layout", () => {
     expect(response.ok()).toBe(true);
     const payload = (await response.json()) as ProductsPayload;
     const products = payload.products ?? [];
-    const availableProduct = products.find((product) => product.isActive !== false && (product.stock ?? 0) > 0);
+    const availableProduct = products.find(isSellableProduct);
     const unavailableProduct = products.find((product) => product.isActive !== false && (product.stock ?? 0) === 0);
 
     expect(availableProduct?.slug, "An available product is required for the mobile shop smoke.").toBeTruthy();
@@ -240,7 +260,7 @@ test.describe("mobile public layout", () => {
     await page.waitForLoadState("networkidle");
     await expectNoHorizontalOverflow(page);
 
-    await expectMinTapSize(page.locator(".catalog-side-link, .catalog-cat-pill").first(), "catalog category chip");
+    await expectMinTapSize(page.locator(".catalog-cat-pill").first(), "catalog category chip");
     await expectMinTapSize(page.locator(".catalog-product-card a[href^='/products/']").first(), "first product details link");
     await expectMinTapSize(page.locator(".catalog-product-add").first(), "first product add button");
 
@@ -269,7 +289,7 @@ test.describe("mobile public layout", () => {
         return 0;
       }
     })).toBeGreaterThan(0);
-    await expect(page.locator(".nav-marketplace-mobile-actions .nav-cart-count")).toHaveText(/[1-9]/);
+    await expect(page.locator(".pwa-app-header__action[href='/cart'] em")).toHaveText(/[1-9]/);
 
     if (unavailableProduct) {
       const unavailableCard = page
@@ -288,7 +308,7 @@ test.describe("mobile public layout", () => {
     expect(response.ok()).toBe(true);
     const payload = (await response.json()) as ProductsPayload;
     const products = payload.products ?? [];
-    const availableProduct = products.find((product) => product.isActive !== false && (product.stock ?? 0) > 0);
+    const availableProduct = products.find(isSellableProduct);
     const unavailableProduct = products.find((product) => product.isActive !== false && (product.stock ?? 0) === 0);
 
     expect(availableProduct?.slug, "An available product is required for the mobile product smoke.").toBeTruthy();
@@ -302,17 +322,26 @@ test.describe("mobile public layout", () => {
     expect(productAddBox, "product add button should be measurable").not.toBeNull();
     expect(productAddBox!.y, "product add button should appear in the first mobile screen").toBeLessThan(MOBILE_VIEWPORT.height);
     await expectMinTapSize(page.locator(".olive-product-trust-grid a").first(), "product trust link");
-    await expect(page.locator(".olive-product-trust-grid")).toContainText(/Livraison locale|Local delivery/i);
+    await expect(page.locator(".olive-product-trust-grid")).toContainText(/Livraison locale|Livraison à domicile|Local delivery|Home delivery/i);
     await expect(page.locator(".olive-product-trust-grid")).toContainText(/Paiement sécurisé|Secure payment/i);
     await expect(page.locator(".olive-product-trust-grid")).toContainText(/Retour \/ problème|Return \/ issue/i);
     await page.locator(".olive-product-add-btn").first().click();
     await expect(page.locator(".olive-product-add-btn").first()).toContainText(/Ajout|Added/i);
-    await page.evaluate(() => window.scrollTo(0, 520));
-    await expect(page.locator(".olive-product-sticky-cta").first()).toBeVisible();
-    await expectMinTapSize(page.locator(".olive-product-sticky-cta__button").first(), "product sticky add button");
+    await page.evaluate(() => {
+      window.scrollTo(0, 520);
+      window.dispatchEvent(new Event("scroll"));
+    });
+    const stickyCta = page.locator(".olive-product-sticky-cta").first();
+    if (await stickyCta.count()) {
+      await expect(stickyCta).toBeVisible();
+      await expectMinTapSize(page.locator(".olive-product-sticky-cta__button").first(), "product sticky add button");
+    }
     const productSupportFloat = page.locator(".support-lite-float").first();
     if (await productSupportFloat.count()) {
-      await expect(productSupportFloat).toBeHidden();
+      await expect(productSupportFloat).toBeVisible();
+      if (await stickyCta.count()) {
+        await expectNoOverlap(page, ".olive-product-sticky-cta", ".support-lite-float", "product support widget must not overlap sticky CTA");
+      }
     }
     await page.screenshot({ path: "test-results/mobile-product-step4.png", fullPage: false });
 
@@ -334,7 +363,7 @@ test.describe("mobile public layout", () => {
     const response = await request.get("/api/products");
     expect(response.ok()).toBe(true);
     const payload = (await response.json()) as ProductsPayload;
-    const availableProduct = payload.products?.find((product) => product.isActive !== false && (product.stock ?? 0) > 0);
+    const availableProduct = payload.products?.find(isSellableProduct);
     expect(availableProduct?.id, "An available product is required for the mobile cart smoke.").toBeTruthy();
 
     const cartLine = getAvailableCartLine(availableProduct!, 2);
@@ -366,7 +395,7 @@ test.describe("mobile public layout", () => {
     const response = await request.get("/api/products");
     expect(response.ok()).toBe(true);
     const payload = (await response.json()) as ProductsPayload;
-    const availableProduct = payload.products?.find((product) => product.isActive !== false && (product.stock ?? 0) > 0);
+    const availableProduct = payload.products?.find(isSellableProduct);
     expect(availableProduct?.id, "An available product is required for the mobile checkout smoke.").toBeTruthy();
 
     const checkoutLine = getAvailableCartLine(availableProduct!, 1);
@@ -395,7 +424,8 @@ test.describe("mobile public layout", () => {
 
     const supportFloat = page.locator(".support-lite-float").first();
     if (await supportFloat.count()) {
-      await expect(supportFloat).toBeHidden();
+      await expect(supportFloat).toBeVisible();
+      await expectNoOverlap(page, ".checkout-place-order-btn", ".support-lite-float", "checkout support widget must not overlap final CTA");
     }
 
     await page.screenshot({ path: "test-results/mobile-checkout-step5.png", fullPage: false });
@@ -412,8 +442,10 @@ test.describe("mobile public layout", () => {
       await expectMinTapSize(page.locator(".account-access-actions .btn").first(), "account sign-in CTA");
 
       const supportFloat = page.locator(".support-lite-float").first();
-      if (await supportFloat.count()) {
+      if (route === "/account/support") {
         await expect(supportFloat).toBeHidden();
+      } else if (await supportFloat.count()) {
+        await expect(supportFloat).toBeVisible();
       }
     }
 

@@ -29,6 +29,10 @@ vi.mock("@/components/Navigation", () => ({
   Navigation: () => null,
 }));
 
+vi.mock("@/components/MobileAppChrome", () => ({
+  MobileAppChrome: () => <div data-testid="mobile-app-clone-chrome" />,
+}));
+
 describe("LoginClient", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -41,6 +45,7 @@ describe("LoginClient", () => {
 
     const registerPanel = screen.getByRole("region", { name: /créer un compte/i });
 
+    expect(screen.getByTestId("mobile-app-clone-chrome")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /^connexion$/i })).toBeInTheDocument();
     expect(registerPanel).toBeInTheDocument();
     expect(within(registerPanel).getByText("Commandes")).toBeInTheDocument();

@@ -41,6 +41,13 @@ async function expectMinTapSize(locator: Locator, label: string, min = 44) {
   expect(box!.height, `${label} height`).toBeGreaterThanOrEqual(min);
 }
 
+async function expectNoClientQrSurface(page: Page) {
+  await expect(page.locator('a[href="/account/dogs"]')).toHaveCount(0);
+  await expect(
+    page.getByText(/Chiens QR|Dog QR|collier QR|QR collar|profil QR|QR profile|G.rer mes chiens|Manage my dogs|G.rer cette fiche|Manage this profile/i),
+  ).toHaveCount(0);
+}
+
 async function screenshot(page: Page, fileName: string) {
   mkdirSync(artifactDir, { recursive: true });
   await page.screenshot({ path: path.join(artifactDir, fileName), fullPage: true });
@@ -77,42 +84,51 @@ test.describe("authenticated mobile account smoke", () => {
     await loginCustomer(page);
   });
 
-  test("app connected notification center stays optional and testable", async ({ page }) => {
+  test("app connected hub stays mobile-safe", async ({ page }) => {
     await page.goto("/app");
     await page.waitForLoadState("domcontentloaded");
 
-    await page.locator(".pwa-more-panel > summary").click();
-    await expect(page.getByRole("heading", { name: "Centre d'actions" })).toBeVisible();
-    await expect(page.getByText("In-app actif")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Tester une notification" })).toBeVisible();
-    await page.getByRole("button", { name: "Tester une notification" }).click();
-    await expect(page.getByText(/Notification test creee/i)).toBeVisible();
+    await expect(page.locator(".pwa-app-header")).toBeVisible();
+    await expect(page.locator(".pwa-app-nav:visible a")).toHaveCount(5);
+    await expectMinTapSize(page.locator(".pwa-app-nav:visible a").first(), "app mobile nav first item");
+    await expect(page.getByRole("heading", { name: /Bonjour|Hi/i })).toBeVisible();
     await expectNoHorizontalOverflow(page);
-    await screenshot(page, "app-client-notifications.png");
+    await screenshot(page, "app-client-hub.png");
   });
 
-  test("dashboard, orders and dog profile are visible", async ({ page }) => {
+  test("client QR surfaces stay hidden while connected", async ({ page }) => {
+    for (const route of ["/?home=1", "/app", "/account", "/boutique", "/cart"]) {
+      await page.goto(route);
+      await page.waitForLoadState("domcontentloaded");
+      await expectNoClientQrSurface(page);
+      await expectNoHorizontalOverflow(page);
+    }
+
+    await page.goto("/account/dogs");
+    await page.waitForLoadState("domcontentloaded");
+    await expect(page).toHaveURL(/\/account(?:[?#].*)?$/);
+    await expectNoClientQrSurface(page);
+  });
+
+  test("dashboard and orders are visible", async ({ page }) => {
     await openAccountPage(page, "/account", /bonjour|hello/i);
     await expect(page.getByText(email)).toBeVisible();
+    await expectNoClientQrSurface(page);
     await screenshot(page, "account-dashboard.png");
 
     await openAccountPage(page, "/account/orders", /centre de commandes|order center|mes commandes|my orders/i);
+    await expectNoClientQrSurface(page);
     if (orderNumber) {
       await expect(page.getByText(orderNumber).first()).toBeVisible();
-      await expectMinTapSize(page.getByRole("link", { name: /Voir le détail|View details/i }).first(), "order detail link");
+      await expectMinTapSize(page.getByRole("link", { name: /Voir le suivi|View tracking/i }).first(), "order tracking link");
     }
     await screenshot(page, "account-orders.png");
-
-    await openAccountPage(page, "/account/dogs", /mes chiens|my dogs/i);
-    if (dogName) {
-      await expect(page.getByText(dogName).first()).toBeVisible();
-    }
-    await screenshot(page, "account-dogs.png");
 
     if (dogToken && dogName) {
       await page.goto(`/dog/${encodeURIComponent(dogToken)}`);
       await page.waitForLoadState("domcontentloaded");
       await expect(page.getByText(dogName).first()).toBeVisible();
+      await expectNoClientQrSurface(page);
       await expectNoHorizontalOverflow(page);
       await screenshot(page, "dog-public.png");
     }
@@ -126,8 +142,12 @@ test.describe("authenticated mobile account smoke", () => {
     await openAccountPage(page, "/account/subscriptions", /abonnements|subscriptions/i);
     await screenshot(page, "account-subscriptions.png");
 
-    await openAccountPage(page, "/account/support", /support client|customer support/i);
-    await expectMinTapSize(page.locator(".account-support-card__cta").first(), "support primary action");
+    await openAccountPage(page, "/account/support", /messages|support/i);
+    await expect(page.getByPlaceholder(/Écris ton message|Write your message/i)).toBeVisible();
+    const closeTicketButton = page.getByRole("button", { name: /Fermer le billet|Close ticket/i }).first();
+    if (await closeTicketButton.count()) {
+      await expectMinTapSize(closeTicketButton, "support close ticket button");
+    }
     await screenshot(page, "account-support.png");
   });
 

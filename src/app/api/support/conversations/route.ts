@@ -1,8 +1,22 @@
 import { getCurrentUser } from "@/lib/auth";
 import { jsonError, jsonOk } from "@/lib/http";
 import { applyRateLimit } from "@/lib/rate-limit";
-import { createSupportConversation, createSupportGuestAccessToken } from "@/lib/support";
+import { createSupportConversation, createSupportGuestAccessToken, getCustomerSupportInbox } from "@/lib/support";
 import { supportConversationCreateSchema } from "@/lib/validators";
+
+export async function GET() {
+  try {
+    const user = await getCurrentUser();
+    if (!user) return jsonError("Unauthorized", 401);
+    if (user.role === "ADMIN") return jsonError("Forbidden", 403);
+
+    const inbox = await getCustomerSupportInbox(user);
+    return jsonOk(inbox);
+  } catch (error) {
+    if (error instanceof Error && error.message === "FORBIDDEN") return jsonError("Forbidden", 403);
+    return jsonError("Failed to fetch support conversations", 500);
+  }
+}
 
 export async function POST(request: Request) {
   const rate = await applyRateLimit(request, { namespace: "support:create-conversation", windowMs: 60_000, max: 8 });

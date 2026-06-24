@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { createElement, type AnchorHTMLAttributes, type ImgHTMLAttributes } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { Capacitor } from "@capacitor/core";
@@ -7,6 +9,7 @@ import { PwaAppHeader } from "@/app/app/pwa-app-header";
 import { PwaInstallPanel } from "@/app/app/pwa-install-panel";
 import { AppNotificationCenter } from "@/app/app/app-notification-center";
 import { PwaSupportButton } from "@/app/app/pwa-support-button";
+import { PwaServiceWorkerRegister } from "@/app/app/pwa-service-worker-register";
 
 const prismaMock = vi.hoisted(() => ({
   order: {
@@ -71,6 +74,7 @@ vi.mock("@/lib/language", () => ({
 }));
 
 vi.mock("@/lib/app-notifications", () => ({
+  CLIENT_HIDDEN_NOTIFICATION_TYPES: ["DOG_QR_UPDATE"],
   getAppNotificationPreferences: (...args: unknown[]) => getAppNotificationPreferencesMock(...args),
   getWebPushPublicKey: (...args: unknown[]) => getWebPushPublicKeyMock(...args),
   listAppNotificationsForUser: (...args: unknown[]) => listAppNotificationsForUserMock(...args),
@@ -94,6 +98,20 @@ vi.mock("@/lib/prisma", () => ({
 vi.mock("@/components/Navigation", () => ({
   Navigation: () => <nav data-testid="pwa-navigation" />,
 }));
+
+const lockedAppSourceHashes = {
+  "public/sw.js": "717cc08527ad69833b1ff5f1ce7218d9ceb13de0c4f4b10bf124ac0902974d75",
+  "src/app/app/app-mobile-nav.tsx": "c8be9d72172dadd1e396be0691dd790c59f9c23c4ee47b00d01243886b2d8937",
+  "src/app/app/page.tsx": "8f025806239f8e40dc0aec0e0e587df860ddf9dac5aa2b90738de86014d866a1",
+  "src/app/app/pwa-service-worker-register.tsx": "6c7fc913096408b0776cad975038b53afd6b195573d28e3bda12134baa142ed1",
+  "src/app/app/pwa-support-button.tsx": "fde89b7ae3b7ce2b114afa234efb469406256eabc4df9bc829ce22abf20215e6",
+} as const;
+
+function stableSourceHash(path: string) {
+  return createHash("sha256")
+    .update(readFileSync(path, "utf8").replace(/\r\n/g, "\n"))
+    .digest("hex");
+}
 
 describe("PWA Chez Olive", () => {
   beforeEach(() => {
@@ -156,22 +174,82 @@ describe("PWA Chez Olive", () => {
     );
   });
 
-  it("rend le hub public sans section admin quand aucun utilisateur n'est connecte", async () => {
+  it("verrouille les sources APP stabilisees", () => {
+    const currentHashes = Object.fromEntries(
+      Object.keys(lockedAppSourceHashes).map((path) => [path, stableSourceHash(path)]),
+    );
+
+    expect(currentHashes).toEqual(lockedAppSourceHashes);
+  });
+
+  it("enregistre le service worker sans forcer le reload de l'app", async () => {
+    const update = vi.fn().mockResolvedValue(undefined);
+    const waitingPostMessage = vi.fn();
+    const registrationAddEventListener = vi.fn();
+    const serviceWorkerAddEventListener = vi.fn();
+    const serviceWorkerRegister = vi.fn().mockResolvedValue({
+      addEventListener: registrationAddEventListener,
+      update,
+      waiting: { postMessage: waitingPostMessage },
+    });
+
+    Object.defineProperty(navigator, "serviceWorker", {
+      configurable: true,
+      value: {
+        addEventListener: serviceWorkerAddEventListener,
+        register: serviceWorkerRegister,
+      },
+    });
+
+    render(<PwaServiceWorkerRegister />);
+
+    await waitFor(() => expect(serviceWorkerRegister).toHaveBeenCalledWith("/sw.js", {
+      scope: "/",
+      updateViaCache: "none",
+    }));
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(waitingPostMessage).not.toHaveBeenCalled();
+    expect(registrationAddEventListener).not.toHaveBeenCalled();
+    expect(serviceWorkerAddEventListener).not.toHaveBeenCalledWith("controllerchange", expect.any(Function));
+  });
+
+  it("rend un accueil deconnecte aligne sur la structure connectee", async () => {
     const { default: PwaAppPage } = await import("@/app/app/page");
     const { container } = render(await PwaAppPage());
     const hrefs = Array.from(container.querySelectorAll("a")).map((link) => link.getAttribute("href"));
+    const hero = container.querySelector(".pwa-home-hero--guest");
+    const css = readFileSync("src/app/globals.css", "utf8");
 
     expect(screen.getByRole("banner", { name: "En-tete application" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Chez Olive App/ })).toHaveAttribute("href", "/app");
-    expect(screen.getByRole("heading", { name: "Bienvenue" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Bienvenue chez Olive" })).toBeInTheDocument();
+    expect(screen.queryByText("Prochaine action")).not.toBeInTheDocument();
+    expect(screen.getByText("Commencer")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Magasiner chez Olive" })).toBeInTheDocument();
+    expect(container.querySelector(".pwa-home-hero__eyebrow-row")).toBeNull();
+    expect(container.querySelector(".pwa-home-hero__image")).toBeNull();
+    expect(hero).not.toBeNull();
+    expect(css).toContain('url("/images/chez-olive/family-dogs.png")');
+    expect(screen.getAllByText("Application client")).toHaveLength(1);
+    expect(screen.getByRole("link", { name: "Magasiner" })).toHaveAttribute("href", "/boutique");
+    expect(screen.getByRole("link", { name: "Me connecter" })).toHaveAttribute("href", "/login");
     expect(screen.getAllByRole("link", { name: "Boutique" }).map((link) => link.getAttribute("href"))).toContain(
       "/boutique",
     );
-    expect(screen.getAllByRole("link", { name: "Connexion" }).map((link) => link.getAttribute("href"))).toContain(
+    expect(screen.getByRole("link", { name: /Mes commandes/ })).toHaveAttribute(
+      "href",
+      "/login?returnTo=%2Faccount%2Forders",
+    );
+    expect(screen.getAllByRole("link", { name: /Support/ }).map((link) => link.getAttribute("href"))).toContain(
+      "/faq",
+    );
+    expect(screen.getAllByRole("link", { name: /Compte/ }).map((link) => link.getAttribute("href"))).toContain(
       "/login",
     );
+    expect(screen.getAllByText("Connexion").length).toBeLessThanOrEqual(2);
     expect(hrefs).toContain("/faq");
     expect(hrefs).toContain("/login");
+    expect(screen.queryByRole("link", { name: /Profil/ })).not.toBeInTheDocument();
     expect(screen.queryByText("Admin leger")).not.toBeInTheDocument();
     expect(prismaMock.order.count).not.toHaveBeenCalled();
   });
@@ -198,7 +276,6 @@ describe("PWA Chez Olive", () => {
       language: "fr",
     });
     prismaMock.order.count.mockResolvedValue(2);
-    prismaMock.dogProfile.count.mockResolvedValue(1);
     prismaMock.supportConversation.count.mockResolvedValue(1);
     prismaMock.order.findFirst.mockResolvedValue({
       orderNumber: "CO-4242",
@@ -207,18 +284,36 @@ describe("PWA Chez Olive", () => {
     });
 
     const { default: PwaAppPage } = await import("@/app/app/page");
-    render(await PwaAppPage());
+    const { container } = render(await PwaAppPage());
 
     expect(screen.getByRole("heading", { name: "Bonjour, Gary" })).toBeInTheDocument();
+    expect(container.querySelector(".pwa-home-hero__eyebrow-row")).toBeNull();
+    expect(screen.getByText("Prochaine action")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Commande #CO-4242" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Resume utile" })).toBeInTheDocument();
-    expect(screen.getByText("Plus dans l'app")).toBeInTheDocument();
+    expect(screen.getByText("En préparation. Voir le suivi.")).toBeInTheDocument();
+    expect(container.querySelectorAll(".pwa-next-action-card")).toHaveLength(1);
+    expect(screen.getByRole("heading", { name: "À compléter" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Liens rapides" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Centre d'actions")).not.toBeInTheDocument();
+    expect(screen.getByText("Conversation ouverte ou en attente.")).toBeInTheDocument();
+    expect(screen.getByText("À ajouter")).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: /Boutique/ }).map((link) => link.getAttribute("href"))).toContain("/boutique");
+    expect(screen.getAllByRole("link", { name: /Commandes/ }).map((link) => link.getAttribute("href"))).toContain("/account/orders");
+    expect(screen.getAllByRole("link", { name: /Support/ }).map((link) => link.getAttribute("href"))).toContain("/account/support");
+    expect(screen.getByRole("button", { name: /Support/ })).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: /Profil/ }).map((link) => link.getAttribute("href"))).toContain("/account/profile");
+    expect(screen.queryByRole("heading", { name: "Resume utile" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/A surveiller|À surveiller|Worth checking|Plus dans l'app|More in the app/)).not.toBeInTheDocument();
+    expect(screen.queryByText("Commande active")).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Tout pour ton compte" })).not.toBeInTheDocument();
-    expect(screen.getAllByText(/45,99/).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole("link", { name: /Chiens QR/ }).map((link) => link.getAttribute("href"))).toContain(
-      "/account/dogs",
-    );
-    expect(prismaMock.dogProfile.count).toHaveBeenCalledWith({ where: { userId: "user_1", isActive: true } });
+    expect(screen.queryByText("Panier en cours")).not.toBeInTheDocument();
+    expect(screen.queryByText(/45,99/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Chiens QR/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/QR/)).not.toBeInTheDocument();
+    expect(container.querySelector('a[href="/account/dogs"]')).toBeNull();
+    expect(prismaMock.dogProfile.count).not.toHaveBeenCalled();
+    expect(listAppNotificationsForUserMock).not.toHaveBeenCalled();
+    expect(getAppNotificationPreferencesMock).toHaveBeenCalledWith("user_1");
   });
 
   it("affiche le centre de notifications in-app sans forcer le push", () => {
@@ -257,6 +352,7 @@ describe("PWA Chez Olive", () => {
     expect(screen.getByText("Non supporte ici")).toBeInTheDocument();
     expect(screen.getByText("Types d'alertes")).toBeInTheDocument();
     expect(screen.getByText("Commandes").closest("label")?.querySelector("input")).toBeChecked();
+    expect(screen.queryByText("Chiens QR")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Actualiser" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Tester une notification" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Commande confirmee/ })).toHaveAttribute(
@@ -264,6 +360,56 @@ describe("PWA Chez Olive", () => {
       "/account/orders/order_1",
     );
     expect(screen.getByRole("button", { name: "Activer les alertes utiles" })).toBeDisabled();
+  });
+
+  it("masque les notifications QR du centre d'actions client", () => {
+    render(
+      <AppNotificationCenter
+        language="fr"
+        publicKey=""
+        userRole="CUSTOMER"
+        initialNotifications={[
+          {
+            id: "notif_qr",
+            type: "DOG_QR_UPDATE",
+            audience: "CUSTOMER",
+            title: "Profil QR consulté",
+            body: "Olive vient d'être consultée depuis son médaillon.",
+            href: "/account/dogs",
+            readAt: null,
+            createdAt: "2026-05-03T16:00:00.000Z",
+          },
+          {
+            id: "notif_order",
+            type: "ORDER_UPDATE",
+            audience: "CUSTOMER",
+            title: "Commande confirmee",
+            body: "Ta commande est bien creee.",
+            href: "/account/orders/order_1",
+            readAt: null,
+            createdAt: "2026-05-03T16:01:00.000Z",
+          },
+        ]}
+        initialUnreadCount={2}
+        initialPreferences={{
+          pushEnabled: false,
+          orderUpdates: true,
+          deliveryUpdates: true,
+          supportUpdates: true,
+          dogQrUpdates: true,
+          adminAlerts: true,
+          driverRunUpdates: true,
+        }}
+      />,
+    );
+
+    expect(screen.getByText("1 non lue(s)")).toBeInTheDocument();
+    expect(screen.queryByText("Profil QR consulté")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Profil QR/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Commande confirmee/ })).toHaveAttribute(
+      "href",
+      "/account/orders/order_1",
+    );
   });
 
   it("masque le panneau d'installation PWA en mode Capacitor natif", async () => {
@@ -383,7 +529,7 @@ describe("PWA Chez Olive", () => {
     expect(screen.getByRole("link", { name: /Notification test/ })).toHaveAttribute("href", "/app");
   });
 
-  it("affiche l'admin leger seulement pour un admin avec cockpit mobile", async () => {
+  it("ne rend plus de cockpit admin dans l'accueil client", async () => {
     getCurrentUserMock.mockResolvedValue({
       id: "admin_1",
       email: "admin@chezolive.ca",
@@ -462,16 +608,14 @@ describe("PWA Chez Olive", () => {
     const { container } = render(await PwaAppPage());
     const hrefs = Array.from(container.querySelectorAll("a")).map((link) => link.getAttribute("href"));
 
-    expect(screen.getByText("Admin quotidien")).toBeInTheDocument();
-    expect(screen.getByText("Prochaine #CO-9001 - Client Admin.")).toBeInTheDocument();
-    expect(screen.getByText(/#CO-9002/)).toBeInTheDocument();
-    expect(screen.getByText("Client Support - attend une reponse.")).toBeInTheDocument();
-    expect(screen.getByText("2026-05-03 - en cours - 7 arrets")).toBeInTheDocument();
-    expect(screen.getByText("Collier test - 2 en stock.")).toBeInTheDocument();
-    expect(hrefs).toContain("/admin/orders");
-    expect(hrefs).toContain("/admin/delivery");
-    expect(hrefs).toContain("/admin/delivery/runs");
-    expect(hrefs).toContain("/admin/support");
+    expect(container.querySelector(".pwa-admin-lite")).toBeNull();
+    expect(screen.queryByText("Admin quotidien")).not.toBeInTheDocument();
+    expect(screen.queryByText("Prochaine #CO-9001 - Client Admin.")).not.toBeInTheDocument();
+    expect(screen.queryByText(/#CO-9002/)).not.toBeInTheDocument();
+    expect(screen.queryByText("Client Support - attend une reponse.")).not.toBeInTheDocument();
+    expect(screen.queryByText("2026-05-03 - en cours - 7 arrets")).not.toBeInTheDocument();
+    expect(screen.queryByText("Collier test - 2 en stock.")).not.toBeInTheDocument();
+    expect(hrefs).toContain("/admin");
   });
 
   it("rend la page hors ligne sans cache agressif sensible", async () => {

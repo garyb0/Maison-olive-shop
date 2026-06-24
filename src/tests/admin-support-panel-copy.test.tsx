@@ -1,6 +1,9 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { AdminSupportPanel } from "@/components/AdminSupportPanel";
 
+const longTicketMessage =
+  "Bonjour, je veux expliquer un probleme assez long avec ma commande, la livraison et le suivi pour confirmer que le contenu du ticket reste lisible sans etre pousse sous les cartes de contexte.";
+
 describe("AdminSupportPanel French copy", () => {
   beforeEach(() => {
     window.localStorage.clear();
@@ -20,7 +23,7 @@ describe("AdminSupportPanel French copy", () => {
                 {
                   id: "msg_open",
                   senderType: "CUSTOMER",
-                  content: "Bonjour",
+                  content: longTicketMessage,
                   createdAt: "2026-04-28T12:00:00.000Z",
                 },
               ],
@@ -53,5 +56,18 @@ describe("AdminSupportPanel French copy", () => {
     expect(await screen.findByText("Client Ferme")).toBeInTheDocument();
     expect(screen.getByText("Fermée")).toBeInTheDocument();
     expect(screen.queryByText("Fermee")).not.toBeInTheDocument();
+  });
+
+  it("affiche les messages du ticket comme premier contenu du detail", async () => {
+    const { container } = render(<AdminSupportPanel language="fr" />);
+
+    expect(await screen.findByText("Client Actif")).toBeInTheDocument();
+
+    const detailScroll = container.querySelector(".support-admin-detail-scroll");
+    expect(detailScroll?.firstElementChild).toHaveClass("support-admin-messages");
+
+    const messageBubble = container.querySelector(".support-admin-messages .support-msg-bubble");
+    expect(messageBubble).toHaveTextContent(longTicketMessage);
+    expect(messageBubble).toHaveClass("support-msg-bubble");
   });
 });

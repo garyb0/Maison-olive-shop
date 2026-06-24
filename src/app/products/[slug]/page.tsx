@@ -9,6 +9,7 @@ import { getDictionary } from "@/lib/i18n";
 import { getCurrentLanguage } from "@/lib/language";
 import { buildProductSocialMetadata } from "@/lib/product-share";
 import { Navigation } from "@/components/Navigation";
+import { MobileAppChrome } from "@/components/MobileAppChrome";
 import { ProductShareButton } from "@/components/ProductShareButton";
 import { ProductFavoriteButton } from "@/components/ProductFavoriteButton";
 import { ProductSubscriptionInlineClient } from "./product-subscription-inline-panel";
@@ -196,8 +197,9 @@ export default async function ProductDetailsPage({ params, searchParams }: Produ
   };
 
   return (
-    <div className="app-shell">
+    <div className="app-shell mobile-app-clone-shell product-mobile-app-shell">
       <ProductConversionTracker productId={product.id} productSlug={product.slug} language={language} />
+      <MobileAppChrome language={language} userRole={user?.role ?? null} />
       <header className="topbar">
         <div className="brand">{t.brandName}</div>
         <Navigation language={language} t={t} user={user} />
@@ -246,7 +248,7 @@ export default async function ProductDetailsPage({ params, searchParams }: Produ
             </div>
 
             <div className="olive-product-highlights">
-              <div className="badge">{language === "fr" ? "Livraison locale rapide" : "Fast local delivery"}</div>
+              <div className="badge">{language === "fr" ? "Livraison à domicile rapide" : "Fast home delivery"}</div>
               <div className="badge">{language === "fr" ? "Support bilingue" : "Bilingual support"}</div>
               <div className="badge">{language === "fr" ? "Sélection animale spécialisée" : "Specialized pet selection"}</div>
             </div>
@@ -304,12 +306,12 @@ export default async function ProductDetailsPage({ params, searchParams }: Produ
             <div className="olive-product-purchase-note">
               <span aria-hidden="true">✓</span>
               {language === "fr"
-                ? "Livraison locale à Rimouski et environs, avec suivi attentionné."
-                : "Local delivery in the Rimouski area, with thoughtful follow-up."}
+                ? "Livraison à domicile à Rimouski et environs, avec suivi attentionné."
+                : "Home delivery in the Rimouski area, with thoughtful follow-up."}
             </div>
             <div className="olive-product-trust-grid" aria-label={language === "fr" ? "Aide produit" : "Product help"}>
               <Link href="/faq#livraison">
-                {language === "fr" ? "Livraison locale" : "Local delivery"}
+                {language === "fr" ? "Livraison à domicile" : "Home delivery"}
               </Link>
               <Link href="/faq#paiement">
                 {language === "fr" ? "Paiement sécurisé" : "Secure payment"}

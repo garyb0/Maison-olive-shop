@@ -1,5 +1,6 @@
+import { readFileSync } from "node:fs";
 import type { AnchorHTMLAttributes } from "react";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { CartClient } from "@/app/cart/cart-client";
 import { CheckoutClient } from "@/app/checkout/checkout-client";
 import { ProductAddToCartButton } from "@/app/products/[slug]/product-add-to-cart-button";
@@ -26,6 +27,12 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("@/components/Navigation", () => ({
   Navigation: () => null,
+}));
+
+vi.mock("@/components/MobileAppChrome", () => ({
+  MobileAppChrome: ({ className }: { className?: string }) => (
+    <div className={className} data-testid="mobile-app-clone-chrome" />
+  ),
 }));
 
 vi.mock("@/app/app/pwa-app-header", () => ({
@@ -102,6 +109,88 @@ describe("public cart and checkout flow", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    cleanup();
+  });
+
+  it("verrouille les cartes boutique mobile en mode app compact", () => {
+    const css = readFileSync("src/app/globals.css", "utf8");
+
+    expect(css).toContain("@media (max-width: 760px)");
+    expect(css).toContain("body:has(.app-shell--shop .catalog-section)");
+    expect(css).toMatch(/\.mobile-app-clone-shell > \.mobile-app-clone-chrome\s*\{\s*display: block;\s*\}/);
+    expect(css).toMatch(/\.mobile-app-clone-shell > \.topbar\s*\{\s*display: none;\s*\}/);
+    expect(css).toMatch(
+      /\.is-capacitor-native\.has-native-client-chrome \.mobile-app-clone-shell > \.mobile-app-clone-chrome\s*\{\s*display: none !important;\s*\}/,
+    );
+    expect(css).toMatch(/\.app-shell--shop \.catalog-side-panel\s*\{\s*display: none;\s*\}/);
+    expect(css).toContain(".app-shell--shop .catalog-product-card {");
+    expect(css).toContain("grid-template-columns: 104px minmax(0, 1fr)");
+    expect(css).toContain('"media meta"');
+    expect(css).toContain('"media footer"');
+    expect(css).toContain("height: 104px");
+    expect(css).toContain("object-fit: contain");
+    expect(css).toMatch(
+      /\.app-shell--shop \.catalog-product-card \.catalog-product-description,\s*\.app-shell--shop \.catalog-product-card \.catalog-product-benefits\s*\{\s*display: none;\s*\}/,
+    );
+    expect(css).toMatch(/\.app-shell--shop \.catalog-product-card \.catalog-product-qty\s*\{\s*display: none;\s*\}/);
+    expect(css).toMatch(/\.app-shell--shop \.catalog-product-card \.catalog-product-secondary-actions\s*\{\s*display: none;\s*\}/);
+    expect(css).toMatch(/\.app-shell--shop \.catalog-cat-pill\s*\{[\s\S]*?min-height: 44px;/);
+    expect(css).toMatch(/\.app-shell--shop \.catalog-product-card \.catalog-product-add\s*\{[\s\S]*?min-height: 44px;/);
+    expect(css).toMatch(/\.olive-product-visual\s*\{[\s\S]*?height: min\(12\.5rem, 48vw\);/);
+    expect(css).toMatch(/\.olive-variant-preview\s*\{\s*display: none;\s*\}/);
+    expect(css).toMatch(/\.olive-product-secondary-actions\s*\{\s*display: none;\s*\}/);
+    expect(css).toMatch(/\.olive-product-purchase-links\s*\{\s*display: none;\s*\}/);
+    expect(css).toMatch(
+      /\.is-capacitor-native\.has-native-client-chrome \.app-shell--shop \.grid-products,\s*\.is-capacitor-native\.has-native-client-chrome \.catalog-products-panel \.grid-products\s*\{\s*grid-template-columns: 1fr;/,
+    );
+    expect(css).toMatch(
+      /\.is-capacitor-native\.has-native-client-chrome \.app-shell--shop \.catalog-side-panel\s*\{\s*display: none;\s*\}/,
+    );
+    expect(css).toMatch(/body:has\(\.app-shell--shop \.catalog-section\) \.support-lite-float\s*\{/);
+  });
+
+  it("monte le chrome app mobile sur boutique, panier et checkout", () => {
+    render(
+      <StorefrontClient
+        surface="shop"
+        language="fr"
+        t={getDictionary("fr")}
+        user={null}
+        products={[]}
+      />,
+    );
+    expect(screen.getByTestId("mobile-app-clone-chrome")).toBeInTheDocument();
+    cleanup();
+
+    render(
+      <CartClient
+        language="fr"
+        t={getDictionary("fr")}
+        user={null}
+        productIndex={productIndex}
+        shippingFlatCents={899}
+        shippingFreeThresholdCents={9900}
+      />,
+    );
+    expect(screen.getByTestId("mobile-app-clone-chrome")).toHaveClass("cart-mobile-chrome");
+    cleanup();
+
+    render(
+      <CheckoutClient
+        language="fr"
+        t={getDictionary("fr")}
+        user={null}
+        productIndex={productIndex}
+        initialDeliveryAddresses={[]}
+        shippingFlatCents={899}
+        shippingFreeThresholdCents={9900}
+        initialConfirmation={null}
+        initialPaymentMode="stripe"
+        initialStripeNotice={null}
+        googleOAuthEnabled={false}
+      />,
+    );
+    expect(screen.getByTestId("mobile-app-clone-chrome")).toHaveClass("checkout-mobile-chrome");
   });
 
   it("calcule le badge abonnement seulement quand un prix recurrent est disponible", () => {
@@ -189,13 +278,21 @@ describe("public cart and checkout flow", () => {
     expect(screen.getByRole("heading", { level: 1, name: "Catalogue" })).toBeInTheDocument();
     await waitFor(() => expect(trackConversionEventMock).toHaveBeenCalledWith("SHOP_VIEW", { language: "fr" }));
     expect(document.querySelector(".catalog-section--spotlight")).toBeInTheDocument();
-    expect(screen.getAllByText("Livraison Rimouski").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Livraison à domicile").length).toBeGreaterThan(0);
     expect(screen.queryByLabelText("Note cinq etoiles")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Indisponible" })).toBeDisabled();
     expect(screen.getAllByRole("button", { name: "Partager" })).toHaveLength(2);
     expect(screen.getAllByText("Abonnement")).toHaveLength(1);
+    const mediaBadges = Array.from(document.querySelectorAll(".catalog-product-media .catalog-product-category"));
+    const mediaBadgeTexts = mediaBadges.map((badge) => badge.textContent?.trim());
+    expect(mediaBadgeTexts).not.toContain("Literie");
+    expect(mediaBadgeTexts).not.toContain("Accessoires");
+    expect(mediaBadges[0]).toHaveAccessibleName("Literie");
 
-    fireEvent.click(screen.getAllByRole("button", { name: "Ajouter au panier" })[0]);
+    expect(screen.queryByText("Voir les couleurs")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Ajouter au panier" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Ajout rapide" })[0]);
 
     await waitFor(() => {
       expect(window.localStorage.getItem("chezolive_cart_v1")).toBe(
@@ -260,7 +357,8 @@ describe("public cart and checkout flow", () => {
     expect(document.querySelector(".catalog-side-panel")).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 2, name: "Disponible maintenant" })).toBeInTheDocument();
     expect(screen.getByText("Lit pour chien douillet")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Choisir la couleur" })).toHaveAttribute("href", "/products/lit-chien-tres-grand-37x30");
+    expect(screen.queryByText("Voir les couleurs")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Voir le produit" })).toHaveAttribute("href", "/products/lit-chien-tres-grand-37x30");
   });
 
   it("garde le layout catalogue complet quand plusieurs produits sont visibles", () => {
@@ -315,6 +413,8 @@ describe("public cart and checkout flow", () => {
     );
 
     expect(document.querySelector(".catalog-section--spotlight")).not.toBeInTheDocument();
+    expect(document.querySelector(".catalog-product-card")).toBeInTheDocument();
+    expect(document.querySelector(".catalog-product-card--spotlight")).not.toBeInTheDocument();
     expect(document.querySelector(".catalog-side-panel")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Tout le catalogue" })).toBeInTheDocument();
   });
@@ -415,6 +515,29 @@ describe("public cart and checkout flow", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("ne montre aucun texte ou lien QR sur l'accueil connecte", () => {
+    const { container } = render(
+      <StorefrontClient
+        surface="home"
+        language="fr"
+        t={getDictionary("fr")}
+        user={{
+          id: "user_1",
+          email: "client@chezolive.ca",
+          firstName: "Gary",
+          lastName: "Olive",
+          role: "CUSTOMER",
+          language: "fr",
+        }}
+        products={[]}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "Bienvenue Gary" })).toBeInTheDocument();
+    expect(container.querySelector('a[href="/account/dogs"]')).toBeNull();
+    expect(container.textContent).not.toMatch(/QR|Chiens QR|collier QR|profil QR/i);
+  });
+
   it("ouvre un mini-guide abonnement pour les invites", async () => {
     render(<ProductSubscriptionInlineClient product={subscriptionProduct} language="fr" isAuthenticated={false} />);
 
@@ -484,11 +607,11 @@ describe("public cart and checkout flow", () => {
     expect(screen.getAllByRole("link", { name: "Passer à la caisse" })).toHaveLength(1);
     expect(screen.getByText("Visa, Mastercard; paiement local avec compte")).toBeInTheDocument();
     expect(screen.getByText("Ensuite au checkout")).toBeInTheDocument();
-    expect(screen.getByText("Adresse locale")).toBeInTheDocument();
+    expect(screen.getByText("Adresse de livraison")).toBeInTheDocument();
     expect(screen.getByText("Créneau de livraison")).toBeInTheDocument();
     expect(screen.getByText("Besoin d'aide avant de payer?")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Voir l'aide commande" })).toHaveAttribute("href", "/faq#commandes");
-    expect(screen.getByRole("link", { name: "Livraison locale" })).toHaveAttribute("href", "/faq#livraison");
+    expect(screen.getByRole("link", { name: "Livraison à domicile" })).toHaveAttribute("href", "/faq#livraison");
     expect(screen.getByRole("link", { name: "Paiement" })).toHaveAttribute("href", "/faq#paiement");
   });
 
@@ -859,7 +982,7 @@ describe("public cart and checkout flow", () => {
       expect.objectContaining({ paymentMethod: "STRIPE", language: "fr" }),
     );
     expect(screen.getByText("Commande en invité")).toBeInTheDocument();
-    expect(screen.getByText("Livraison locale (Rimouski) — paiement par carte en invité; paiement local avec compte.")).toBeInTheDocument();
+    expect(screen.getByText("Livraison à domicile (Rimouski) — paiement par carte en invité; paiement local avec compte.")).toBeInTheDocument();
     expect(screen.getByText("En invité, seul le paiement par carte est disponible. Ton paiement est confirmé immédiatement et ton courriel sert au reçu.")).toBeInTheDocument();
 
     const mobileSummary = screen.getByLabelText("Résumé mobile du checkout");
@@ -884,6 +1007,51 @@ describe("public cart and checkout flow", () => {
     expect(manualPayment).toBeDisabled();
     expect(stripePayment).not.toBeNull();
     expect(stripePayment).toBeChecked();
+  });
+
+  it("affiche un message clair quand aucun creneau de livraison n'est disponible", async () => {
+    fetchMock.mockImplementation(async (url: RequestInfo | URL) => {
+      const requestUrl = String(url);
+      if (requestUrl.startsWith("/api/delivery/slots")) {
+        return {
+          ok: true,
+          json: async () => ({ mode: "dynamic", activeDriverCount: 0, slots: [] }),
+        };
+      }
+
+      return {
+        ok: true,
+        json: async () => ({ quote }),
+      };
+    });
+
+    window.localStorage.setItem("chezolive_cart_v1", JSON.stringify([{ productId: "prod_cart", quantity: 1 }]));
+
+    render(
+      <CheckoutClient
+        language="fr"
+        t={getDictionary("fr")}
+        user={null}
+        productIndex={productIndex}
+        initialDeliveryAddresses={[]}
+        shippingFlatCents={899}
+        shippingFreeThresholdCents={7500}
+        initialConfirmation={null}
+        initialPaymentMode="stripe"
+        initialStripeNotice={null}
+      />,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("Ex. G5L1A1"), { target: { value: "G5L1A1" } });
+
+    await waitFor(() => {
+      expect(fetchMock.mock.calls.some(([url]) => String(url).startsWith("/api/delivery/slots"))).toBe(true);
+    });
+
+    const emptyDeliveryMessage = await screen.findByText(/Aucune période n'est disponible/i);
+    expect(emptyDeliveryMessage.closest(".checkout-delivery-empty")).not.toBeNull();
+    expect(screen.getByText(/notre équipe t'appellera/i)).toBeInTheDocument();
+    expect(screen.getByText(/Ajoute ton numéro de téléphone/i)).toBeInTheDocument();
   });
 
   it("bloque le checkout si le panier contient un article en rupture", async () => {

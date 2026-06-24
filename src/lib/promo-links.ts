@@ -1,7 +1,6 @@
 const PUBLIC_PROMO_ROUTE_PATTERNS = [
   /^\/$/,
   /^\/account$/,
-  /^\/account\/dogs$/,
   /^\/account\/orders$/,
   /^\/account\/orders\/[^/]+$/,
   /^\/account\/profile$/,

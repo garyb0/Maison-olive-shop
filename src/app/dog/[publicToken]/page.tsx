@@ -126,11 +126,6 @@ export default async function DogPublicPage({ params }: DogPageProps) {
                 ? "Les informations publiques de ce chien ne sont pas disponibles pour le moment."
                 : "This dog's public information is not available right now."}
             </p>
-            {isOwner ? (
-              <Link className="btn mt-6" href="/account/dogs">
-                {language === "fr" ? "Gérer mes chiens" : "Manage my dogs"}
-              </Link>
-            ) : null}
           </section>
         </div>
         <Link
@@ -265,11 +260,6 @@ export default async function DogPublicPage({ params }: DogPageProps) {
                     : "The details shown here are intentionally limited to protect the dog and their family's privacy."}
                 </p>
 
-                {isOwner ? (
-                  <Link className="btn btn-secondary" href="/account/dogs">
-                    {language === "fr" ? "Gérer cette fiche dans mon compte" : "Manage this profile in my account"}
-                  </Link>
-                ) : null}
               </div>
             </div>
           </div>

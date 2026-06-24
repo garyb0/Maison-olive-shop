@@ -31,7 +31,7 @@ const FALLBACK_BANNERS: PromoBannerData[] = [
     isActive: true,
     sortOrder: 0,
     badge: "Rimouski et environs",
-    title: "Livraison locale simple pour les essentiels de ton chien",
+    title: "Livraison à domicile simple pour les essentiels de ton chien",
     price1: "Gratuite dès 75 $ CAD",
     price2: "Commande facile, sans surprise",
     point1: "Zone locale desservie",

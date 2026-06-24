@@ -22,6 +22,7 @@ vi.mock("@/lib/permissions", () => ({
 }));
 
 vi.mock("@/lib/app-notifications", () => ({
+  CLIENT_HIDDEN_NOTIFICATION_TYPES: ["DOG_QR_UPDATE"],
   createAppNotification: (...args: unknown[]) => createAppNotificationMock(...args),
   getAppNotificationPreferences: (...args: unknown[]) => getAppNotificationPreferencesMock(...args),
   isWebPushConfigured: (...args: unknown[]) => isWebPushConfiguredMock(...args),
@@ -176,6 +177,19 @@ describe("notification and push routes", () => {
     expect(response.status).toBe(200);
     expect(payload.unreadCount).toBe(0);
     expect(markAppNotificationsReadMock).toHaveBeenCalledWith(user, { all: true, read: true });
+  });
+
+  it("liste les notifications client sans les alertes QR", async () => {
+    const { GET } = await import("@/app/api/notifications/route");
+
+    const response = await GET(new Request("http://localhost:3101/api/notifications?take=8"));
+    const payload = (await response.json()) as { unreadCount?: number };
+
+    expect(response.status).toBe(200);
+    expect(payload.unreadCount).toBe(1);
+    expect(listAppNotificationsForUserMock).toHaveBeenCalledWith(user, 8, {
+      excludeTypes: ["DOG_QR_UPDATE"],
+    });
   });
 
   it("cree une notification test protegee pour l'utilisateur courant", async () => {

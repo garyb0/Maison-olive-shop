@@ -49,7 +49,7 @@ export function CartResumeBanner({ language }: Props) {
         <strong>{language === "fr" ? "Panier en cours" : "Cart in progress"}</strong>
         <p>
           {language === "fr"
-            ? `${count} article${count > 1 ? "s" : ""} à vérifier avant le checkout.`
+            ? `${count} article${count > 1 ? "s" : ""} à vérifier avant de commander.`
             : `${count} item${count > 1 ? "s" : ""} to review before checkout.`}
         </p>
       </div>

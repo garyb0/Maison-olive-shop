@@ -52,6 +52,11 @@ describe("Native app chrome", () => {
       "/account/support",
       "/account",
     ]);
+    links.forEach((link) => {
+      expect(link.querySelector("svg")).not.toBeNull();
+    });
+    const ordersLink = within(nav).getByRole("link", { name: "Commandes" });
+    expect(ordersLink.querySelector("svg")).not.toBeNull();
     expect(within(nav).queryByRole("link", { name: /Admin/ })).not.toBeInTheDocument();
   });
 
@@ -88,7 +93,6 @@ describe("Native app chrome", () => {
     ["/account/orders", "Commandes"],
     ["/account/orders/MO-20260505-9337", "Commandes"],
     ["/account/support", "Support"],
-    ["/account/dogs", "Compte"],
     ["/account/profile", "Compte"],
     ["/account/subscriptions", "Compte"],
   ])("marks only %s active in the native bottom nav", async (pathname, expectedLabel) => {
@@ -103,6 +107,21 @@ describe("Native app chrome", () => {
       .map((link) => link.textContent?.trim());
 
     expect(activeLabels).toEqual([expectedLabel]);
+  });
+
+  it("does not treat the hidden dog QR client page as an active account tab", async () => {
+    pathnameMock.mockReturnValue("/account/dogs");
+
+    render(<NativeAppChromeClient language="fr" userRole="ADMIN" />);
+
+    const nav = await screen.findByRole("navigation", { name: "Navigation application" });
+    const activeLabels = within(nav)
+      .getAllByRole("link")
+      .filter((link) => link.classList.contains("active"))
+      .map((link) => link.textContent?.trim());
+
+    expect(activeLabels).toEqual([]);
+    expect(within(nav).queryByRole("link", { name: /QR|Chiens/ })).not.toBeInTheDocument();
   });
 
   it("does not mount client chrome on admin, driver, or dog surfaces", () => {
