@@ -3,6 +3,8 @@ import { pathToFileURL } from "node:url";
 export const REQUIRED_CONFIRMATION_1 = "GARY_CONFIRM_SCOPE";
 export const REQUIRED_CONFIRMATION_2 = "GARY_CONFIRM_EXECUTE";
 const MIN_REASON_LENGTH = 8;
+const TRUSTED_CI_REPOSITORY = "garyb0/Maison-olive-shop";
+const TRUSTED_CI_WORKFLOW = "CI";
 
 const protectedCommands = new Set([
   "check",
@@ -29,6 +31,15 @@ export function hasDoubleConfirmation(env: NodeJS.ProcessEnv) {
 
 export function hasUnlockReason(env: NodeJS.ProcessEnv) {
   return (env.CHEZ_OLIVE_UNLOCK_REASON ?? "").trim().length >= MIN_REASON_LENGTH;
+}
+
+export function isTrustedGithubActionsBuild(env: NodeJS.ProcessEnv) {
+  return (
+    env.GITHUB_ACTIONS === "true" &&
+    env.CI === "true" &&
+    env.GITHUB_WORKFLOW === TRUSTED_CI_WORKFLOW &&
+    env.GITHUB_REPOSITORY === TRUSTED_CI_REPOSITORY
+  );
 }
 
 function statusLines() {
@@ -65,6 +76,18 @@ export function evaluateProjectLock(command: string, env: NodeJS.ProcessEnv = pr
 
   if (!protectedCommands.has(command)) {
     return { exitCode: 1, stdout: [], stderr: blockedLines(command) };
+  }
+
+  if (command === "build" && isTrustedGithubActionsBuild(env)) {
+    return {
+      exitCode: 0,
+      stdout: [
+        "Project lock: GitHub Actions CI build validation allowed.",
+        `Repository: ${env.GITHUB_REPOSITORY}`,
+        `Workflow: ${env.GITHUB_WORKFLOW}`,
+      ],
+      stderr: [],
+    };
   }
 
   if (!hasDoubleConfirmation(env) || !hasUnlockReason(env)) {

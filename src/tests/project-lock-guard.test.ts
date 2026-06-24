@@ -2,6 +2,13 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { evaluateProjectLock } from "../../scripts/project-lock-guard";
 
+const trustedGithubActionsEnv = {
+  GITHUB_ACTIONS: "true",
+  CI: "true",
+  GITHUB_WORKFLOW: "CI",
+  GITHUB_REPOSITORY: "garyb0/Maison-olive-shop",
+};
+
 describe("project lock guard", () => {
   it("reports the lock status", () => {
     const result = evaluateProjectLock("status", {});
@@ -26,6 +33,30 @@ describe("project lock guard", () => {
 
     expect(result.exitCode).toBe(0);
     expect(result.stdout.join("\n")).toContain("double confirmation received");
+  });
+
+  it("allows build validation only in the trusted GitHub Actions CI", () => {
+    const result = evaluateProjectLock("build", trustedGithubActionsEnv);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout.join("\n")).toContain("GitHub Actions CI build validation allowed");
+  });
+
+  it("does not allow deployment commands from GitHub Actions CI", () => {
+    const result = evaluateProjectLock("deploy", trustedGithubActionsEnv);
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain("PROJECT LOCK ACTIVE");
+  });
+
+  it("does not allow CI build validation from an untrusted repository", () => {
+    const result = evaluateProjectLock("build", {
+      ...trustedGithubActionsEnv,
+      GITHUB_REPOSITORY: "someone/fork",
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain("PROJECT LOCK ACTIVE");
   });
 
   it("guards the npm scripts that can change production or the native app", () => {
