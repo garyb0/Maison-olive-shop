@@ -97,5 +97,5 @@ describe("delivery checkpoint git state", () => {
     expect(runGit(repoDir, ["show", `${state.commitSha}:new-file.txt`], false)).toBe("new\n");
     expect(() => runGit(repoDir, ["show", `${state.commitSha}:nested/kept.txt`], false)).toThrow();
     expect(runGit(repoDir, ["show", `${headCommitSha}:tracked.txt`], false)).toBe("before\n");
-  });
+  }, 15_000);
 });

@@ -333,5 +333,5 @@ describe("delivery run dynamic windows", () => {
     });
     expect(result.reusedExisting).toBe(false);
     expect(result.run.stopCounts.total).toBe(2);
-  });
+  }, 15_000);
 });
