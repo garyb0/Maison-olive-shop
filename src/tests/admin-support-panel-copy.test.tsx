@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { AdminSupportPanel } from "@/components/AdminSupportPanel";
 
 const longTicketMessage =
@@ -63,10 +63,12 @@ describe("AdminSupportPanel French copy", () => {
 
     expect(await screen.findByText("Client Actif")).toBeInTheDocument();
 
-    const detailScroll = container.querySelector(".support-admin-detail-scroll");
-    expect(detailScroll?.firstElementChild).toHaveClass("support-admin-messages");
+    await waitFor(() => {
+      const detailScroll = container.querySelector(".support-admin-detail-scroll");
+      expect(detailScroll?.firstElementChild).toHaveClass("support-admin-messages");
+    });
 
-    const messageBubble = container.querySelector(".support-admin-messages .support-msg-bubble");
+    const messageBubble = await screen.findByText(longTicketMessage);
     expect(messageBubble).toHaveTextContent(longTicketMessage);
     expect(messageBubble).toHaveClass("support-msg-bubble");
   });
