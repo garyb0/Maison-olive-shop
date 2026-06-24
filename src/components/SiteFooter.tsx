@@ -34,8 +34,8 @@ export function SiteFooter() {
         : "Monday to Friday, 9am to 5pm (Montreal time)",
     shippingPolicy:
       language === "fr"
-        ? "Livraison locale à Rimouski et environs. Les frais et le seuil gratuit sont confirmés au panier et au passage à la caisse."
-        : "Local delivery in Rimouski and nearby areas. Fees and the free-delivery threshold are confirmed in cart and checkout.",
+        ? "Livraison à domicile à Rimouski et environs. Les frais et le seuil gratuit sont confirmés au panier et au passage à la caisse."
+        : "Home delivery in Rimouski and nearby areas. Fees and the free-delivery threshold are confirmed in cart and checkout.",
   };
 
   if (pathname.startsWith("/admin")) {
@@ -61,8 +61,8 @@ export function SiteFooter() {
             </h2>
             <p className="site-footer__text">
               {language === "fr"
-                ? "Des produits choisis avec soin, une livraison locale claire et un suivi humain pour prendre soin de vos compagnons."
-                : "Carefully chosen products, clear local delivery, and human follow-up to care for your companions."}
+                ? "Une boutique animalière locale, des produits choisis avec soin et la livraison à domicile à Rimouski."
+                : "A local pet boutique with carefully chosen products and home delivery in Rimouski."}
             </p>
           </div>
 

@@ -22493,3 +22493,45 @@ body:has(.account-access-card) .support-lite-window {
     box-shadow: 0 10px 30px rgba(45, 38, 27, 0.055);
   }
 }
+
+@media (min-width: 761px) {
+  .site-footer__links,
+  .site-footer__meta {
+    gap: 0;
+  }
+
+  .site-footer__links a,
+  .site-footer__meta > * {
+    position: relative;
+    display: block;
+    width: 100%;
+  }
+
+  .site-footer__links a + a,
+  .site-footer__meta > * + * {
+    padding-top: 0.48rem;
+  }
+
+  .site-footer__links a:not(:last-child),
+  .site-footer__meta > *:not(:last-child) {
+    padding-bottom: 0.48rem;
+  }
+
+  .site-footer__links a + a::before,
+  .site-footer__meta > * + *::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0.35rem;
+    left: 0.35rem;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(84, 93, 46, 0.08) 14%,
+      rgba(84, 93, 46, 0.14) 50%,
+      rgba(84, 93, 46, 0.08) 86%,
+      transparent 100%
+    );
+  }
+}
